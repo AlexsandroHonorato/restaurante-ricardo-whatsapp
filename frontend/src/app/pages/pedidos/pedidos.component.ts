@@ -136,10 +136,20 @@ import { Pedido } from '../../core/models/dashboard.model';
                   </button>
                 }
                 @if (pedido.status === 'em_preparo') {
-                  <button class="btn btn-warning btn-sm full dispatch-btn" (click)="despacharParaEntrega(pedido)">
-                    🛵 Despachar (Notificar Cliente)
+                  <button
+                    class="btn btn-warning btn-sm full dispatch-btn"
+                    [disabled]="despachandoIds()[pedido.id]"
+                    (click)="despacharParaEntrega(pedido)"
+                  >
+                    @if (despachandoIds()[pedido.id]) {
+                      ⏳ Despachando & Notificando...
+                    } @else {
+                      🛵 Despachar (Notificar Cliente)
+                    }
                   </button>
                 }
+
+
                 @if (pedido.status === 'saiu_para_entrega') {
                   <button class="btn btn-success btn-sm full" (click)="alterarStatus(pedido, 'entregue')">
                     ✅ Confirmar Entrega
@@ -231,10 +241,20 @@ import { Pedido } from '../../core/models/dashboard.model';
                         </button>
                       }
                       @if (pedido.status === 'em_preparo') {
-                        <button class="btn btn-warning btn-xs" (click)="despacharParaEntrega(pedido)">
-                          🛵 Despachar
+                        <button
+                          class="btn btn-warning btn-xs"
+                          [disabled]="despachandoIds()[pedido.id]"
+                          (click)="despacharParaEntrega(pedido)"
+                        >
+                          @if (despachandoIds()[pedido.id]) {
+                            ⏳ Despachando...
+                          } @else {
+                            🛵 Despachar
+                          }
                         </button>
                       }
+
+
                       @if (pedido.status === 'saiu_para_entrega') {
                         <button class="btn btn-success btn-xs" (click)="alterarStatus(pedido, 'entregue')">
                           ✅ Entregue
@@ -746,6 +766,7 @@ export class PedidosComponent implements OnInit {
   modoVisao = signal<'cards' | 'lista'>('cards');
   termoBusca: string = '';
   toastMensagem = signal<string | null>(null);
+  despachandoIds = signal<Record<number, boolean>>({});
 
   ngOnInit() {
     this.carregarPedidos();
@@ -778,18 +799,47 @@ export class PedidosComponent implements OnInit {
   }
 
   despacharParaEntrega(pedido: Pedido) {
-    this.api.updatePedidoStatus(pedido.id, 'saiu_para_entrega').subscribe(() => {
-      this.carregarPedidos();
-      this.api.getKpis().subscribe();
+    // Trava de Idempotência: Bloqueia se já estiver processando ou se já estiver em rota
+    if (this.despachandoIds()[pedido.id] || pedido.status === 'saiu_para_entrega') {
+      return;
+    }
 
-      const mensagemNotificacao = `Mensagem enviada para ${pedido.cliente?.nome || 'o cliente'} (${pedido.cliente?.telefone}): "🛵💨 Temos uma ótima notícia! O seu pedido ${pedido.codigo_pedido} acabou de sair para entrega e está a caminho!"`;
-      this.toastMensagem.set(mensagemNotificacao);
+    // Ativa estado de carregamento do botão imediatamente
+    this.despachandoIds.update((m) => ({ ...m, [pedido.id]: true }));
 
-      setTimeout(() => {
-        this.toastMensagem.set(null);
-      }, 6000);
+    this.api.updatePedidoStatus(pedido.id, 'saiu_para_entrega').subscribe({
+      next: () => {
+        this.carregarPedidos();
+        this.api.getKpis().subscribe();
+
+        const mensagemNotificacao = `Mensagem enviada para ${pedido.cliente?.nome || 'o cliente'} (${pedido.cliente?.telefone}): "🛵💨 Temos uma ótima notícia! O seu pedido ${pedido.codigo_pedido} acabou de sair para entrega e está a caminho!"`;
+        this.toastMensagem.set(mensagemNotificacao);
+
+        setTimeout(() => {
+          this.toastMensagem.set(null);
+        }, 6000);
+      },
+      error: () => {
+        // Em caso de falha, libera o botão
+        this.despachandoIds.update((m) => {
+          const copy = { ...m };
+          delete copy[pedido.id];
+          return copy;
+        });
+      },
+      complete: () => {
+        // Libera a trava após 1.5s
+        setTimeout(() => {
+          this.despachandoIds.update((m) => {
+            const copy = { ...m };
+            delete copy[pedido.id];
+            return copy;
+          });
+        }, 1500);
+      }
     });
   }
+
 
   formatStatus(status: string): string {
     const map: Record<string, string> = {

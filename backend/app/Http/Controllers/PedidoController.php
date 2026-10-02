@@ -92,21 +92,24 @@ class PedidoController extends Controller
             );
         }
 
-        // Dispara notificação automática para o WhatsApp do cliente se saiu para entrega
+        // Dispara notificação automática para o WhatsApp do cliente se saiu para entrega com idempotência
         $mensagemNotificacao = null;
         if ($statusNovo === 'saiu_para_entrega') {
             $mensagemNotificacao = "🛵💨 Temos uma ótima notícia! O seu pedido {$pedido->codigo_pedido} acabou de sair para entrega e está a caminho! Em breve nosso motoboy chegará ao seu endereço.";
-            if ($pedido->cliente && $pedido->cliente->telefone) {
+            // Só dispara se o status anterior ainda não era saiu_para_entrega
+            if ($statusAnterior !== 'saiu_para_entrega' && $pedido->cliente && $pedido->cliente->telefone) {
                 try {
                     \Illuminate\Support\Facades\Http::timeout(3)->post('http://127.0.0.1:3000/api/notificar', [
                         'para' => $pedido->cliente->telefone,
                         'texto' => $mensagemNotificacao,
+                        'idempotency_key' => "despacho_{$pedido->id}_{$pedido->codigo_pedido}",
                     ]);
                 } catch (\Throwable $e) {
                     // Tratamento resiliente se o serviço do webhook estiver ocupado
                 }
             }
         }
+
 
         return response()->json([
             'message' => 'Status atualizado com sucesso',

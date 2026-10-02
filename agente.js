@@ -59,6 +59,23 @@ async function tratar(msg) {
 
 }
 
+// ---------------------------------------------------------------- idempotência de notificações
+const notificacoesEnviadas = new Map(); // key -> timestamp (expira em 10 minutos)
+const LIMPAR_NOTIFICACOES_MS = 10 * 60 * 1000;
+
+function verificarIdempotencia(chave) {
+  const agora = Date.now();
+  // Limpeza periódica
+  for (const [k, exp] of notificacoesEnviadas.entries()) {
+    if (agora - exp > LIMPAR_NOTIFICACOES_MS) notificacoesEnviadas.delete(k);
+  }
+  if (notificacoesEnviadas.has(chave)) {
+    return false; // Já foi enviada recentemente (duplicada)
+  }
+  notificacoesEnviadas.set(chave, agora);
+  return true; // Primeira vez (permitida)
+}
+
 // ---------------------------------------------------------------- o servidor
 createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -96,18 +113,27 @@ createServer((req, res) => {
     return;
   }
 
-
-  // rota interna para envio de notificações automáticas pelo Dashboard/API
+  // rota interna para envio de notificações automáticas pelo Dashboard/API com idempotência
   if (req.method === 'POST' && url.pathname === '/api/notificar') {
     const partes = [];
     req.on('data', (p) => partes.push(p));
     req.on('end', async () => {
       try {
-        const { para, texto } = JSON.parse(Buffer.concat(partes).toString('utf8'));
+        const dados = JSON.parse(Buffer.concat(partes).toString('utf8'));
+        const { para, texto, idempotency_key } = dados;
         if (!para || !texto) {
           res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ erro: 'Informe "para" e "texto"' }));
           return;
         }
+
+        // Chave de idempotência (fornecida ou gerada a partir do destinatário + texto)
+        const chaveUnica = idempotency_key || `notif_${para}_${texto.substring(0, 30)}`;
+        if (!verificarIdempotencia(chaveUnica)) {
+          console.log(`🛡️ [IDEMPOTÊNCIA] Notificação duplicada bloqueada para ${para} (chave: ${chaveUnica})`);
+          res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, repetido: true, mensagem: 'Notificação já enviada anteriormente' }));
+          return;
+        }
+
         await enviarTexto(para, texto);
         console.log(`📢 [NOTIFICAÇÃO DISPARADA] WhatsApp: ${para}\nTexto: ${texto}\n`);
         res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, enviado: true, para }));
@@ -120,4 +146,5 @@ createServer((req, res) => {
 
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }).end('agente no ar');
 }).listen(PORTA, () => console.log(`✅ Agente Restaurante Família Ricardo ouvindo na porta ${PORTA}`));
+
 
