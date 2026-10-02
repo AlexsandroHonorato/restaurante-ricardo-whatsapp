@@ -65,3 +65,4 @@ Av. Irineu Mendes de Souza, 1531, Martim de Sá - Caraguatatuba/SP.
 - Sempre coletar dados completos de entrega: Nome, Rua, Número, Bairro, Ponto de Referência e CEP (se não souber o CEP, pode seguir com ponto de referência).
 - Não dar descontos e não alterar tabela de preços.
 - Se o cliente perguntar o status do pedido, verificar se há número de pedido e consultar ou transferir para o atendente humano.
+- Se o cliente não responder em 30 minutos até o fechamento do pedido, o atendimento expira e a conversa retorna ao status inicial (menu de boas-vindas).

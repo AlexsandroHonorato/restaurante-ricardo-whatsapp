@@ -6,25 +6,35 @@ import { registrarPedido, consultarStatusPedido } from './pedidos.js';
 const FUSO = process.env.FUSO || 'America/Sao_Paulo';
 const MODELO = process.env.MODELO || 'google/gemini-3.7-flash';
 const MAX_MENSAGENS = 20;            // quantas mensagens da conversa voltam para o modelo
-const EXPIRA_HORAS = 24;             // conversa parada há mais tempo que isso começa do zero
+const EXPIRA_MINUTOS_INATIVIDADE = 30; // se o cliente não responder em 30 min antes de fechar o pedido, volta ao status inicial
 const ARQ_MEMORIA = 'memoria.json';
 const FICHA = readFileSync(new URL('./negocio.md', import.meta.url), 'utf8');
 
 // ---------------------------------------------------------------- memória (por número de telefone)
-const memoria = existsSync(ARQ_MEMORIA) ? JSON.parse(readFileSync(ARQ_MEMORIA, 'utf8')) : {};
+export const memoria = existsSync(ARQ_MEMORIA) ? JSON.parse(readFileSync(ARQ_MEMORIA, 'utf8')) : {};
 let salvando = null;
 function salvarMemoria() {
   clearTimeout(salvando);
   salvando = setTimeout(() => writeFileSync(ARQ_MEMORIA, JSON.stringify(memoria)), 300);
 }
-function historico(tel) {
+export function historico(tel) {
   const c = memoria[tel];
-  if (!c || Date.now() - c.atualizado > EXPIRA_HORAS * 3600e3) return [];
+  if (!c) return [];
+  // Se o cliente não responder em 30 minutos antes do fechamento do pedido, zera a memória
+  if (Date.now() - c.atualizado > EXPIRA_MINUTOS_INATIVIDADE * 60 * 1000) {
+    delete memoria[tel];
+    salvarMemoria();
+    return [];
+  }
   return c.msgs;
 }
-function lembrar(tel, role, content) {
+export function limparMemoria(tel) {
+  delete memoria[tel];
+  salvarMemoria();
+}
+export function lembrar(tel, role, content, timestamp = Date.now()) {
   const msgs = [...historico(tel), { role, content }].slice(-MAX_MENSAGENS);
-  memoria[tel] = { msgs, atualizado: Date.now() };
+  memoria[tel] = { msgs, atualizado: timestamp };
   salvarMemoria();
 }
 
@@ -65,6 +75,8 @@ FLUXO DE ATENDIMENTO OBRIGATÓRIO:
 3. Se o cliente deseja SABER O STATUS DE UM PEDIDO:
    - Peça o número do pedido ou use o próprio telefone para consultar via ferramenta 'consultar_status_pedido'.
    - Se o cliente relatar atraso ou o pedido não for localizado, use 'chamar_atendente'.
+4. REGRA DE INATIVIDADE (30 MINUTOS):
+   - Se o cliente ficar mais de 30 minutos sem responder antes do fechamento do pedido, o atendimento expira e volta ao status inicial. Se o cliente mandar nova mensagem, receba-o cordialmente com a saudação inicial do cardápio/status.
 
 REGRAS RÍGIDAS:
 - NUNCA dê desconto, não altere os preços da ficha e não invente pratos fora do cardápio.
@@ -180,23 +192,38 @@ async function chamarModelo(messages) {
 export async function responder(tel, texto) {
   const messages = [{ role: 'system', content: promptDeSistema() }, ...historico(tel), { role: 'user', content: texto }];
   const passos = [];
-  let resposta = 'Desculpe, tive uma instabilidade no sistema. Já estou avisando nossa equipe para te atender.';
-  for (let i = 0; i < 6; i++) {
-    const msg = await chamarModelo(messages);
-    if (!msg.tool_calls?.length) {
-      resposta = (msg.content || '').trim() || resposta;
-      break;
+  let resposta = 'Olá! Tive uma breve instabilidade para consultar as opções. Nossa equipe humana já foi notificada para te responder por aqui! 🍽️';
+  
+  try {
+    for (let i = 0; i < 6; i++) {
+      const msg = await chamarModelo(messages);
+      if (!msg.tool_calls?.length) {
+        resposta = (msg.content || '').trim() || resposta;
+        break;
+      }
+      messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: msg.tool_calls });
+      for (const tc of msg.tool_calls) {
+        let args = {};
+        try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* argumento quebrado */ }
+        let saida;
+        try { saida = await executar(tel, tc.function.name, args); } catch (e) { saida = { erro: String(e.message || e) }; }
+        passos.push({ ferramenta: tc.function.name, args, saida });
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(saida) });
+      }
     }
-    messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: msg.tool_calls });
-    for (const tc of msg.tool_calls) {
-      let args = {};
-      try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* argumento quebrado */ }
-      let saida;
-      try { saida = await executar(tel, tc.function.name, args); } catch (e) { saida = { erro: String(e.message || e) }; }
-      passos.push({ ferramenta: tc.function.name, args, saida });
-      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(saida) });
+  } catch (err) {
+    const errStr = String(err?.message || err);
+    console.error(`⚠ [AVISO DE SERVIÇO - Tel: ${tel}]:`, errStr);
+
+    if (/402|budget_exhausted|credits|payment/i.test(errStr)) {
+      resposta = 'Olá! No momento nosso canal de atendimento automático está com alta demanda. ⏳\n\nNossa equipe já foi acionada e vai te atender aqui em instantes! Se preferir fazer seu pedido agora por ligação, ligue para (12) 99750-0045 ou (12) 98146-4976. 🍽️😊';
+    } else if (/429|rate_limit|too many requests/i.test(errStr)) {
+      resposta = 'Estou recebendo muitas mensagens simultâneas neste momento! ⏳ Já estou processando seu atendimento. Pode aguardar um instante ou falar conosco pelo telefone (12) 99750-0045.';
+    } else {
+      resposta = 'Desculpe, tive uma instabilidade momentânea na conexão. Nossa equipe humana já foi avisada para te dar suporte por aqui! Contato direto: (12) 99750-0045.';
     }
   }
+
   lembrar(tel, 'user', texto);
   lembrar(tel, 'assistant', resposta);
   appendFileSync('conversas.log', JSON.stringify({ quando: new Date().toISOString(), tel, texto, passos, resposta }) + '\n');

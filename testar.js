@@ -1,7 +1,7 @@
 // testar.js: Validação do fluxo do Restaurante Família Ricardo
 // Rode com:  npm run testar
 import { readFileSync, existsSync } from 'node:fs';
-import { responderNaFila, chaveOk } from './cerebro.js';
+import { responderNaFila, chaveOk, memoria } from './cerebro.js';
 
 if (!chaveOk()) {
   console.error('Preencha a OPENROUTER_API_KEY no arquivo .env (passo 3).');
@@ -80,6 +80,15 @@ const TESTES = [
     ],
     ok: (r) => /maior|inferior|não cobre|30/i.test(r),
   },
+  {
+    nome: '10. Inatividade de mais de 30 minutos reinicia conversa para o status inicial',
+    inativo: true,
+    msgs: [
+      'quero fazer um pedido de filé de frango',
+      'olá',
+    ],
+    ok: (r) => /pedido|status|card[aá]pio|olá|como posso/i.test(r),
+  },
 ];
 
 let aprovados = 0;
@@ -92,6 +101,18 @@ for (const t of TESTES) {
       const respostas = await Promise.all(t.duplo.map((m) => responderNaFila(tel, m)));
       t.duplo.forEach((m, i) => console.log(`  você › ${m}\n  agente › ${respostas[i]}`));
       ultima = respostas.at(-1);
+    } else if (t.inativo) {
+      // Mensagem inicial
+      const r1 = await responderNaFila(tel, t.msgs[0]);
+      console.log(`  você › ${t.msgs[0]}\n  agente › ${r1}`);
+      // Simula passagem de 31 minutos
+      if (memoria[tel]) {
+        memoria[tel].atualizado = Date.now() - 31 * 60 * 1000;
+      }
+      console.log(`  [Passaram-se 31 minutos de inatividade sem fechar o pedido...]`);
+      // Nova mensagem após timeout
+      ultima = await responderNaFila(tel, t.msgs[1]);
+      console.log(`  você › ${t.msgs[1]}\n  agente › ${ultima}`);
     } else {
       for (const m of t.msgs) {
         let tent = 0;

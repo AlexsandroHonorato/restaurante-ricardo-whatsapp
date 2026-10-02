@@ -25,7 +25,8 @@ Este projeto implementa um atendente virtual inteligente para o **Restaurante Fa
   - Validação criptográfica de webhooks via HMAC-SHA256 (`x-hub-signature-256`).
   - Deduplicação de mensagens recebidas.
   - Fila de atendimento por número de telefone para evitar condições de corrida (concorrência).
-  - Janela de memória de 24h e limite de mensagens contextuais.
+  - Janela de inatividade de 30 minutos: se o cliente parar de responder antes de fechar o pedido, a sessão expira e retorna ao menu inicial.
+  - Limite de mensagens contextuais dinâmicas.
 
 ---
 
@@ -66,6 +67,14 @@ graph TD
 ├── AGENTS.md            # Diretrizes globais para desenvolvimento com agentes
 ├── ANDAMENTO.md         # Memória contínua e contexto consolidado do projeto
 ├── LEIA-ME.md           # Resumo rápido de execução
+├── backend/             # API REST em Laravel (PHP 8.5) & MySQL
+│   ├── app/Http/Controllers/ # Dashboard, Pedidos, Clientes, Cardápio
+│   ├── database/migrations/ # Migrações do banco relacional
+│   └── routes/api.php   # Rotas da API
+├── frontend/            # Dashboard SPA em Angular 22 (Standalone / Signals)
+│   ├── src/app/pages/   # Dashboard, Pedidos, Clientes, Cardápio, Atendimentos
+│   └── src/app/core/    # ApiService e Modelos TypeScript
+├── database/            # Scripts SQL (Schema, Seeds, Views)
 ├── README.md            # Documentação completa do projeto
 ├── agenda.js            # Integração com agenda (ou agenda de demonstração)
 ├── agente.js            # Servidor HTTP / Webhook para Meta Cloud API
@@ -83,6 +92,8 @@ graph TD
 
 ### 1. Pré-requisitos
 - **Node.js** 20.6 ou superior instalado.
+- **PHP** 8.2 ou superior e **Composer** instalados.
+- **MySQL** 8.0 rodando na porta 3306.
 
 ### 2. Configurar Variáveis de Ambiente
 Copie o arquivo [.env.exemplo](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/.env.exemplo) para criar o seu `.env`:
@@ -95,27 +106,42 @@ Preencha as chaves no `.env`:
 - `OPENROUTER_API_KEY`: Chave da API OpenRouter (necessária para simulação e produção).
 - `MODELO`: Modelo de IA utilizado (Padrão: `google/gemini-3.7-flash`).
 - `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`: Credenciais do Meta for Developers (necessárias para execução em produção).
+- `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`: Credenciais do banco MySQL.
 
 ---
 
 ## 💻 Como Executar
 
-### 1. Simulação Interativa no Terminal
+### 1. Iniciar a API em Laravel (Backend)
+```bash
+npm run start:api
+# ou: cd backend && php artisan serve
+```
+A API estará disponível em: `http://127.0.0.1:8000/api`
+
+### 2. Iniciar o Dashboard em Angular (Frontend)
+```bash
+npm run start:front
+# ou: cd frontend && npm start
+```
+O Dashboard abrirá em: `http://localhost:4200`
+
+### 3. Iniciar o Robô no WhatsApp
+```bash
+npm run start:bot
+# ou: npm start
+```
+
+### 4. Simulação Interativa no Terminal
 Converse diretamente com o agente no console, sem necessidade de configurar o WhatsApp:
 ```bash
 npm run simular
 ```
 
-### 2. Bateria de Testes Automatizados
-Valida regras de negócio, cálculos de troco, ferramentas e segurança:
+### 5. Bateria de Testes Automatizados
+Valida regras de negócio, cálculos de troco, ferramentas e inatividade de 30 minutos:
 ```bash
 npm run testar
-```
-
-### 3. Servidor de Produção (Webhook WhatsApp)
-Inicia o servidor HTTP nativo na porta configurada (padrão: `3000`):
-```bash
-npm start
 ```
 
 ---
