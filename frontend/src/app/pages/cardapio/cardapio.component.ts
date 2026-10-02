@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { finalize } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { CategoriaCardapio, ProdutoCardapio } from '../../core/models/dashboard.model';
@@ -195,7 +196,7 @@ interface VariacaoForm {
                 <button type="button" class="btn btn-secondary" (click)="fecharModal()">
                   Cancelar
                 </button>
-                <button type="submit" class="btn btn-primary" [disabled]="!formValido()">
+                <button type="submit" class="btn btn-primary" [disabled]="!formValido() || salvando()">
                   {{ modoEdicao() ? 'Salvar Alterações' : 'Cadastrar Prato' }}
                 </button>
               </div>
@@ -625,6 +626,7 @@ export class CardapioComponent implements OnInit {
   cardapio = signal<CategoriaCardapio[]>([]);
   categorias = signal<any[]>([]);
 
+  salvando = signal(false);
   modalAberto = signal<boolean>(false);
   modoEdicao = signal<boolean>(false);
   editandoId: number | null = null;
@@ -697,33 +699,30 @@ export class CardapioComponent implements OnInit {
       this.formCategoriaId &&
       this.formNome.trim() &&
       this.formVariacoes.length > 0 &&
-      this.formVariacoes.every((v) => v.tamanho.trim() && v.preco >= 0)
+      this.formVariacoes.every((v) => v.tamanho.trim() && Number.isFinite(Number(v.preco)) && v.preco >= 0)
     );
   }
 
   salvarProduto() {
-    if (!this.formValido()) return;
-
+    if (!this.formValido() || this.salvando()) return;
+    this.salvando.set(true);
     const payload = {
       categoria_id: this.formCategoriaId,
       nome: this.formNome.trim(),
       descricao: this.formDescricao.trim(),
       variacoes: this.formVariacoes
     };
-
-    if (this.modoEdicao() && this.editandoId) {
-      this.api.atualizarProduto(this.editandoId, payload).subscribe(() => {
-        this.mostrarToast(`Prato "${this.formNome}" atualizado e disponível no WhatsApp!`);
+    const requisicao = this.modoEdicao() && this.editandoId
+      ? this.api.atualizarProduto(this.editandoId, payload)
+      : this.api.criarProduto(payload);
+    requisicao.pipe(finalize(() => this.salvando.set(false))).subscribe({
+      next: () => {
+        this.mostrarToast(`Prato "${this.formNome}" salvo no cardápio.`);
         this.fecharModal();
         this.carregarCardapio();
-      });
-    } else {
-      this.api.criarProduto(payload).subscribe(() => {
-        this.mostrarToast(`Prato "${this.formNome}" cadastrado e ativo no WhatsApp!`);
-        this.fecharModal();
-        this.carregarCardapio();
-      });
-    }
+      },
+      error: () => this.mostrarToast('Não foi possível salvar o produto. Verifique os campos e tente novamente.')
+    });
   }
 
   toggleProduto(prod: ProdutoCardapio) {

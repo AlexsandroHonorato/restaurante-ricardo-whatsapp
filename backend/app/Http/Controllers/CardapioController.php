@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Categoria;
 use App\Models\Produto;
 use App\Models\ProdutoVariacao;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CardapioController extends Controller
@@ -25,8 +25,8 @@ class CardapioController extends Controller
                 }
             }]);
         }])
-        ->where('ativo', true)
-        ->orderBy('ordem_exibicao', 'ASC');
+            ->where('ativo', true)
+            ->orderBy('ordem_exibicao', 'ASC');
 
         return response()->json($query->get());
     }
@@ -49,15 +49,17 @@ class CardapioController extends Controller
                 $qv->where('ativo', true);
             }]);
         }])
-        ->where('ativo', true)
-        ->orderBy('ordem_exibicao', 'ASC')
-        ->get();
+            ->where('ativo', true)
+            ->orderBy('ordem_exibicao', 'ASC')
+            ->get();
 
         $linhas = [];
         foreach ($categorias as $cat) {
-            if ($cat->produtos->isEmpty()) continue;
+            if ($cat->produtos->isEmpty()) {
+                continue;
+            }
 
-            $linhas[] = "\n### " . mb_strtoupper($cat->nome, 'UTF-8');
+            $linhas[] = "\n### ".mb_strtoupper($cat->nome, 'UTF-8');
             if ($cat->descricao) {
                 $linhas[] = "_{$cat->descricao}_";
             }
@@ -65,16 +67,18 @@ class CardapioController extends Controller
             foreach ($cat->produtos as $prod) {
                 $variacoesStr = [];
                 foreach ($prod->variacoes as $v) {
-                    $precoFmt = 'R$ ' . number_format((float) $v->preco, 2, ',', '.');
+                    $precoFmt = 'R$ '.number_format((float) $v->preco, 2, ',', '.');
                     $variacoesStr[] = "{$v->tamanho}: {$precoFmt}";
                 }
-                $varTexto = !empty($variacoesStr) ? implode(' | ', $variacoesStr) : 'Preço sob consulta';
+                $varTexto = ! empty($variacoesStr) ? implode(' | ', $variacoesStr) : 'Preço sob consulta';
+                $diasTexto = $prod->dias_disponiveis && $prod->dias_disponiveis !== 'todos' ? " [Disponível: {$prod->dias_disponiveis}]" : '';
                 $descTexto = $prod->descricao ? " ({$prod->descricao})" : '';
-                $linhas[] = "• **{$prod->nome}**{$descTexto} — {$varTexto}";
+                $linhas[] = "• **{$prod->nome}**{$descTexto}{$diasTexto} — {$varTexto}";
             }
         }
 
         $textoCompleto = implode("\n", $linhas);
+
         return response()->json([
             'ok' => true,
             'cardapio_texto' => $textoCompleto,
@@ -96,18 +100,25 @@ class CardapioController extends Controller
             'ativo' => 'nullable|boolean',
             'variacoes' => 'required|array|min:1',
             'variacoes.*.tamanho' => 'required|string|max:50',
-            'variacoes.*.preco' => 'required|numeric|min:0',
+            'variacoes.*.preco' => 'required|numeric|min:0|max:99999999.99',
+            'variacoes.*.ativo' => 'sometimes|boolean',
         ]);
 
         return DB::transaction(function () use ($request) {
             $categoria = Categoria::find($request->categoria_id);
             $tipoPadrao = 'prato_executivo';
             if ($categoria) {
-                if (str_contains($categoria->slug, 'bebida')) $tipoPadrao = 'bebida';
-                elseif (str_contains($categoria->slug, 'cerveja')) $tipoPadrao = 'cerveja';
-                elseif (str_contains($categoria->slug, 'porcao') || str_contains($categoria->slug, 'porcoe')) $tipoPadrao = 'porcao';
-                elseif (str_contains($categoria->slug, 'adicional')) $tipoPadrao = 'adicional';
-                elseif (str_contains($categoria->slug, 'dia')) $tipoPadrao = 'prato_do_dia';
+                if (str_contains($categoria->slug, 'bebida')) {
+                    $tipoPadrao = 'bebida';
+                } elseif (str_contains($categoria->slug, 'cerveja')) {
+                    $tipoPadrao = 'cerveja';
+                } elseif (str_contains($categoria->slug, 'porcao') || str_contains($categoria->slug, 'porcoe')) {
+                    $tipoPadrao = 'porcao';
+                } elseif (str_contains($categoria->slug, 'adicional')) {
+                    $tipoPadrao = 'adicional';
+                } elseif (str_contains($categoria->slug, 'dia')) {
+                    $tipoPadrao = 'prato_do_dia';
+                }
             }
 
             $produto = Produto::create([
@@ -130,7 +141,7 @@ class CardapioController extends Controller
 
             return response()->json([
                 'message' => 'Prato/produto cadastrado com sucesso',
-                'produto' => $produto->load('variacoes', 'categoria')
+                'produto' => $produto->load('variacoes', 'categoria'),
             ], 201);
         });
     }
@@ -141,6 +152,7 @@ class CardapioController extends Controller
     public function show($id)
     {
         $produto = Produto::with(['variacoes', 'categoria'])->findOrFail($id);
+
         return response()->json($produto);
     }
 
@@ -158,9 +170,10 @@ class CardapioController extends Controller
             'descricao' => 'nullable|string',
             'dias_disponiveis' => 'nullable|string',
             'ativo' => 'nullable|boolean',
-            'variacoes' => 'nullable|array|min:1',
+            'variacoes' => 'sometimes|array|min:1',
             'variacoes.*.tamanho' => 'required|string|max:50',
-            'variacoes.*.preco' => 'required|numeric|min:0',
+            'variacoes.*.preco' => 'required|numeric|min:0|max:99999999.99',
+            'variacoes.*.ativo' => 'sometimes|boolean',
         ]);
 
         return DB::transaction(function () use ($request, $produto) {
@@ -188,7 +201,7 @@ class CardapioController extends Controller
 
             return response()->json([
                 'message' => 'Prato/produto atualizado com sucesso',
-                'produto' => $produto->fresh(['variacoes', 'categoria'])
+                'produto' => $produto->fresh(['variacoes', 'categoria']),
             ]);
         });
     }
@@ -202,7 +215,7 @@ class CardapioController extends Controller
         $produto->delete();
 
         return response()->json([
-            'message' => 'Prato/produto removido do cardápio com sucesso'
+            'message' => 'Prato/produto removido do cardápio com sucesso',
         ]);
     }
 
@@ -212,13 +225,13 @@ class CardapioController extends Controller
     public function toggleProdutoStatus($id)
     {
         $produto = Produto::findOrFail($id);
-        $produto->ativo = !$produto->ativo;
+        $produto->ativo = ! $produto->ativo;
         $produto->save();
 
         return response()->json([
             'message' => 'Status do produto alterado com sucesso',
             'ativo' => $produto->ativo,
-            'produto' => $produto
+            'produto' => $produto,
         ]);
     }
 }

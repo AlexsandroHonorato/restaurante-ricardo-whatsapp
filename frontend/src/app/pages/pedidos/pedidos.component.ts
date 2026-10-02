@@ -808,11 +808,13 @@ export class PedidosComponent implements OnInit {
     this.despachandoIds.update((m) => ({ ...m, [pedido.id]: true }));
 
     this.api.updatePedidoStatus(pedido.id, 'saiu_para_entrega').subscribe({
-      next: () => {
+      next: (res) => {
         this.carregarPedidos();
         this.api.getKpis().subscribe();
 
-        const mensagemNotificacao = `Mensagem enviada para ${pedido.cliente?.nome || 'o cliente'} (${pedido.cliente?.telefone}): "🛵💨 Temos uma ótima notícia! O seu pedido ${pedido.codigo_pedido} acabou de sair para entrega e está a caminho!"`;
+        const mensagemNotificacao = res.notificacao_enviada
+          ? `Pedido ${pedido.codigo_pedido} despachado. Cliente notificado pelo WhatsApp.`
+          : `Pedido ${pedido.codigo_pedido} despachado. ${res.erro_notificacao || 'Envio da notificação não confirmado.'}`;
         this.toastMensagem.set(mensagemNotificacao);
 
         setTimeout(() => {

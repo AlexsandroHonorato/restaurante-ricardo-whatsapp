@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Atendimento;
+use App\Models\Cliente;
 use App\Models\Pedido;
 use App\Models\PedidoItem;
-use App\Models\Cliente;
-use App\Models\Atendimento;
-use App\Models\Endereco;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -18,10 +17,11 @@ class DashboardController extends Controller
      */
     public function getKpis()
     {
-        $hoje = Carbon::today();
+        $inicioHoje = Carbon::now('America/Sao_Paulo')->startOfDay()->utc();
+        $fimHoje = $inicioHoje->copy()->addDay();
 
         $faturamentoTotal = Pedido::where('status', '!=', 'cancelado')->sum('valor_total');
-        $faturamentoHoje = Pedido::where('status', '!=', 'cancelado')->whereDate('created_at', $hoje)->sum('valor_total');
+        $faturamentoHoje = Pedido::where('status', '!=', 'cancelado')->where('created_at', '>=', $inicioHoje)->where('created_at', '<', $fimHoje)->sum('valor_total');
 
         $totalPedidos = Pedido::count();
         $pedidosHoje = Pedido::whereDate('created_at', $hoje)->count();
@@ -30,6 +30,7 @@ class DashboardController extends Controller
         $totalClientes = Cliente::count();
 
         $pedidosPorStatus = [
+            'confirmado' => Pedido::where('status', 'confirmado')->count(),
             'pendente' => Pedido::where('status', 'pendente')->count(),
             'em_preparo' => Pedido::where('status', 'em_preparo')->count(),
             'saiu_para_entrega' => Pedido::where('status', 'saiu_para_entrega')->count(),
@@ -64,7 +65,7 @@ class DashboardController extends Controller
      */
     public function getSalesChart(Request $request)
     {
-        $dias = $request->query('dias', 7);
+        $dias = max(1, min(365, (int) $request->query('dias', 7)));
         $dataInicio = Carbon::today()->subDays($dias - 1);
 
         $vendas = Pedido::select(
@@ -72,10 +73,10 @@ class DashboardController extends Controller
             DB::raw('COUNT(id) as total_pedidos'),
             DB::raw('SUM(CASE WHEN status != "cancelado" THEN valor_total ELSE 0 END) as faturamento')
         )
-        ->where('created_at', '>=', $dataInicio)
-        ->groupBy('data')
-        ->orderBy('data', 'ASC')
-        ->get();
+            ->where('created_at', '>=', $dataInicio)
+            ->groupBy('data')
+            ->orderBy('data', 'ASC')
+            ->get();
 
         return response()->json($vendas);
     }
@@ -91,12 +92,12 @@ class DashboardController extends Controller
             DB::raw('SUM(quantidade) as total_quantidade'),
             DB::raw('SUM(subtotal) as total_faturado')
         )
-        ->join('pedidos', 'pedido_itens.pedido_id', '=', 'pedidos.id')
-        ->where('pedidos.status', '!=', 'cancelado')
-        ->groupBy('nome_snapshot', 'tamanho_snapshot')
-        ->orderBy('total_quantidade', 'DESC')
-        ->limit(8)
-        ->get();
+            ->join('pedidos', 'pedido_itens.pedido_id', '=', 'pedidos.id')
+            ->where('pedidos.status', '!=', 'cancelado')
+            ->groupBy('nome_snapshot', 'tamanho_snapshot')
+            ->orderBy('total_quantidade', 'DESC')
+            ->limit(8)
+            ->get();
 
         return response()->json($top);
     }
@@ -130,10 +131,10 @@ class DashboardController extends Controller
             DB::raw('COUNT(id) as quantidade'),
             DB::raw('SUM(valor_total) as faturamento')
         )
-        ->where('status', '!=', 'cancelado')
-        ->groupBy('forma_pagamento')
-        ->orderBy('quantidade', 'DESC')
-        ->get();
+            ->where('status', '!=', 'cancelado')
+            ->groupBy('forma_pagamento')
+            ->orderBy('quantidade', 'DESC')
+            ->get();
 
         return response()->json($pagamentos);
     }

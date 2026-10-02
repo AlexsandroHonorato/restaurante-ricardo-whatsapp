@@ -1,7 +1,10 @@
 // agente.js: passo 2 e passo 8. O servidor que a Meta chama (webhook) e que responde pelo WhatsApp.
 // Rode com:  npm start   (lê o .env pelo --env-file do Node 20.6+)
 import { createServer } from 'node:http';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { assinaturaValida } from './lib/webhook.js';
+import { criarFilaPorChave } from './lib/fila.js';
+import { sincronizarPedidosPendentes } from './pedidos.js';
+import { criarNotificador } from './lib/notificacoes.js';
 import { responderNaFila } from './cerebro.js';
 
 
@@ -12,16 +15,18 @@ const { WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, WHATSAP
 for (const k of ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_VERIFY_TOKEN']) {
   if (!process.env[k]) console.warn(`⚠ falta ${k} no .env`);
 }
-if (!WHATSAPP_APP_SECRET) console.warn('⚠ sem WHATSAPP_APP_SECRET: a assinatura do webhook NÃO está sendo conferida (obrigatório em produção)');
+if (!WHATSAPP_APP_SECRET) console.warn('⚠ sem WHATSAPP_APP_SECRET: webhooks serão rejeitados até configurar a assinatura');
 
 // ---------------------------------------------------------------- enviar pelo WhatsApp
 async function graph(corpo) {
   const r = await fetch(`${GRAPH}/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+    signal: AbortSignal.timeout(15000),
     method: 'POST',
     headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', ...corpo }),
   });
-  if (!r.ok) console.error('WhatsApp', r.status, await r.text());
+  if (!r.ok) throw new Error(`WhatsApp retornou HTTP ${r.status}`);
+  return r.json();
 }
 const enviarTexto = (para, texto) => graph({ recipient_type: 'individual', to: para, type: 'text', text: { preview_url: false, body: texto } });
 // marca como lida na Meta Cloud API
@@ -29,20 +34,13 @@ const marcarComoLida = (id) => graph({ status: 'read', message_id: id });
 
 
 // ---------------------------------------------------------------- segurança: a URL é pública, então confira quem mandou
-function assinaturaValida(bruto, cabecalho) {
-  if (!WHATSAPP_APP_SECRET || WHATSAPP_APP_SECRET.includes('cole-aqui')) return true;
-  const esperado = 'sha256=' + createHmac('sha256', WHATSAPP_APP_SECRET).update(bruto).digest('hex');
-  const a = Buffer.from(esperado), b = Buffer.from(cabecalho || '');
-  const valida = a.length === b.length && timingSafeEqual(a, b);
-  if (!valida) console.warn('⚠️ Assinatura HMAC do webhook inválida. Verifique o WHATSAPP_APP_SECRET no .env');
-  return valida;
-}
-
-
 // ---------------------------------------------------------------- mensagens: sem duplicar
+const enfileirarMensagem = criarFilaPorChave();
+const tratar = msg => enfileirarMensagem(msg?.from, () => processarMensagem(msg)).catch(erro => console.error('Falha no processamento:', erro.message));
 const vistas = new Set(); // a Meta pode reenviar a mesma mensagem: guarda os ids já tratados
 
-async function tratar(msg) {
+async function processarMensagem(msg) {
+  if (!msg || typeof msg.id !== 'string' || typeof msg.from !== 'string' || (msg.type === 'text' && typeof msg.text?.body !== 'string')) return;
   if (vistas.has(msg.id)) return;
   vistas.add(msg.id);
   if (vistas.size > 5000) vistas.delete(vistas.values().next().value);
@@ -60,49 +58,50 @@ async function tratar(msg) {
 }
 
 // ---------------------------------------------------------------- idempotência de notificações
-const notificacoesEnviadas = new Map(); // key -> timestamp (expira em 10 minutos)
-const LIMPAR_NOTIFICACOES_MS = 10 * 60 * 1000;
+const notificar = criarNotificador(enviarTexto);
 
-function verificarIdempotencia(chave) {
-  const agora = Date.now();
-  // Limpeza periódica
-  for (const [k, exp] of notificacoesEnviadas.entries()) {
-    if (agora - exp > LIMPAR_NOTIFICACOES_MS) notificacoesEnviadas.delete(k);
-  }
-  if (notificacoesEnviadas.has(chave)) {
-    return false; // Já foi enviada recentemente (duplicada)
-  }
-  notificacoesEnviadas.set(chave, agora);
-  return true; // Primeira vez (permitida)
+function lerCorpo(req, res, tratarCorpo) {
+  const partes = [];
+  let tamanho = 0;
+  let excedeu = false;
+  req.on('data', parte => {
+    tamanho += parte.length;
+    if (tamanho > 1024 * 1024) {
+      if (!excedeu) res.writeHead(413).end();
+      excedeu = true;
+      partes.length = 0;
+    } else if (!excedeu) partes.push(parte);
+  });
+  req.on('error', () => { if (!res.writableEnded) res.writeHead(400).end(); });
+  req.on('end', () => { if (!excedeu) tratarCorpo(Buffer.concat(partes)); });
 }
 
 // ---------------------------------------------------------------- o servidor
 createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  const url = new URL(req.url, 'http://localhost');
 
   // a Meta confere o seu webhook uma vez, com um GET
   if (req.method === 'GET' && url.pathname === '/webhook') {
-    const ok = url.searchParams.get('hub.mode') === 'subscribe' && url.searchParams.get('hub.verify_token') === WHATSAPP_VERIFY_TOKEN;
+    const ok = Boolean(WHATSAPP_VERIFY_TOKEN) && url.searchParams.get('hub.mode') === 'subscribe' && url.searchParams.get('hub.verify_token') === WHATSAPP_VERIFY_TOKEN;
     res.writeHead(ok ? 200 : 403).end(ok ? url.searchParams.get('hub.challenge') : 'token errado');
     return;
   }
 
   // cada mensagem nova chega num POST
   if (req.method === 'POST' && url.pathname === '/webhook') {
-    const partes = [];
-    req.on('data', (p) => partes.push(p));
-    req.on('end', () => {
-      const bruto = Buffer.concat(partes);
-      if (!assinaturaValida(bruto, req.headers['x-hub-signature-256'])) {
+    lerCorpo(req, res, (bruto) => {
+      if (!assinaturaValida(bruto, req.headers['x-hub-signature-256'], WHATSAPP_APP_SECRET)) {
         res.writeHead(401).end();
         return;
       }
-      res.writeHead(200).end(); // responde já: a Meta reenvia se você demorar
       let corpo;
-      try { corpo = JSON.parse(bruto); } catch { return; }
+      try { corpo = JSON.parse(bruto); } catch { res.writeHead(400).end(); return; }
+      if (!corpo || typeof corpo !== 'object' || (corpo.entry !== undefined && !Array.isArray(corpo.entry))) { res.writeHead(400).end(); return; }
+      res.writeHead(200).end();
       for (const e of corpo.entry ?? []) {
-        for (const c of e.changes ?? []) {
-          for (const m of c.value?.messages ?? []) {
+        for (const c of (Array.isArray(e?.changes) ? e.changes : [])) {
+          for (const m of (Array.isArray(c?.value?.messages) ? c.value.messages : [])) {
+            if (!m) continue;
             console.log(`📩 [WhatsApp] Mensagem recebida de ${m.from}: "${m.text?.body || m.type}"`);
             tratar(m);
           }
@@ -115,30 +114,24 @@ createServer((req, res) => {
 
   // rota interna para envio de notificações automáticas pelo Dashboard/API com idempotência
   if (req.method === 'POST' && url.pathname === '/api/notificar') {
-    const partes = [];
-    req.on('data', (p) => partes.push(p));
-    req.on('end', async () => {
+    const remoto = req.socket.remoteAddress;
+    const token = process.env.NOTIFICACAO_TOKEN;
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remoto);
+    if ((!token && process.env.NODE_ENV === 'production') || (token ? req.headers.authorization !== `Bearer ${token}` : !local)) {
+      res.writeHead(401).end();
+      return;
+    }
+    lerCorpo(req, res, async bruto => {
       try {
-        const dados = JSON.parse(Buffer.concat(partes).toString('utf8'));
-        const { para, texto, idempotency_key } = dados;
-        if (!para || !texto) {
-          res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ erro: 'Informe "para" e "texto"' }));
-          return;
-        }
-
-        // Chave de idempotência (fornecida ou gerada a partir do destinatário + texto)
-        const chaveUnica = idempotency_key || `notif_${para}_${texto.substring(0, 30)}`;
-        if (!verificarIdempotencia(chaveUnica)) {
-          console.log(`🛡️ [IDEMPOTÊNCIA] Notificação duplicada bloqueada para ${para} (chave: ${chaveUnica})`);
-          res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, repetido: true, mensagem: 'Notificação já enviada anteriormente' }));
-          return;
-        }
-
-        await enviarTexto(para, texto);
-        console.log(`📢 [NOTIFICAÇÃO DISPARADA] WhatsApp: ${para}\nTexto: ${texto}\n`);
-        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, enviado: true, para }));
+        let dados;
+        try { dados = JSON.parse(bruto); } catch { throw new TypeError('JSON inválido'); }
+        if (!dados || Array.isArray(dados) || typeof dados !== 'object') throw new TypeError('Payload inválido');
+        const resultado = await notificar(dados);
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(resultado));
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ erro: err.message }));
+        const codigo = err instanceof TypeError ? 400 : 502;
+        console.error('Falha de notificação:', err.message);
+        res.writeHead(codigo, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: false, erro: err.message }));
       }
     });
     return;
@@ -148,3 +141,7 @@ createServer((req, res) => {
 }).listen(PORTA, () => console.log(`✅ Agente Restaurante Família Ricardo ouvindo na porta ${PORTA}`));
 
 
+
+const reconciliarPedidos = () => sincronizarPedidosPendentes().catch(erro => console.error('Falha na reconciliação de pedidos:', erro.message));
+reconciliarPedidos();
+setInterval(reconciliarPedidos, 60000).unref();

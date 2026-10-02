@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, of, tap } from 'rxjs';
+import { Observable, catchError, tap, EMPTY, finalize } from 'rxjs';
 import {
   DashboardKpis,
   VendaGrafico,
@@ -20,6 +20,12 @@ export class ApiService {
   private http = inject(HttpClient);
   private baseUrl = 'http://127.0.0.1:8080/api';
 
+  erro = signal<string | null>(null);
+
+  private registrarFalha() {
+    this.erro.set('Não foi possível atualizar os dados. Verifique a conexão com a API.');
+  }
+
   // Signals para estado reativo
   kpis = signal<DashboardKpis | null>(null);
   loading = signal<boolean>(false);
@@ -29,86 +35,43 @@ export class ApiService {
     this.loading.set(true);
     return this.http.get<DashboardKpis>(`${this.baseUrl}/dashboard/kpis`).pipe(
       tap((data) => {
+        this.erro.set(null);
         this.kpis.set(data);
         this.loading.set(false);
         this.lastUpdated.set(new Date());
       }),
       catchError(() => {
-        const mock: DashboardKpis = {
-          faturamento_total: 1420.50,
-          faturamento_hoje: 385.00,
-          total_pedidos: 28,
-          pedidos_hoje: 8,
-          ticket_medio: 50.73,
-          total_clientes: 15,
-          pedidos_por_status: {
-            pendente: 3,
-            em_preparo: 2,
-            saiu_para_entrega: 1,
-            entregue: 21,
-            cancelado: 1
-          },
-          taxa_conversao_ia: 82.4,
-          total_transbordo_humano: 4,
-          taxa_transbordo: 14.3,
-          tempo_medio_atendimento_min: 3.2
-        };
-        this.kpis.set(mock);
-        this.loading.set(false);
-        return of(mock);
-      })
+        this.registrarFalha();
+        return EMPTY;
+      }),
+      finalize(() => this.loading.set(false))
     );
   }
 
   getSalesChart(dias: number = 7): Observable<VendaGrafico[]> {
     return this.http.get<VendaGrafico[]>(`${this.baseUrl}/dashboard/vendas-grafico?dias=${dias}`).pipe(
       catchError(() => {
-        const mock: VendaGrafico[] = [
-          { data: '2026-09-26', total_pedidos: 4, faturamento: 190.00 },
-          { data: '2026-09-27', total_pedidos: 6, faturamento: 310.00 },
-          { data: '2026-09-28', total_pedidos: 2, faturamento: 110.00 },
-          { data: '2026-09-29', total_pedidos: 5, faturamento: 245.00 },
-          { data: '2026-09-30', total_pedidos: 8, faturamento: 420.00 },
-          { data: '2026-10-01', total_pedidos: 7, faturamento: 360.00 },
-          { data: '2026-10-02', total_pedidos: 8, faturamento: 385.00 }
-        ];
-        return of(mock);
+        this.registrarFalha();
+        return EMPTY;
       })
     );
   }
 
   getTopProducts(): Observable<TopProduto[]> {
     return this.http.get<TopProduto[]>(`${this.baseUrl}/dashboard/top-produtos`).pipe(
-      catchError(() => of([
-        { produto: 'Filé de Frango à Parmegiana', tamanho: 'Grande', total_quantidade: 16, total_faturado: 480.00 },
-        { produto: 'Feijoada Tradicional', tamanho: 'Grande', total_quantidade: 12, total_faturado: 540.00 },
-        { produto: 'Bife em Tiras Acebolado', tamanho: 'Grande', total_quantidade: 9, total_faturado: 315.00 },
-        { produto: 'Calabresa Acebolada', tamanho: 'Médio', total_quantidade: 8, total_faturado: 200.00 },
-        { produto: 'Coca-Cola 2 Litros', tamanho: '2 Litros', total_quantidade: 14, total_faturado: 280.00 },
-        { produto: 'Batata Frita', tamanho: 'Média', total_quantidade: 10, total_faturado: 230.00 },
-      ]))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
   getDeliveryHeatmap(): Observable<MapaBairro[]> {
     return this.http.get<MapaBairro[]>(`${this.baseUrl}/dashboard/mapa-bairros`).pipe(
-      catchError(() => of([
-        { bairro: 'Martim de Sá', total_pedidos: 12, total_faturamento: 640.00 },
-        { bairro: 'Centro', total_pedidos: 8, total_faturamento: 410.00 },
-        { bairro: 'Indaiá', total_pedidos: 5, total_faturamento: 260.00 },
-        { bairro: 'Prainha', total_pedidos: 3, total_faturamento: 155.00 }
-      ]))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
   getPaymentMethods(): Observable<FormaPagamentoStat[]> {
     return this.http.get<FormaPagamentoStat[]>(`${this.baseUrl}/dashboard/formas-pagamento`).pipe(
-      catchError(() => of([
-        { forma_pagamento: 'pix', quantidade: 14, faturamento: 710.00 },
-        { forma_pagamento: 'cartao_credito', quantidade: 8, faturamento: 420.00 },
-        { forma_pagamento: 'dinheiro', quantidade: 4, faturamento: 195.00 },
-        { forma_pagamento: 'cartao_debito', quantidade: 2, faturamento: 95.50 }
-      ]))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
@@ -119,7 +82,7 @@ export class ApiService {
     const qs = params.length ? `?${params.join('&')}` : '';
 
     return this.http.get<{ data: Pedido[] }>(`${this.baseUrl}/pedidos${qs}`).pipe(
-      catchError(() => of({ data: [] }))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
@@ -130,19 +93,19 @@ export class ApiService {
   getClientes(busca?: string): Observable<{ data: Cliente[] }> {
     const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
     return this.http.get<{ data: Cliente[] }>(`${this.baseUrl}/clientes${qs}`).pipe(
-      catchError(() => of({ data: [] }))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
   getCardapio(): Observable<CategoriaCardapio[]> {
     return this.http.get<CategoriaCardapio[]>(`${this.baseUrl}/cardapio`).pipe(
-      catchError(() => of([]))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
   getCategoriasCardapio(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/cardapio/categorias`).pipe(
-      catchError(() => of([]))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
@@ -165,13 +128,13 @@ export class ApiService {
   getAtendimentos(transbordo?: boolean): Observable<{ data: Atendimento[] }> {
     const qs = transbordo !== undefined ? `?transbordo=${transbordo}` : '';
     return this.http.get<{ data: Atendimento[] }>(`${this.baseUrl}/atendimentos${qs}`).pipe(
-      catchError(() => of({ data: [] }))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
   getStatusConversas(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/status-conversa`).pipe(
-      catchError(() => of([]))
+      catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Cliente;
+use Illuminate\Http\Request;
 
 class ClienteController extends Controller
 {
@@ -13,19 +13,21 @@ class ClienteController extends Controller
 
         if ($request->filled('busca')) {
             $busca = $request->busca;
-            $query->where(function($q) use ($busca) {
+            $query->where(function ($q) use ($busca) {
                 $q->where('nome', 'like', "%{$busca}%")
-                  ->orWhere('telefone', 'like', "%{$busca}%");
+                    ->orWhere('telefone', 'like', "%{$busca}%");
             });
         }
 
-        $clientes = $query->orderBy('total_gasto', 'DESC')->paginate($request->query('per_page', 15));
+        $clientes = $query->orderBy('total_gasto', 'DESC')->paginate(max(1, min(100, (int) $request->query('per_page', 15))));
+
         return response()->json($clientes);
     }
 
     public function show($id)
     {
         $cliente = Cliente::with(['enderecos', 'pedidos.itens', 'atendimentos'])->findOrFail($id);
+
         return response()->json($cliente);
     }
 }

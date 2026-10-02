@@ -28,3 +28,7 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Escritas atômicas de dados locais
+memoria.json.tmp
+pedidos.json.tmp

@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Atendimento;
 use App\Models\Cliente;
 use App\Models\StatusConversa;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class AtendimentoController extends Controller
 {
@@ -25,7 +25,8 @@ class AtendimentoController extends Controller
             $query->where('status', $request->status);
         }
 
-        $atendimentos = $query->orderBy('created_at', 'DESC')->paginate($request->query('per_page', 15));
+        $atendimentos = $query->orderBy('created_at', 'DESC')->paginate(max(1, min(100, (int) $request->query('per_page', 15))));
+
         return response()->json($atendimentos);
     }
 
@@ -35,8 +36,13 @@ class AtendimentoController extends Controller
     public function syncStatus(Request $request)
     {
         $request->validate([
-            'telefone' => 'required|string',
-            'status' => 'required|string',
+            'telefone' => ['required', 'regex:/^\d{10,15}$/'],
+            'status' => 'required|in:conversa_iniciada,fazendo_pedido_pratos,fazendo_pedido_bebidas,coletando_endereco,coletando_pagamento,preparando_na_cozinha,saiu_para_entrega,cancelado_apos_30_minutos',
+            'rascunho' => 'nullable|array',
+            'nome' => 'nullable|string|max:150',
+            'motivo_transbordo' => 'nullable|string|max:255',
+            'expirou' => 'nullable|boolean',
+            'registrar_mensagem' => 'nullable|boolean',
         ]);
 
         $tel = preg_replace('/\D/', '', $request->input('telefone'));
@@ -49,12 +55,12 @@ class AtendimentoController extends Controller
         $cliente = Cliente::firstOrCreate(
             ['telefone' => $tel],
             [
-                'nome' => $request->input('nome', 'Cliente WhatsApp'),
+                'nome' => ($request->input('nome') ?: 'Cliente WhatsApp'),
                 'primeiro_contato_em' => Carbon::now(),
                 'ultimo_contato_em' => Carbon::now(),
             ]
         );
-        $cliente->touch();
+        $cliente->update(['ultimo_contato_em' => Carbon::now()]);
 
         // 2. Registra / Atualiza a tabela status_conversas
         $statusAnterior = null;
@@ -80,16 +86,18 @@ class AtendimentoController extends Controller
             ->latest('id')
             ->first();
 
-        if (!$atendimento) {
+        if (! $atendimento) {
             $atendimento = Atendimento::create([
                 'cliente_id' => $cliente->id,
                 'inicio_em' => Carbon::now(),
                 'status' => 'em_andamento',
-                'total_mensagens_cliente' => 1,
-                'total_mensagens_bot' => 1,
+                'total_mensagens_cliente' => 0,
+                'total_mensagens_bot' => 0,
                 'canal' => 'whatsapp',
             ]);
-        } else {
+        }
+
+        if ($request->boolean('registrar_mensagem')) {
             $atendimento->increment('total_mensagens_cliente');
             $atendimento->increment('total_mensagens_bot');
         }
@@ -104,7 +112,7 @@ class AtendimentoController extends Controller
             $atendimento->status = 'finalizado_com_pedido';
             $atendimento->fim_em = Carbon::now();
             $atendimento->save();
-        } elseif ($statusAtual === 'cancelado_apos_30_minutos') {
+        } elseif ($statusAtual === 'cancelado_apos_30_minutos' || $request->boolean('expirou')) {
             $atendimento->status = 'abandonado';
             $atendimento->fim_em = Carbon::now();
             $atendimento->save();
@@ -123,6 +131,7 @@ class AtendimentoController extends Controller
     public function getStatusConversas()
     {
         $status = StatusConversa::orderBy('ultimo_contato_em', 'DESC')->get();
+
         return response()->json($status);
     }
 }

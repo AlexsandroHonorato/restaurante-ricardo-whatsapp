@@ -4,13 +4,16 @@
   "description": "Agente de IA no WhatsApp em 8 passos: webhook da Meta, OpenRouter, memória, ficha do negócio, Cal.com e testes. Guia: marcondes-whatsapp.vercel.app",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=20.6" },
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
     "start": "node --env-file=.env agente.js",
     "start:bot": "node --env-file=.env agente.js",
     "start:api": "cd backend && php artisan serve --host=127.0.0.1 --port=8080",
     "start:front": "cd frontend && npm start",
     "simular": "node --env-file=.env simular.js",
-    "testar": "node --env-file=.env testar.js"
+    "testar": "node --env-file=.env testar.js",
+    "test": "node tests/regressoes.test.js"
   }
 }

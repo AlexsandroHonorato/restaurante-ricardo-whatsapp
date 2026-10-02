@@ -74,7 +74,7 @@ graph TD
 
 ## 4. 🗂️ Estrutura e Papel dos Arquivos
 
-### 🚀 Backend API (Laravel 12 / PHP 8.5) — `backend/`
+### 🚀 Backend API (Laravel 13 / PHP 8.5) — `backend/`
 * [backend/routes/api.php](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/backend/routes/api.php): Endpoints REST para Dashboard, Pedidos, Clientes, Cardápio e Atendimentos.
 * [backend/app/Http/Controllers/DashboardController.php](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/backend/app/Http/Controllers/DashboardController.php): KPIs em tempo real, gráfico de vendas, top produtos, mapa de bairros e métricas de IA.
 * [backend/app/Http/Controllers/PedidoController.php](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/backend/app/Http/Controllers/PedidoController.php): Gestão e avanço de status dos pedidos da cozinha.
@@ -204,3 +204,54 @@ graph TD
 
 
 
+
+
+## 9. Revisão técnica e continuidade — 02/10/2026 (Codex)
+
+Esta seção continua o histórico alimentado pelo Antigravity. O arquivo existente é `ANDAMENTO.md`; não existe `Andamentoi.md`. Os registros anteriores foram preservados. As observações abaixo prevalecem sobre descrições antigas do comportamento corrigido.
+
+### O que foi feito
+
+- Revisados bot Node, ferramentas da IA, persistência JSON, integração Laravel, controllers/models/migrations, SQL analítico, serviço HTTP Angular e telas operacionais. Stack verificada nos manifestos: Laravel **13**, PHP **8.5**, Angular **22**, Node **>=20.6** (runtime local 24).
+- Instalado Laravel Boost conforme exigência do `backend/AGENTS.md`; as diretrizes do backend e `boost.json` foram gerados. Não houve atualização de versão do framework.
+- Separadas responsabilidades em `lib/pedido.js` (validação de total/itens), `lib/persistencia.js` (escrita atômica), `lib/fila.js` (serialização), `lib/notificacoes.js` (idempotência/concorrência), `lib/webhook.js` (HMAC). Backend ganhou `PedidoService` e `ValorMonetario`, mantendo rotas/contratos existentes de cadastro.
+- Atualizações parciais do rascunho ignoram campos `undefined`; `null` continua limpando explicitamente. Estados inválidos são rejeitados. Expiração ocorre a partir de 30 minutos, alinhando o estado local e remoto ao início e registrando o abandono.
+- Consulta de status deixou de ativar indevidamente a escolha de pratos. Consulta do cliente compara telefone completo, exige titularidade para código informado e prioriza o status atualizado do backend (`GET /api/pedidos/consulta/bot`). Em indisponibilidade, permanece fallback local, que pode estar desatualizado.
+- Fechamento valida campos obrigatórios, quantidades/preços, total, mínimo de R$25 para entrega e troco antes da gravação; usa IDs com aleatoriedade criptográfica; interrompe chamadas ao modelo após fechamento bem-sucedido e entrega comprovante determinístico.
+- JSON agora é gravado em arquivo temporário e renomeado; dados inválidos geram erro explícito em vez de retornar um banco vazio e sobrescrever registros. Caminhos ficam ancorados ao projeto, com overrides para testes isolados. `.gitignore` protege temporários.
+- Pedidos novos possuem marca `sincronizado` e erro de sincronização. O agente tenta reconciliar os pendentes a cada 60 segundos e ao iniciar. A API recebe o mesmo código, permitindo reenvio idempotente. Registros legados sem marca não são reenviados automaticamente.
+- Sincronizações de conversa são serializadas por telefone com snapshot dos dados; timeouts e falhas HTTP são explícitos. Métricas contam uma interação apenas na sincronização final (`registrar_mensagem`), sem fabricar contagens para etapas intermediárias.
+- API de pedidos usa transação e bloqueio por cliente; grava itens com quantidade, preço e subtotal reais. Removidos total padrão de R$30, taxa inventada de R$5, bairro presumido e duração/mensagens fictícias. Taxa de entrega só entra no cálculo quando explicitamente informada.
+- Transições de pedidos são validadas, status terminais não regridem e status repetido não duplica histórico. Alterar um pedido antigo não sobrescreve o rascunho de uma compra nova na tabela de conversas.
+- Despacho verifica o resultado HTTP do bot e retorna `notificacao_enviada`/`erro_notificacao`; o toast só declara envio confirmado quando o serviço confirma. Repetir o mesmo status permite retentar uma notificação que falhou.
+- WhatsApp Graph tem timeout e lança erro em resposta não bem-sucedida. Notificações concorrentes compartilham o envio; falhas liberam a chave para retry; chave padrão usa hash do texto completo. A fila do webhook cobre também o envio ao cliente, preservando ordem.
+- HMAC deixa de aceitar segredo ausente/placeholder. Webhooks têm limite de 1 MiB e validação básica de payload. `/api/notificar` exige token quando configurado; sem token permite apenas conexão local em desenvolvimento e rejeita em `NODE_ENV=production`. Um túnel pode encaminhar chamadas como localhost: configurar a chave compartilhada antes de expor o serviço.
+- Exemplo de ambiente inclui `API_BASE_URL` e `NOTIFICACAO_TOKEN`; backend lê `BOT_URL`/token. CORS deixa de aceitar qualquer origem; padrão permite localhost/127.0.0.1:4200, ajustável por `CORS_ALLOWED_ORIGINS` no backend.
+- Removidos dados financeiros de demonstração exibidos silenciosamente em falhas da API. A UI preserva dados carregados e exibe aviso de conexão. Dashboard libera polling e gráficos ao desmontar. Cabeçalho calcula aberto/fechado pelo horário de São Paulo.
+- Formulário do cardápio bloqueia submissão duplicada e comunica falha mantendo o formulário. Cardápio textual informa dias de disponibilidade; validações de variações foram reforçadas.
+- KPI de pedidos/faturamento de hoje usa limites de São Paulo convertidos para UTC; catálogo inclui o status confirmado. Paginação e janela de dias possuem limites.
+- Comprovante não afirma impressão física: `imprimirComanda` ainda gera saída no console. Testes existentes da IA agora encerram com código de falha quando há reprovação.
+
+### Validação e como repetir
+
+- `npm test` na raiz: testes determinísticos locais de bot/domínio/concorrência/HMAC/persistência, com arquivos temporários e HTTP/IA simulados; sem créditos OpenRouter e sem WhatsApp real.
+- Backend: `php -d extension=pdo_sqlite vendor/phpunit/phpunit/phpunit` dentro de `backend/`. Testes usam SQLite em memória e HTTP fake. O PHP local possui a DLL, mas o driver não está habilitado por padrão; foi ativado apenas no comando. Não houve migration nem alteração de dados do MySQL operacional.
+- Frontend: `npm test -- --watch=false` e `npm run build` dentro de `frontend/`.
+- PHP formatado com `php vendor/bin/pint --dirty --format agent`; verificação de diff e sintaxe Node incluídas.
+- Testes ao vivo de Meta/OpenRouter, impressora e túnel não foram executados nesta revisão. Reiniciar os processos do bot/API/frontend é necessário para carregar o código alterado.
+
+### Próximos passos / pontos fracos remanescentes
+
+1. **Alta prioridade — autenticação e autorização:** rotas Laravel ainda não exigem login/perfis. CORS não substitui autenticação. Implementar Sanctum, acesso operador/admin, login no Angular e credencial própria do bot antes de exposição pública. A consulta por telefone restringe a ferramenta conversacional, mas não autentica um chamador HTTP externo.
+2. **Alta prioridade — preços e estoque confiáveis:** ferramentas ainda recebem descrições textuais e preços da IA. Agora há validação aritmética, porém o servidor precisa resolver produto/variação por IDs, validar preço vigente e disponibilidade/dia dentro da transação. Planejar migração compatível do contrato do bot; não foi implantada correspondência textual aproximada que poderia escolher produto errado.
+3. **Alta prioridade — eventos duráveis:** deduplicação de mensagens e notificações permanece em memória com janela de 10 minutos para notificações. Implementar inbox/outbox persistente, retries com backoff e status de envio/delivery para sobreviver a reinícios. O ACK do webhook antecede o processamento; falha posterior ainda precisa de retry próprio.
+4. **Integração operacional:** impressão térmica real não está conectada; transferência humana registra evento no backend, mas não há console de atendimento com pausar/retomar bot ou garantia de alerta entregue ao operador.
+5. **Atendimentos:** consolidar sessões após fechamento/reset/transferência e associar todos os eventos ao atendimento correto. As contagens fictícias foram removidas, mas há necessidade de sessão e eventos com IDs para medir TMA/conversão sob retries/reinícios.
+6. **Dados/SQL:** `database/schema.sql` usa `criado_em`/`atualizado_em`, enquanto migrations Laravel usam `created_at`/`updated_at`. `database/views.sql` é compatível com o schema SQL antigo; não aplicar essas views diretamente sobre migrations sem adaptação. Unificar a fonte do DDL e preparar migração versionada. O gráfico diário ainda agrupa a data SQL/UTC; alinhar ao mesmo fuso dos KPIs.
+7. **UI:** listas ainda exibem a primeira página retornada pela API, sem navegação completa. Implementar paginação visível, cancelamento de buscas antigas, feedback uniforme de erros em todas as mutações e revisão de teclado/foco/mobile dos modais. Aviso global pode ser limpo por um KPI bem-sucedido enquanto outro endpoint continua indisponível.
+8. **Persistência local:** escrita atômica evita truncamento, mas arquivos JSON suportam um processo por instância; não há bloqueio entre processos. Migrar memória/pedidos/fila para armazenamento central se houver múltiplos workers. Retenção/anonymização dos logs e dados pessoais precisa de configuração.
+9. **Pendências de sincronização:** erros permanentes (422/contrato) ficam pendentes e devem ter visibilidade no painel; não são descartados. Planejar dead-letter/revisão manual e importação explícita de registros legados após conferir duplicidade.
+
+### Resultado final desta revisão
+
+**31 testes aprovados:** 15 no Node, 12 no Laravel (55 assertions) e 4 no Angular. Build de produção Angular aprovado, sintaxe Node válida, Pint aplicado e `git diff --check` sem erros de whitespace. Nenhuma publicação, envio de WhatsApp real ou operação destrutiva de banco foi realizada. Os resultados cobrem testes locais/mocks; homologação integrada com Meta/OpenRouter/MySQL operacional permanece pendente.

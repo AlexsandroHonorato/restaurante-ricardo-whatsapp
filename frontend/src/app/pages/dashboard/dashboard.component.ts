@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
@@ -597,7 +597,7 @@ Chart.register(...registerables);
     }
   `]
 })
-export class DashboardComponent implements OnInit, AfterViewInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   api = inject(ApiService);
   diasGrafico = signal<number>(7);
   pollingInterval: any = null;
@@ -611,6 +611,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   salesChartInstance: Chart | null = null;
   paymentChartInstance: Chart | null = null;
+
+  ngOnDestroy() {
+    clearInterval(this.pollingInterval);
+    this.salesChartInstance?.destroy();
+    this.paymentChartInstance?.destroy();
+  }
 
   ngOnInit() {
     this.carregarTudo();

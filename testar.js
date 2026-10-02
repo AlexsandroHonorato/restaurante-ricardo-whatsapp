@@ -155,4 +155,4 @@ for (const t of TESTES) {
   console.log(`  ${passou ? '✓ passou' : '✗ FALHOU: ajuste o negocio.md ou cerebro.js e rode de novo'}`);
 }
 console.log(`\n${aprovados}/${TESTES.length} testes passaram. Leia as respostas acima para verificar o tom.`);
-setTimeout(() => process.exit(0), 500);
+setTimeout(() => process.exit(aprovados === TESTES.length ? 0 : 1), 500);

@@ -1,13 +1,18 @@
 // cerebro.js: memória + ficha do negócio + modelo (OpenRouter) + máquina de estados + ferramentas de pedidos.
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { readFileSync, appendFileSync } from 'node:fs';
+import { criarFilaPorChave } from './lib/fila.js';
+import { lerJson, gravarJson } from './lib/persistencia.js';
 import { registrarPedido, consultarStatusPedido } from './pedidos.js';
 
 const FUSO = process.env.FUSO || 'America/Sao_Paulo';
 const MODELO = process.env.MODELO || 'google/gemini-3.7-flash';
 const MAX_MENSAGENS = 20;              // quantas mensagens da conversa voltam para o modelo
 const EXPIRA_MINUTOS_INATIVIDADE = 30;   // inatividade de 30 min antes de fechar o pedido expira e volta ao início
-const ARQ_MEMORIA = 'memoria.json';
+const ARQ_MEMORIA = process.env.ARQ_MEMORIA || fileURLToPath(new URL('./memoria.json', import.meta.url));
 const FICHA = readFileSync(new URL('./negocio.md', import.meta.url), 'utf8');
+const INFORMACOES_NEGOCIO = FICHA.split(/(?=^## )/m)
+  .filter(secao => /^## (Quem somos|Horários|Endereço|Formas|Políticas)/m.test(secao)).join('\n');
 
 // ---------------------------------------------------------------- status conversacionais
 export const STATUS_CONVERSA = {
@@ -22,31 +27,38 @@ export const STATUS_CONVERSA = {
 };
 
 // ---------------------------------------------------------------- memória com máquina de estados
-export const memoria = existsSync(ARQ_MEMORIA) ? JSON.parse(readFileSync(ARQ_MEMORIA, 'utf8')) : {};
+export const memoria = lerJson(ARQ_MEMORIA);
 let salvando = null;
 function salvarMemoria() {
   clearTimeout(salvando);
-  salvando = setTimeout(() => writeFileSync(ARQ_MEMORIA, JSON.stringify(memoria, null, 2)), 300);
+  salvando = setTimeout(() => gravarJson(ARQ_MEMORIA, memoria), 300);
 }
 
+const filasSincronizacao = new Map();
 export function sincronizarStatusBanco(tel, status, rascunho = {}, extras = {}) {
-  try {
-    fetch('http://127.0.0.1:8080/api/status-conversa/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        telefone: tel,
-        status: status || STATUS_CONVERSA.INICIADA,
-        rascunho: rascunho || {},
-        transbordo: extras.transbordo || false,
-        motivo_transbordo: extras.motivo_transbordo || null,
-        nome: extras.nome || null,
-      }),
-    }).catch(() => {});
-  } catch { /* API em boot */ }
+  const corpo = JSON.stringify({
+    telefone: tel, status: status || STATUS_CONVERSA.INICIADA, rascunho: rascunho || {},
+    transbordo: extras.transbordo || false, motivo_transbordo: extras.motivo_transbordo || null,
+    nome: extras.nome || null, expirou: extras.expirou || false,
+    registrar_mensagem: extras.registrar_mensagem || false,
+  });
+  const anterior = filasSincronizacao.get(tel) || Promise.resolve();
+  const tarefa = anterior.catch(() => {}).then(async () => {
+    try {
+      const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/status-conversa/sync`, {
+        signal: AbortSignal.timeout(5000), method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: corpo,
+      });
+      if (!resposta.ok) throw new Error(`API de status retornou ${resposta.status}`);
+    } catch (erro) { console.warn('Falha ao sincronizar conversa:', tel, erro.message); }
+  });
+  filasSincronizacao.set(tel, tarefa);
+  tarefa.finally(() => { if (filasSincronizacao.get(tel) === tarefa) filasSincronizacao.delete(tel); }).catch(() => {});
+  return tarefa;
 }
 
 export function obterEstadoCliente(tel) {
+  if (typeof tel !== 'string' || !/^\d{10,15}$/.test(tel)) throw new Error('Telefone inválido');
   let c = memoria[tel];
   if (!c) {
     c = {
@@ -68,7 +80,7 @@ export function obterEstadoCliente(tel) {
 
   // Verifica tempo de inatividade
   const tempoInativoMs = Date.now() - (c.atualizado || 0);
-  const expirou30Min = tempoInativoMs > EXPIRA_MINUTOS_INATIVIDADE * 60 * 1000;
+  const expirou30Min = tempoInativoMs >= EXPIRA_MINUTOS_INATIVIDADE * 60 * 1000;
 
   const pedidoEmAndamento = [
     STATUS_CONVERSA.PRATOS,
@@ -86,7 +98,7 @@ export function obterEstadoCliente(tel) {
     c.msgs = [];
     c.atualizado = Date.now();
     salvarMemoria();
-    sincronizarStatusBanco(tel, STATUS_CONVERSA.CANCELADO_30MIN, c.rascunho);
+    sincronizarStatusBanco(tel, STATUS_CONVERSA.INICIADA, c.rascunho, { expirou: true });
   }
 
   return c;
@@ -94,8 +106,9 @@ export function obterEstadoCliente(tel) {
 
 export function atualizarStatusCliente(tel, novoStatus, dadosRascunho = {}, extras = {}) {
   const c = obterEstadoCliente(tel);
+  if (!Object.values(STATUS_CONVERSA).includes(novoStatus)) throw new Error('Status conversacional inválido');
   c.status = novoStatus;
-  c.rascunho = { ...(c.rascunho || {}), ...dadosRascunho };
+  c.rascunho = { ...(c.rascunho || {}), ...Object.fromEntries(Object.entries(dadosRascunho).filter(([, valor]) => valor !== undefined)) };
   c.atualizado = Date.now();
   memoria[tel] = c;
   salvarMemoria();
@@ -132,11 +145,11 @@ export async function obterCardapioAtivo() {
     return cardapioBancoCache;
   }
   try {
-    const res = await fetch('http://127.0.0.1:8080/api/cardapio/texto');
+    const res = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/cardapio/texto`, { signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
-      if (data.cardapio_texto) {
-        cardapioBancoCache = data.cardapio_texto;
+      if (typeof data.cardapio_texto === 'string') {
+        cardapioBancoCache = data.cardapio_texto || 'Nenhum produto disponível no momento. Encaminhe para a equipe.';
         ultimoFetchCardapio = agora;
         return cardapioBancoCache;
       }
@@ -163,7 +176,7 @@ function promptDeSistema(tel, cardapioTexto = null) {
   const statusAtual = estado?.status || STATUS_CONVERSA.INICIADA;
   const rascunho = estado?.rascunho || {};
   const rascunhoStr = JSON.stringify(rascunho);
-  const cardapioOficial = cardapioTexto || cardapioBancoCache || FICHA;
+  const cardapioOficial = cardapioTexto ?? cardapioBancoCache ?? FICHA;
 
   return `Você é o atendente virtual do Restaurante Família Ricardo no WhatsApp.
 Seu objetivo é guiar o cliente de forma cordial, ágil e organizada para realizar pedidos de delivery ou consultar o status de um pedido.
@@ -192,7 +205,7 @@ Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
    - Se for Dinheiro, pergunte se precisa de troco e para quanto.
      * Troco para valor exato da compra: avise gentilmente que não precisa de troco.
      * Troco para valor menor que a compra: avise que deve ser maior que o total e pergunte a nota.
-   - Apresente o resumo final e chame a ferramenta 'fechar_pedido' (o status mudará para 'preparando_na_cozinha').
+   - Apresente o resumo final e chame a ferramenta 'fechar_pedido' (o pedido irá para a cozinha e a conversa voltará a 'conversa_iniciada').
 6. Se status for 'preparando_na_cozinha' ou 'saiu_para_entrega':
    - O pedido já foi enviado para a cozinha. Se o cliente perguntar o andamento, use 'consultar_status_pedido'. Se quiser fazer um novo pedido, comece um novo fluxo.
 7. REGRA DE TEMPO LIMITE (30 MINUTOS):
@@ -202,6 +215,9 @@ Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
 REGRAS RÍGIDAS:
 - NUNCA dê desconto, não altere os preços da tabela e não invente pratos fora do cardápio oficial.
 - Respostas dinâmicas, simpáticas, bem formatadas com emojis e quebras de linha para leitura agradável no WhatsApp.
+
+INFORMAÇÕES DO RESTAURANTE:
+${INFORMACOES_NEGOCIO}
 
 CARDÁPIO OFICIAL ATIVO (CONSULTADO DIRETAMENTE DA TABELA DE PRODUTOS):
 ${cardapioOficial}
@@ -256,7 +272,7 @@ const FERRAMENTAS = [
           itens: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Lista descritiva dos itens pedidos (ex: ["1x Filé de frango à parmegiana (Grande) - R$ 30,00", "1x Coca-Cola 2L - R$ 20,00"])',
+            description: 'Lista descritiva; cada preço é UNITÁRIO, o total é quantidade vezes preço (ex: ["1x Filé de frango à parmegiana (Grande) - R$ 30,00", "1x Coca-Cola 2L - R$ 20,00"])',
           },
           endereco: { type: 'string', description: 'Endereço completo de entrega (Rua, Número, Bairro, CEP/Referência)' },
           formaPagamento: { type: 'string', description: 'Forma de pagamento (Cartão de Crédito, Débito, Pix ou Dinheiro)' },
@@ -300,7 +316,12 @@ const FERRAMENTAS = [
 ];
 
 async function executar(tel, nome, args) {
+  if (!args || Array.isArray(args) || typeof args !== 'object') return { erro: 'Argumentos inválidos' };
   if (nome === 'atualizar_status_conversa') {
+    for (const campo of ['pratos', 'bebidas']) {
+      if (args[campo] !== undefined && (!Array.isArray(args[campo]) || args[campo].some(item => typeof item !== 'string'))) return { erro: `Campo ${campo} inválido` };
+    }
+    if ([STATUS_CONVERSA.COZINHA, STATUS_CONVERSA.ENTREGA].includes(args.novoStatus)) return { erro: 'O status operacional deve vir de um pedido registrado.' };
     atualizarStatusCliente(tel, args.novoStatus, {
       pratos: args.pratos,
       bebidas: args.bebidas,
@@ -310,7 +331,7 @@ async function executar(tel, nome, args) {
     return { ok: true, statusAtual: args.novoStatus };
   }
   if (nome === 'fechar_pedido') {
-    const resPedido = registrarPedido({
+    const resPedido = await registrarPedido({
       telefone: tel,
       nome: args.nome,
       itens: args.itens,
@@ -335,11 +356,12 @@ async function executar(tel, nome, args) {
     return resPedido;
   }
   if (nome === 'consultar_status_pedido') {
-    return consultarStatusPedido(args.idOuTelefone || tel);
+    return consultarStatusPedido(args.idOuTelefone || tel, tel);
   }
   if (nome === 'chamar_atendente') {
+    sincronizarStatusBanco(tel, obterEstadoCliente(tel).status, obterEstadoCliente(tel).rascunho, { transbordo: true, motivo_transbordo: args.motivo });
     console.log(`🔔 [TRANSFERÊNCIA PARA ATENDENTE HUMANO] Tel: ${tel} | Motivo: ${args.motivo} | Pedido: ${args.numeroPedido || 'Nenhum'}`);
-    return { ok: true, mensagem: 'Um atendente da nossa equipe foi notificado e dará continuidade ao atendimento em instantes.' };
+    return { ok: true, mensagem: 'Solicitação de atendimento humano registrada. Contato direto da equipe: (12) 99750-0045.' };
   }
   return { erro: `Ferramenta desconhecida: ${nome}` };
 }
@@ -355,6 +377,7 @@ async function chamarModelo(messages) {
       'HTTP-Referer': 'https://familia-ricardo-whatsapp.local',
       'X-OpenRouter-Title': 'Agente Restaurante Familia Ricardo',
     },
+    signal: AbortSignal.timeout(45000),
     body: JSON.stringify({ model: MODELO, messages, tools: FERRAMENTAS, temperature: 0.3, max_tokens: 1500 }),
   });
 
@@ -369,9 +392,10 @@ export async function responder(tel, texto) {
   const cardapioTexto = await obterCardapioAtivo();
   const messages = [{ role: 'system', content: promptDeSistema(tel, cardapioTexto) }, ...historico(tel), { role: 'user', content: texto }];
   const passos = [];
-  let resposta = 'Olá! Tive uma breve instabilidade para consultar as opções. Nossa equipe humana já foi notificada para te responder por aqui! 🍽️';
+  let resposta = 'Olá! Tive uma breve instabilidade para consultar as opções. Se precisar de ajuda, ligue para (12) 99750-0045. 🍽️';
 
   try {
+    let pedidoFechado = null;
     for (let i = 0; i < 6; i++) {
       const msg = await chamarModelo(messages);
       if (!msg.tool_calls?.length) {
@@ -383,10 +407,15 @@ export async function responder(tel, texto) {
         let args = {};
         try { args = JSON.parse(tc.function.arguments || '{}'); } catch { /* argumento quebrado */ }
         let saida;
-        try { saida = await executar(tel, tc.function.name, args); } catch (e) { saida = { erro: String(e.message || e) }; }
+        try {
+          saida = tc.function.name === 'fechar_pedido' && pedidoFechado
+            ? pedidoFechado : await executar(tel, tc.function.name, args);
+          if (tc.function.name === 'fechar_pedido' && saida.ok) pedidoFechado = saida;
+        } catch (e) { saida = { erro: String(e.message || e) }; }
         passos.push({ ferramenta: tc.function.name, args, saida });
         messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(saida) });
       }
+      if (pedidoFechado) break;
     }
 
     // Se houve fechamento de pedido ou consulta de status, envia a mensagem consultada e gerada diretamente da tabela de pedidos (sem deixar na mão da IA)
@@ -410,11 +439,11 @@ export async function responder(tel, texto) {
     console.error(`⚠ [AVISO DE SERVIÇO - Tel: ${tel}]:`, errStr);
 
     if (/402|budget_exhausted|credits|payment/i.test(errStr)) {
-      resposta = 'Olá! No momento nosso canal de atendimento automático está com alta demanda. ⏳\n\nNossa equipe já foi acionada e vai te atender aqui em instantes! Se preferir fazer seu pedido agora por ligação, ligue para (12) 99750-0045 ou (12) 98146-4976. 🍽️😊';
+      resposta = 'Olá! No momento nosso canal de atendimento automático está com alta demanda. ⏳\n\nVocê pode falar com nossa equipe pelo telefone. Se preferir fazer seu pedido agora por ligação, ligue para (12) 99750-0045 ou (12) 98146-4976. 🍽️😊';
     } else if (/429|rate_limit|too many requests/i.test(errStr)) {
       resposta = 'Estou recebendo muitas mensagens simultâneas neste momento! ⏳ Já estou processando seu atendimento. Pode aguardar um instante ou falar conosco pelo telefone (12) 99750-0045.';
     } else {
-      resposta = 'Desculpe, tive uma instabilidade momentânea na conexão. Nossa equipe humana já foi avisada para te dar suporte por aqui! Contato direto: (12) 99750-0045.';
+      resposta = 'Desculpe, tive uma instabilidade momentânea na conexão. Você pode falar diretamente com nossa equipe. Contato direto: (12) 99750-0045.';
     }
   }
 
@@ -422,7 +451,7 @@ export async function responder(tel, texto) {
   const passoFecharNestaMensagem = passos.find((p) => p.ferramenta === 'fechar_pedido');
   if (!passoFecharNestaMensagem) {
     const estado = obterEstadoCliente(tel);
-    if (estado.status === STATUS_CONVERSA.INICIADA && /pedido|pedir|card[aá]pio|quero|comprar|fazer um pedido/i.test(texto)) {
+    if (estado.status === STATUS_CONVERSA.INICIADA && /(?:quero|vou|gostaria de)\s+(?:fazer\s+um\s+pedido|pedir|comprar)|fazer um pedido/i.test(texto) && !/status|andamento|situa[çc][aã]o/i.test(texto)) {
       estado.status = STATUS_CONVERSA.PRATOS;
       atualizarStatusCliente(tel, STATUS_CONVERSA.PRATOS, estado.rascunho);
     }
@@ -430,17 +459,13 @@ export async function responder(tel, texto) {
 
   lembrar(tel, 'user', texto);
   lembrar(tel, 'assistant', resposta);
-  sincronizarStatusBanco(tel, memoria[tel]?.status, memoria[tel]?.rascunho);
-  appendFileSync('conversas.log', JSON.stringify({ quando: new Date().toISOString(), tel, status: memoria[tel]?.status, texto, passos, resposta }) + '\n');
+  sincronizarStatusBanco(tel, memoria[tel]?.status, memoria[tel]?.rascunho, { registrar_mensagem: true });
+  appendFileSync(process.env.ARQ_LOG || fileURLToPath(new URL('./conversas.log', import.meta.url)), JSON.stringify({ quando: new Date().toISOString(), tel, status: memoria[tel]?.status, texto, passos, resposta }) + '\n');
   return resposta;
 }
 
 // ---------------------------------------------------------------- fila por telefone
-const filas = new Map();
+const enfileirarResposta = criarFilaPorChave();
 export function responderNaFila(tel, texto) {
-  const antes = filas.get(tel) || Promise.resolve();
-  const agora = antes.catch(() => {}).then(() => responder(tel, texto));
-  filas.set(tel, agora);
-  agora.finally(() => { if (filas.get(tel) === agora) filas.delete(tel); }).catch(() => {});
-  return agora;
+  return enfileirarResposta(tel, () => responder(tel, texto));
 }

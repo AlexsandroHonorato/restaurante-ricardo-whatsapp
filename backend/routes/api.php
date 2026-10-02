@@ -1,11 +1,11 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AtendimentoController;
+use App\Http\Controllers\CardapioController;
+use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PedidoController;
-use App\Http\Controllers\ClienteController;
-use App\Http\Controllers\CardapioController;
-use App\Http\Controllers\AtendimentoController;
+use Illuminate\Support\Facades\Route;
 
 // Rotas do Dashboard
 Route::prefix('dashboard')->group(function () {
@@ -21,6 +21,7 @@ Route::prefix('dashboard')->group(function () {
 Route::prefix('pedidos')->group(function () {
     Route::get('/', [PedidoController::class, 'index']);
     Route::post('/', [PedidoController::class, 'store']);
+    Route::get('/consulta/bot', [PedidoController::class, 'consultaBot']);
     Route::get('/{id}', [PedidoController::class, 'show']);
     Route::patch('/{id}/status', [PedidoController::class, 'updateStatus']);
 });
@@ -53,4 +54,3 @@ Route::prefix('status-conversa')->group(function () {
     Route::get('/', [AtendimentoController::class, 'getStatusConversas']);
     Route::post('/sync', [AtendimentoController::class, 'syncStatus']);
 });
-

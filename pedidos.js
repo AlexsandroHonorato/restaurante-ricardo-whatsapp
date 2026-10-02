@@ -1,27 +1,21 @@
 // pedidos.js: Gerenciamento, persistência, consulta na tabela de pedidos e formatação de comandas
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { converterValor, validarItensTotal } from './lib/pedido.js';
+export { converterValor } from './lib/pedido.js';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { lerJson, gravarJson } from './lib/persistencia.js';
 
-const ARQ_PEDIDOS = 'pedidos.json';
+const ARQ_PEDIDOS = process.env.ARQ_PEDIDOS || fileURLToPath(new URL('./pedidos.json', import.meta.url));
 
-export function carregarPedidos() {
-  if (!existsSync(ARQ_PEDIDOS)) return {};
-  try {
-    return JSON.parse(readFileSync(ARQ_PEDIDOS, 'utf8'));
-  } catch {
-    return {};
-  }
-}
-
-export function salvarPedidos(pedidos) {
-  writeFileSync(ARQ_PEDIDOS, JSON.stringify(pedidos, null, 2), 'utf8');
-}
+export const carregarPedidos = () => lerJson(ARQ_PEDIDOS);
+export const salvarPedidos = (dados) => gravarJson(ARQ_PEDIDOS, dados);
 
 export function gerarIdPedido() {
   const agora = new Date();
   const dia = String(agora.getDate()).padStart(2, '0');
   const hora = String(agora.getHours()).padStart(2, '0');
   const min = String(agora.getMinutes()).padStart(2, '0');
-  const rand = Math.floor(100 + Math.random() * 900);
+  const rand = randomUUID().slice(0, 12);
   return `PED-${dia}${hora}${min}-${rand}`;
 }
 
@@ -41,8 +35,8 @@ export function obterUltimoPedidoPorTelefone(telefone) {
   const pedidos = carregarPedidos();
   if (!telefone) return null;
   const telLimpo = String(telefone).replace(/\D/g, '');
-  const encontrados = Object.values(pedidos).filter((p) => p.telefone && String(p.telefone).replace(/\D/g, '').includes(telLimpo));
-  return encontrados.length > 0 ? encontrados.at(-1) : null;
+  const encontrados = Object.values(pedidos).filter((p) => p.telefone && String(p.telefone).replace(/\D/g, '').replace(/^00/, '') === telLimpo);
+  return encontrados.sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora))[0] || null;
 }
 
 /**
@@ -64,7 +58,7 @@ export function formatarMensagemConfirmacaoCliente(pedido) {
     `💳 *Pagamento:* ${pedido.formaPagamento}${pedido.trocoPara ? ` (Troco para R$ ${pedido.trocoPara})` : ''}\n` +
     `💰 *Valor Total:* ${pedido.total}\n` +
     `⏳ *Previsão de Entrega:* 40 a 60 minutos\n\n` +
-    `👨‍🍳 O seu pedido já foi impresso na nossa cozinha e está em preparação!\n` +
+    `👨‍🍳 O seu pedido foi registrado e está em preparação!\n` +
     `Para consultar o andamento a qualquer momento, basta enviar: *status do pedido*.\n\n` +
     `Agradecemos a sua preferência! 😊`;
 }
@@ -94,14 +88,23 @@ export function formatarMensagemStatusCliente(pedido) {
  * Registra o pedido na tabela, consulta o registro oficial, gera a comanda para a cozinha
  * e gera a mensagem oficial para o cliente.
  */
-export function registrarPedido({ id, telefone, nome, itens, endereco, formaPagamento, trocoPara, total, observacoes }) {
+export async function registrarPedido({ id, telefone, nome, itens, endereco, formaPagamento, trocoPara, total, observacoes }) {
+  if (typeof telefone !== 'string' || !/^\d{10,15}$/.test(telefone) || !nome?.trim() || !endereco?.trim() || !formaPagamento?.trim() || !Array.isArray(itens) || !itens.length || itens.some(i => typeof i !== 'string' || !i.trim())) throw new Error('Pedido incompleto ou inválido');
+  if (nome.length > 150 || endereco.length > 255 || itens.length > 100) throw new Error('Pedido excede os limites permitidos');
+  validarItensTotal(itens, total);
+  const valor = converterValor(total);
+  if (valor < 25 && !/retirada|balc[aã]o/i.test(endereco)) throw new Error('Pedido mínimo para entrega: R$ 25,00');
+  if (valor <= 0) throw new Error('Total do pedido inválido');
+  if (trocoPara && converterValor(trocoPara) < valor) throw new Error('O valor para troco não cobre o pedido');
   const pedidos = carregarPedidos();
   const novoId = id || gerarIdPedido();
 
+  if (pedidos[novoId]) throw new Error('Número do pedido já registrado');
   const pedido = {
     id: novoId,
     dataHora: new Date().toISOString(),
     status: 'Em preparo',
+    sincronizado: false,
     telefone,
     nome: nome || 'Cliente',
     itens: itens || [],
@@ -116,24 +119,7 @@ export function registrarPedido({ id, telefone, nome, itens, endereco, formaPaga
   pedidos[novoId] = pedido;
   salvarPedidos(pedidos);
 
-  // Sincroniza em tempo real com o banco de dados MySQL via API Laravel
-  try {
-    fetch('http://127.0.0.1:8080/api/pedidos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        codigo_pedido: novoId,
-        telefone,
-        nome,
-        itens: Array.isArray(itens) ? itens : [itens],
-        endereco,
-        formaPagamento,
-        trocoPara,
-        total,
-        observacoes,
-      }),
-    }).catch(() => {});
-  } catch { /* não bloqueia a resposta se a API estiver ocupada */ }
+  await sincronizarPedido(pedido);
 
   // Consulta o pedido diretamente da tabela para garantir consistência
   const pedidoConsultado = obterPedidoPorId(novoId) || pedido;
@@ -159,7 +145,7 @@ export function registrarPedido({ id, telefone, nome, itens, endereco, formaPaga
 /**
  * Consulta a tabela de pedidos por ID ou Telefone e formata a resposta direta
  */
-export function consultarStatusPedido(idOuTelefone) {
+export async function consultarStatusPedido(idOuTelefone, telefoneCliente) {
   if (!idOuTelefone) return { erro: 'Informe o número do pedido ou seu telefone.' };
 
   const idLimpo = String(idOuTelefone).trim();
@@ -168,6 +154,19 @@ export function consultarStatusPedido(idOuTelefone) {
   if (!pedido) {
     pedido = obterUltimoPedidoPorTelefone(idLimpo);
   }
+
+  if (telefoneCliente) {
+    try {
+      const parametros = new URLSearchParams({ telefone: telefoneCliente });
+      if (/^PED-/i.test(idLimpo)) parametros.set('codigo_pedido', idLimpo);
+      const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos/consulta/bot?${parametros}`, { signal: AbortSignal.timeout(5000) });
+      if (resposta.ok) {
+        const { pedido: remoto } = await resposta.json();
+        if (remoto) pedido = { id: remoto.codigo_pedido, telefone: remoto.cliente.telefone, nome: remoto.cliente.nome, status: remoto.status, dataHora: remoto.created_at, endereco: remoto.endereco?.logradouro || 'Retirada no balcão', total: `R$ ${remoto.valor_total}`, itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, qtd: i.quantidade, tamanho: i.tamanho_snapshot, preco: i.preco_unitario })) };
+      } else if (resposta.status === 404) { pedido = null; }
+    } catch (erro) { console.warn('Consulta usando registro local:', erro.message); }
+  }
+  if (pedido && telefoneCliente && String(pedido.telefone).replace(/\D/g, '') !== String(telefoneCliente).replace(/\D/g, '')) pedido = null;
 
   if (pedido) {
     const mensagemStatus = formatarMensagemStatusCliente(pedido);
@@ -184,7 +183,7 @@ export function consultarStatusPedido(idOuTelefone) {
 
   return {
     aviso: 'Pedido não localizado automaticamente na nossa tabela de pedidos. Encaminhando para um atendente humano.',
-    mensagemStatus: 'Não encontrei nenhum pedido em andamento com os dados informados. 🔍\nUm de nossos atendentes foi avisado e vai te responder por aqui!',
+    mensagemStatus: 'Não encontrei nenhum pedido em andamento com os dados informados. 🔍\nPara falar com nossa equipe, ligue para (12) 99750-0045.',
   };
 }
 
@@ -221,3 +220,40 @@ export function imprimirComanda(textoComanda) {
   console.log(`\n🖨️ [IMPRESSORA DE PEDIDOS / COZINHA]\n${textoComanda}\n`);
 }
 
+
+async function sincronizarPedido(pedido) {
+  try {
+    const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos`, {
+      method: 'POST', signal: AbortSignal.timeout(5000),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ ...pedido, codigo_pedido: pedido.id }),
+    });
+    if (!resposta.ok) throw new Error(`API de pedidos retornou ${resposta.status}`);
+    const atuais = carregarPedidos();
+    if (atuais[pedido.id]) {
+      atuais[pedido.id].sincronizado = true;
+      delete atuais[pedido.id].erroSincronizacao;
+      salvarPedidos(atuais);
+    }
+    return true;
+  } catch (erro) {
+    const atuais = carregarPedidos();
+    if (atuais[pedido.id]) {
+      atuais[pedido.id].erroSincronizacao = erro.message;
+      salvarPedidos(atuais);
+    }
+    console.error('Pedido salvo localmente; sincronização pendente:', pedido.id, erro.message);
+    return false;
+  }
+}
+
+let sincronizacaoEmCurso = null;
+export function sincronizarPedidosPendentes() {
+  if (sincronizacaoEmCurso) return sincronizacaoEmCurso;
+  sincronizacaoEmCurso = (async () => {
+    for (const pedido of Object.values(carregarPedidos())) {
+      if (pedido.sincronizado === false) await sincronizarPedido(pedido);
+    }
+  })().finally(() => { sincronizacaoEmCurso = null; });
+  return sincronizacaoEmCurso;
+}

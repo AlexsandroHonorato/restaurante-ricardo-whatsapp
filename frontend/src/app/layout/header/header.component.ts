@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 
@@ -7,12 +7,15 @@ import { ApiService } from '../../core/services/api.service';
   standalone: true,
   imports: [CommonModule],
   template: `
+    @if (api.erro()) {
+      <div role="alert" style="padding: 10px 20px; background: #7f1d1d; color: white">{{ api.erro() }}</div>
+    }
     <header class="header">
       <div class="header-left">
         <div class="store-status">
-          <span class="status-badge open">
+          <span class="status-badge" [class.open]="aberto()" [class.closed]="!aberto()">
             <span class="live-indicator"></span>
-            Restaurante Aberto • Caraguatatuba/SP
+            Restaurante {{ aberto() ? 'Aberto' : 'Fechado' }} • Caraguatatuba/SP
           </span>
           <span class="hours">Segunda a Sábado, 11h00 às 14h30</span>
         </div>
@@ -80,6 +83,8 @@ import { ApiService } from '../../core/services/api.service';
       font-weight: 600;
     }
 
+    .status-badge.closed { background: rgba(239, 68, 68, .12); border-color: #ef4444; color: #fca5a5; }
+
     .hours {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -142,8 +147,22 @@ import { ApiService } from '../../core/services/api.service';
     }
   `]
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnDestroy {
   api = inject(ApiService);
+  private agora = signal(new Date());
+  private relogio = setInterval(() => this.agora.set(new Date()), 60000);
+
+  aberto(): boolean {
+    const partes = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(this.agora());
+    const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value || '';
+    const minutos = Number(valor('hour')) * 60 + Number(valor('minute'));
+    return valor('weekday') !== 'Sun' && minutos >= 660 && minutos < 870;
+  }
+
+  ngOnDestroy() { clearInterval(this.relogio); }
+
 
   refresh() {
     this.api.getKpis().subscribe();
