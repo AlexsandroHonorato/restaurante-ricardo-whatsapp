@@ -240,4 +240,24 @@ CREATE TABLE `historico_status_pedidos` (
   CONSTRAINT `fk_historico_pedido` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- -----------------------------------------------------------------------------
+-- 11. TABELA: status_conversas (Estado Ativo da Conversa & Rascunho)
+-- Armazena o estágio do atendimento no WhatsApp, rascunho de itens e expiração de 30min
+-- -----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `status_conversas`;
+CREATE TABLE `status_conversas` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `telefone` VARCHAR(30) NOT NULL,
+  `status_atual` VARCHAR(50) NOT NULL DEFAULT 'conversa_iniciada',
+  `status_anterior` VARCHAR(50) NULL,
+  `rascunho` JSON NULL,
+  `ultimo_contato_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `expira_em` DATETIME NULL,
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_status_telefone` (`telefone`),
+  INDEX `idx_status_conversas_status` (`status_atual`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
