@@ -70,4 +70,9 @@ class Pedido extends Model
     {
         return $this->hasOne(Atendimento::class);
     }
+
+    public function statusCatalogo()
+    {
+        return $this->belongsTo(StatusPedido::class, 'status', 'codigo');
+    }
 }

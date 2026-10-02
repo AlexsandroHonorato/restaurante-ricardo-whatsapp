@@ -310,13 +310,7 @@ async function executar(tel, nome, args) {
     return { ok: true, statusAtual: args.novoStatus };
   }
   if (nome === 'fechar_pedido') {
-    atualizarStatusCliente(tel, STATUS_CONVERSA.COZINHA, {
-      itens: args.itens,
-      endereco: args.endereco,
-      formaPagamento: args.formaPagamento,
-      total: args.total,
-    });
-    return registrarPedido({
+    const resPedido = registrarPedido({
       telefone: tel,
       nome: args.nome,
       itens: args.itens,
@@ -326,6 +320,19 @@ async function executar(tel, nome, args) {
       total: args.total,
       observacoes: args.observacoes,
     });
+
+    // Reset do status do cliente de volta para o início, pois o fluxo do pedido terminou com sucesso!
+    atualizarStatusCliente(tel, STATUS_CONVERSA.INICIADA, {
+      pratos: [],
+      bebidas: [],
+      endereco: null,
+      formaPagamento: null,
+      trocoPara: null,
+      total: null,
+      ultimoPedidoId: resPedido.id,
+    });
+
+    return resPedido;
   }
   if (nome === 'consultar_status_pedido') {
     return consultarStatusPedido(args.idOuTelefone || tel);
@@ -386,6 +393,12 @@ export async function responder(tel, texto) {
     const passoFechar = passos.find((p) => p.ferramenta === 'fechar_pedido' && p.saida?.mensagemCliente);
     if (passoFechar) {
       resposta = passoFechar.saida.mensagemCliente;
+      // Garante que o status do cliente fique no início com rascunho limpo após fechar o pedido
+      const c = obterEstadoCliente(tel);
+      c.status = STATUS_CONVERSA.INICIADA;
+      c.rascunho = { pratos: [], bebidas: [], endereco: null, formaPagamento: null, trocoPara: null, total: null, ultimoPedidoId: passoFechar.saida.id };
+      salvarMemoria();
+      sincronizarStatusBanco(tel, STATUS_CONVERSA.INICIADA, c.rascunho);
     } else {
       const passoStatus = passos.find((p) => p.ferramenta === 'consultar_status_pedido' && p.saida?.mensagemStatus);
       if (passoStatus) {
@@ -405,11 +418,14 @@ export async function responder(tel, texto) {
     }
   }
 
-  // Se o cliente manifestou intenção clara de pedir e estava no início, avança status
-  const estado = obterEstadoCliente(tel);
-  if (estado.status === STATUS_CONVERSA.INICIADA && /pedido|pedir|card[aá]pio|quero|comprar|fazer um pedido/i.test(texto)) {
-    estado.status = STATUS_CONVERSA.PRATOS;
-    atualizarStatusCliente(tel, STATUS_CONVERSA.PRATOS, estado.rascunho);
+  // Se o cliente manifestou intenção clara de pedir e estava no início (e não acabou de finalizar um pedido nesta mensagem)
+  const passoFecharNestaMensagem = passos.find((p) => p.ferramenta === 'fechar_pedido');
+  if (!passoFecharNestaMensagem) {
+    const estado = obterEstadoCliente(tel);
+    if (estado.status === STATUS_CONVERSA.INICIADA && /pedido|pedir|card[aá]pio|quero|comprar|fazer um pedido/i.test(texto)) {
+      estado.status = STATUS_CONVERSA.PRATOS;
+      atualizarStatusCliente(tel, STATUS_CONVERSA.PRATOS, estado.rascunho);
+    }
   }
 
   lembrar(tel, 'user', texto);

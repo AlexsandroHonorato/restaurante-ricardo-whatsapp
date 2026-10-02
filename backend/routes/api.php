@@ -24,6 +24,7 @@ Route::prefix('pedidos')->group(function () {
     Route::get('/{id}', [PedidoController::class, 'show']);
     Route::patch('/{id}/status', [PedidoController::class, 'updateStatus']);
 });
+Route::get('/status-pedidos', [PedidoController::class, 'getStatusCatalog']);
 
 // Rotas de Clientes
 Route::prefix('clientes')->group(function () {

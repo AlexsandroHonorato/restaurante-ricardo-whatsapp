@@ -229,4 +229,16 @@ class PedidoController extends Controller
             'pedido' => $pedido->load(['cliente', 'endereco', 'itens'])
         ], 201);
     }
+
+    /**
+     * Retorna a lista de status de pedidos cadastrados no sistema
+     */
+    public function getStatusCatalog()
+    {
+        $status = \App\Models\StatusPedido::where('ativo', true)
+            ->orderBy('ordem', 'ASC')
+            ->get();
+
+        return response()->json($status);
+    }
 }

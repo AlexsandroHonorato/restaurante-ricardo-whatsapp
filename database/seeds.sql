@@ -15,6 +15,16 @@ INSERT INTO `categorias` (`id`, `nome`, `slug`, `descricao`, `ordem_exibicao`) V
 (6, 'Cervejas', 'cervejas', 'Cervejas em lata e long neck', 6)
 ON DUPLICATE KEY UPDATE `nome` = VALUES(`nome`);
 
+-- 1.1 Status dos Pedidos
+INSERT INTO `status_pedidos` (`id`, `codigo`, `nome`, `descricao`, `cor_badge`, `icone`, `ordem`, `ativo`, `created_at`, `updated_at`) VALUES
+(1, 'pendente', 'Pendente', 'Pedido registrado pelo cliente e aguardando confirmação da cozinha.', '#F59E0B', '⏳', 1, 1, NOW(), NOW()),
+(2, 'confirmado', 'Confirmado', 'Pedido aceito e comanda enviada para produção.', '#3B82F6', '📋', 2, 1, NOW(), NOW()),
+(3, 'em_preparo', 'Em Preparo', 'Refeição sendo montada e preparada pela equipe da cozinha.', '#8B5CF6', '👨‍🍳', 3, 1, NOW(), NOW()),
+(4, 'saiu_para_entrega', 'Saiu para Entrega', 'Pedido despachado e a caminho do endereço com o motoboy.', '#06B6D4', '🛵', 4, 1, NOW(), NOW()),
+(5, 'entregue', 'Entregue', 'Pedido entregue com sucesso ao cliente.', '#10B981', '✅', 5, 1, NOW(), NOW()),
+(6, 'cancelado', 'Cancelado', 'Pedido cancelado por inatividade ou solicitação.', '#EF4444', '❌', 6, 1, NOW(), NOW())
+ON DUPLICATE KEY UPDATE `nome` = VALUES(`nome`), `descricao` = VALUES(`descricao`), `cor_badge` = VALUES(`cor_badge`), `icone` = VALUES(`icone`);
+
 -- 2. Produtos
 INSERT INTO `produtos` (`id`, `categoria_id`, `tipo`, `nome`, `descricao`, `dias_disponiveis`) VALUES
 -- Pratos Diários

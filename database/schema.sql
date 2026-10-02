@@ -113,6 +113,28 @@ CREATE TABLE `produto_variacoes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
+-- 5.1 TABELA: status_pedidos
+-- Catálogo oficial de status operacionais dos pedidos com metadados e cores
+-- -----------------------------------------------------------------------------
+DROP TABLE IF EXISTS `status_pedidos`;
+CREATE TABLE `status_pedidos` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `codigo` VARCHAR(50) NOT NULL,
+  `nome` VARCHAR(100) NOT NULL,
+  `descricao` TEXT NULL,
+  `cor_badge` VARCHAR(20) NOT NULL DEFAULT '#6B7280',
+  `icone` VARCHAR(50) NULL,
+  `ordem` INT UNSIGNED NOT NULL DEFAULT 0,
+  `ativo` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_status_pedidos_codigo` (`codigo`),
+  INDEX `idx_status_pedidos_ativo` (`ativo`),
+  INDEX `idx_status_pedidos_ordem` (`ordem`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
 -- 6. TABELA: pedidos
 -- Registro central de pedidos delivery (Faturamento, Status, Prazos e Pagamento)
 -- -----------------------------------------------------------------------------
