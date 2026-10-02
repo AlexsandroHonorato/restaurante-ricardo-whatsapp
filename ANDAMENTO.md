@@ -39,25 +39,36 @@
 
 ---
 
-## 3. 🤖 Fluxo de Atendimento do Robô
+## 3. 🤖 Fluxo de Atendimento do Robô & Máquina de Estados da Conversa
+
+### Estados Conversacionais (`STATUS_CONVERSA`):
+1. `conversa_iniciada`: Cliente iniciou contato ou saudação ("oi", "olá"). O bot verifica se deseja fazer pedido ou consultar status.
+2. `fazendo_pedido_pratos`: O cliente escolhe os pratos principais, porções e tamanhos (Infantil, Médio, Grande).
+3. `fazendo_pedido_bebidas`: Pratos definidos. O bot apresenta e coleta as bebidas (Refrigerantes, Sucos, Água, Cervejas) ou confirma se dispensa.
+4. `coletando_endereco`: Pratos e bebidas definidos. O bot solicita os dados de entrega (Rua, Número, Bairro, CEP/Ponto de Referência e Nome).
+5. `coletando_pagamento`: Endereço informado. O bot solicita a forma de pagamento (Cartão de Crédito, Débito, Pix ou Dinheiro) e troco se aplicável.
+6. `preparando_na_cozinha`: Pedido fechado com sucesso (`fechar_pedido`), comanda gerada e pedido em produção.
+7. `saiu_para_entrega`: Pedido despachado para entrega com motoboy.
+8. `cancelado_apos_30_minutos`: Inatividade superior a 30 minutos em pedidos em andamento cancela o rascunho e reinicia o fluxo.
 
 ```mermaid
 graph TD
-    A[Cliente: Oi / Saudação] --> B[Bot: 1. Fazer Pedido ou 2. Status do Pedido?]
-    B -->|1. Fazer Pedido| C[Exibe Cardápio + Solicita Prato e Tamanho]
-    C --> D[Sugere Porções, Adicionais e Bebidas]
-    D --> E[Coleta Endereço: Rua, Nº, Bairro, CEP/Ref, Nome]
-    E --> F[Coleta Pagamento: Cartão / Pix / Dinheiro]
-    F -->|Dinheiro: Troco exato| G1[Informa: Pagamento exato, sem troco]
-    F -->|Dinheiro: Troco menor que total| G2[Informa: Valor deve ser maior que total]
-    F -->|Dados confirmados| H[Ferramenta: fechar_pedido]
-    H --> I[Gera ID + Imprime Comanda + Informa 40-60 min]
-    B -->|2. Status do Pedido| J[Ferramenta: consultar_status_pedido]
-    J -->|Não localizado / Atraso| K[Ferramenta: chamar_atendente]
-    L[Inatividade >= 30 min sem fechar pedido] -.->|Timeout| A
+    A[conversa_iniciada] -->|Deseja fazer pedido| B[fazendo_pedido_pratos]
+    A -->|Consultar pedido| S[consultar_status_pedido]
+    B -->|Pratos escolhidos| C[fazendo_pedido_bebidas]
+    C -->|Bebidas definidas ou dispensadas| D[coletando_endereco]
+    D -->|Endereço informado| E[coletando_pagamento]
+    E -->|Pagamento confirmado| F[fechar_pedido ➔ preparando_na_cozinha]
+    F --> G[saiu_para_entrega]
+    B -.->|Inatividade >= 30 min| H[cancelado_apos_30_minutos ➔ conversa_iniciada]
+    C -.->|Inatividade >= 30 min| H
+    D -.->|Inatividade >= 30 min| H
+    E -.->|Inatividade >= 30 min| H
 ```
 
-> ⏱️ **Regra de Inatividade (30 minutos):** Caso o cliente fique sem responder por 30 minutos ou mais antes de concluir e fechar o pedido, o estado da conversa é zerado automaticamente, fazendo com que uma nova mensagem retorne ao menu/saudação inicial.
+> ⏱️ **Regra de Continuidade e Limite de 30 Minutos:**
+> - **Antes de 30 minutos de inatividade:** Ao receber nova mensagem, o bot verifica o status atual do cliente e continua exatamente do ponto em que parou (se estava escolhendo pratos continua nos pratos; se estava nas bebidas continua nas bebidas; se estava no endereço continua no endereço; se estava no pagamento continua no pagamento).
+> - **Após 30 minutos de inatividade sem fechar o pedido:** O status é resetado para `conversa_iniciada`, limpando o rascunho temporário.
 
 ---
 

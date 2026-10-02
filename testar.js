@@ -83,11 +83,22 @@ const TESTES = [
   {
     nome: '10. Inatividade de mais de 30 minutos reinicia conversa para o status inicial',
     inativo: true,
+    tempoMinutos: 31,
     msgs: [
       'quero fazer um pedido de filé de frango',
       'olá',
     ],
     ok: (r) => /pedido|status|card[aá]pio|olá|como posso/i.test(r),
+  },
+  {
+    nome: '11. Retorno antes de 30 minutos continua exatamente de onde parou',
+    inativo: true,
+    tempoMinutos: 10,
+    msgs: [
+      'quero 1 Filé de frango à parmegiana grande',
+      'e 1 Coca-Cola 2L',
+    ],
+    ok: (r) => /coca|bebida|endereço|entrega/i.test(r),
   },
 ];
 
@@ -102,15 +113,16 @@ for (const t of TESTES) {
       t.duplo.forEach((m, i) => console.log(`  você › ${m}\n  agente › ${respostas[i]}`));
       ultima = respostas.at(-1);
     } else if (t.inativo) {
+      const minutos = t.tempoMinutos || 31;
       // Mensagem inicial
       const r1 = await responderNaFila(tel, t.msgs[0]);
       console.log(`  você › ${t.msgs[0]}\n  agente › ${r1}`);
-      // Simula passagem de 31 minutos
+      // Simula passagem de minutos
       if (memoria[tel]) {
-        memoria[tel].atualizado = Date.now() - 31 * 60 * 1000;
+        memoria[tel].atualizado = Date.now() - minutos * 60 * 1000;
       }
-      console.log(`  [Passaram-se 31 minutos de inatividade sem fechar o pedido...]`);
-      // Nova mensagem após timeout
+      console.log(`  [Passaram-se ${minutos} minutos de inatividade...]`);
+      // Nova mensagem após timeout / pausa
       ultima = await responderNaFila(tel, t.msgs[1]);
       console.log(`  você › ${t.msgs[1]}\n  agente › ${ultima}`);
     } else {
