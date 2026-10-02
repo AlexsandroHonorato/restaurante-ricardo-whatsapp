@@ -159,3 +159,20 @@ graph TD
       > *"🛵💨 Temos uma ótima notícia! O seu pedido [Nº PEDIDO] acabou de sair para entrega e já está a caminho!"*
     - Atualização simultânea das tabelas `pedidos`, `historico_status_pedidos` e `status_conversas` para o status `saiu_para_entrega`.
 
+- [x] **3. Cardápio Dinâmico da Tabela de Produtos & CRUD Completo de Pratos:**
+  - **Injeção Dinâmica na IA:** O bot WhatsApp (`cerebro.js` via `GET /api/cardapio/texto`) obtém os pratos, porções, bebidas e preços diretamente das tabelas relacionais `produtos` e `produto_variacoes` filtrando apenas registros com `ativo = 1`.
+  - **CRUD de Pratos no Backend (Laravel):**
+    - `GET /api/cardapio`: Lista todos os pratos com categorias e variações de tamanho/preço.
+    - `GET /api/cardapio/categorias`: Categorias disponíveis para cadastro.
+    - `GET /api/cardapio/texto`: Texto oficial formatado para o prompt do bot.
+    - `POST /api/cardapio`: Criação de novo prato com variações dinâmicas de preços.
+    - `PUT /api/cardapio/{id}`: Edição completa de nome, categoria, descrição, ativo e variações.
+    - `DELETE /api/cardapio/{id}`: Exclusão com cascata de variações.
+    - `PATCH /api/cardapio/{id}/toggle-status`: Alternância instantânea de Ativo / Pausado no WhatsApp.
+  - **CRUD de Pratos no Frontend (Angular):**
+    - Modal interativo para adicionar novo prato ou editar prato existente.
+    - Gestão inline de múltiplas variações de tamanho (Infantil, Médio, Grande, etc.) e valores em R$.
+    - Toggle visual e ágil de "Ativo / Pausado" por card e tabela.
+    - Filtros por categoria e busca textual em tempo real.
+
+

@@ -140,6 +140,24 @@ export class ApiService {
     );
   }
 
+  getCategoriasCardapio(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/cardapio/categorias`).pipe(
+      catchError(() => of([]))
+    );
+  }
+
+  criarProduto(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/cardapio/produtos`, payload);
+  }
+
+  atualizarProduto(id: number, payload: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/cardapio/produtos/${id}`, payload);
+  }
+
+  excluirProduto(id: number): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/cardapio/produtos/${id}`);
+  }
+
   toggleProduto(id: number): Observable<any> {
     return this.http.patch(`${this.baseUrl}/cardapio/produtos/${id}/toggle`, {});
   }

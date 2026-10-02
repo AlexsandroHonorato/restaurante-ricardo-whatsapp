@@ -122,6 +122,29 @@ export function lembrar(tel, role, content, timestamp = Date.now()) {
   salvarMemoria();
 }
 
+// ---------------------------------------------------------------- cardápio dinâmico do banco
+let cardapioBancoCache = null;
+let ultimoFetchCardapio = 0;
+
+export async function obterCardapioAtivo() {
+  const agora = Date.now();
+  if (cardapioBancoCache && (agora - ultimoFetchCardapio < 10000)) {
+    return cardapioBancoCache;
+  }
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/cardapio/texto');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.cardapio_texto) {
+        cardapioBancoCache = data.cardapio_texto;
+        ultimoFetchCardapio = agora;
+        return cardapioBancoCache;
+      }
+    }
+  } catch { /* fallback se a API estiver em reload */ }
+  return cardapioBancoCache || FICHA;
+}
+
 // ---------------------------------------------------------------- datas
 const fmtData = (d, o) => new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, ...o }).format(d);
 const isoDia = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: FUSO, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
@@ -135,11 +158,12 @@ function calendario(dias = 7) {
 }
 
 // ---------------------------------------------------------------- prompt de sistema dinâmico
-function promptDeSistema(tel) {
+function promptDeSistema(tel, cardapioTexto = null) {
   const estado = tel ? obterEstadoCliente(tel) : null;
   const statusAtual = estado?.status || STATUS_CONVERSA.INICIADA;
   const rascunho = estado?.rascunho || {};
   const rascunhoStr = JSON.stringify(rascunho);
+  const cardapioOficial = cardapioTexto || cardapioBancoCache || FICHA;
 
   return `Você é o atendente virtual do Restaurante Família Ricardo no WhatsApp.
 Seu objetivo é guiar o cliente de forma cordial, ágil e organizada para realizar pedidos de delivery ou consultar o status de um pedido.
@@ -152,7 +176,7 @@ REGRAS OBRIGATÓRIAS DE MÁQUINA DE ESTADOS E CONTINUIDADE:
 Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
 1. Se status for 'conversa_iniciada':
    - Quando o cliente mandar saudação ("oi", "olá"), cumprimente educadamente e pergunte: "Você deseja fazer um pedido ou saber o status de um pedido?"
-   - Ao optar por fazer um pedido, atualize o status para 'fazendo_pedido_pratos' e apresente as opções do cardápio com preços e tamanhos.
+   - Ao optar por fazer um pedido, atualize o status para 'fazendo_pedido_pratos' e apresente as opções do cardápio com preços e tamanhos consultados da tabela abaixo.
 2. Se status for 'fazendo_pedido_pratos':
    - O cliente está escolhendo pratos principais/porções e tamanhos (Infantil, Médio, Grande).
    - Confirme o prato e o tamanho escolhido. Pergunte se deseja adicionar mais algum prato ou se pode avançar para as bebidas.
@@ -176,14 +200,15 @@ Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
    - Se passar de 30 minutos sem fechar o pedido, a sessão expira e retorna ao status inicial ('conversa_iniciada').
 
 REGRAS RÍGIDAS:
-- NUNCA dê desconto, não altere os preços da ficha e não invente pratos fora do cardápio.
+- NUNCA dê desconto, não altere os preços da tabela e não invente pratos fora do cardápio oficial.
 - Respostas dinâmicas, simpáticas, bem formatadas com emojis e quebras de linha para leitura agradável no WhatsApp.
+
+CARDÁPIO OFICIAL ATIVO (CONSULTADO DIRETAMENTE DA TABELA DE PRODUTOS):
+${cardapioOficial}
 
 TABELA DE DATAS (fuso ${FUSO})
 ${calendario()}
-
-FICHA DO NEGÓCIO
-${FICHA}`;
+`;
 }
 
 // ---------------------------------------------------------------- ferramentas
@@ -333,7 +358,8 @@ async function chamarModelo(messages) {
 // ---------------------------------------------------------------- responder
 export async function responder(tel, texto) {
   obterEstadoCliente(tel); // valida inatividade e carrega estado
-  const messages = [{ role: 'system', content: promptDeSistema(tel) }, ...historico(tel), { role: 'user', content: texto }];
+  const cardapioTexto = await obterCardapioAtivo();
+  const messages = [{ role: 'system', content: promptDeSistema(tel, cardapioTexto) }, ...historico(tel), { role: 'user', content: texto }];
   const passos = [];
   let resposta = 'Olá! Tive uma breve instabilidade para consultar as opções. Nossa equipe humana já foi notificada para te responder por aqui! 🍽️';
 

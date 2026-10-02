@@ -31,9 +31,15 @@ Route::prefix('clientes')->group(function () {
     Route::get('/{id}', [ClienteController::class, 'show']);
 });
 
-// Rotas do Cardápio
+// Rotas do Cardápio (CRUD Completo & Listagem Ativa para o Robô)
 Route::prefix('cardapio')->group(function () {
     Route::get('/', [CardapioController::class, 'index']);
+    Route::get('/categorias', [CardapioController::class, 'getCategorias']);
+    Route::get('/texto', [CardapioController::class, 'getTextoCardapio']);
+    Route::post('/produtos', [CardapioController::class, 'store']);
+    Route::get('/produtos/{id}', [CardapioController::class, 'show']);
+    Route::put('/produtos/{id}', [CardapioController::class, 'update']);
+    Route::delete('/produtos/{id}', [CardapioController::class, 'destroy']);
     Route::patch('/produtos/{id}/toggle', [CardapioController::class, 'toggleProdutoStatus']);
 });
 
