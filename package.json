@@ -1,0 +1,13 @@
+{
+  "name": "agente-whatsapp",
+  "version": "1.0.0",
+  "description": "Agente de IA no WhatsApp em 8 passos: webhook da Meta, OpenRouter, memória, ficha do negócio, Cal.com e testes. Guia: marcondes-whatsapp.vercel.app",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20.6" },
+  "scripts": {
+    "start": "node --env-file=.env agente.js",
+    "simular": "node --env-file=.env simular.js",
+    "testar": "node --env-file=.env testar.js"
+  }
+}
