@@ -348,8 +348,9 @@ async function chamarModelo(messages) {
       'HTTP-Referer': 'https://familia-ricardo-whatsapp.local',
       'X-OpenRouter-Title': 'Agente Restaurante Familia Ricardo',
     },
-    body: JSON.stringify({ model: MODELO, messages, tools: FERRAMENTAS, temperature: 0.3, max_tokens: 450 }),
+    body: JSON.stringify({ model: MODELO, messages, tools: FERRAMENTAS, temperature: 0.3, max_tokens: 1500 }),
   });
+
   const j = await r.json();
   if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${JSON.stringify(j.error ?? j)}`);
   return j.choices[0].message;

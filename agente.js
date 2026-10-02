@@ -23,17 +23,21 @@ async function graph(corpo) {
   });
   if (!r.ok) console.error('WhatsApp', r.status, await r.text());
 }
-const enviarTexto = (para, texto) => graph({ recipient_type: 'individual', to: para, type: 'text', text: { body: texto } });
-// marca como lida e mostra "digitando…" para a pessoa até a resposta sair (some sozinho em 25 s)
-const marcarComoLida = (id) => graph({ status: 'read', message_id: id, typing_indicator: { type: 'text' } });
+const enviarTexto = (para, texto) => graph({ recipient_type: 'individual', to: para, type: 'text', text: { preview_url: false, body: texto } });
+// marca como lida na Meta Cloud API
+const marcarComoLida = (id) => graph({ status: 'read', message_id: id });
+
 
 // ---------------------------------------------------------------- segurança: a URL é pública, então confira quem mandou
 function assinaturaValida(bruto, cabecalho) {
-  if (!WHATSAPP_APP_SECRET) return true;
+  if (!WHATSAPP_APP_SECRET || WHATSAPP_APP_SECRET.includes('cole-aqui')) return true;
   const esperado = 'sha256=' + createHmac('sha256', WHATSAPP_APP_SECRET).update(bruto).digest('hex');
   const a = Buffer.from(esperado), b = Buffer.from(cabecalho || '');
-  return a.length === b.length && timingSafeEqual(a, b);
+  const valida = a.length === b.length && timingSafeEqual(a, b);
+  if (!valida) console.warn('⚠️ Assinatura HMAC do webhook inválida. Verifique o WHATSAPP_APP_SECRET no .env');
+  return valida;
 }
+
 
 // ---------------------------------------------------------------- mensagens: sem duplicar
 const vistas = new Set(); // a Meta pode reenviar a mesma mensagem: guarda os ids já tratados
@@ -44,16 +48,15 @@ async function tratar(msg) {
   if (vistas.size > 5000) vistas.delete(vistas.values().next().value);
   const tel = msg.from;
   try {
-    await marcarComoLida(msg.id);
+    try { await marcarComoLida(msg.id); } catch { /* silencia erro de read receipt */ }
     if (msg.type !== 'text') return await enviarTexto(tel, 'Por enquanto eu só consigo ler mensagens de texto. Pode escrever pra mim? 🙂');
     const resposta = await responderNaFila(tel, msg.text.body); // uma de cada vez por pessoa
     await enviarTexto(tel, resposta);
-    console.log(`💬 ${tel}: ${msg.text.body}
-🤖 ${resposta}
-`);
+    console.log(`💬 ${tel}: ${msg.text.body}\n🤖 ${resposta}\n`);
   } catch (e) {
     console.error('erro ao responder', tel, e);
   }
+
 }
 
 // ---------------------------------------------------------------- o servidor
@@ -80,11 +83,19 @@ createServer((req, res) => {
       res.writeHead(200).end(); // responde já: a Meta reenvia se você demorar
       let corpo;
       try { corpo = JSON.parse(bruto); } catch { return; }
-      for (const e of corpo.entry ?? []) for (const c of e.changes ?? []) for (const m of c.value?.messages ?? []) tratar(m);
+      for (const e of corpo.entry ?? []) {
+        for (const c of e.changes ?? []) {
+          for (const m of c.value?.messages ?? []) {
+            console.log(`📩 [WhatsApp] Mensagem recebida de ${m.from}: "${m.text?.body || m.type}"`);
+            tratar(m);
+          }
+        }
+      }
       // c.value.statuses (enviada, entregue, lida) chega aqui também e é ignorado de propósito
     });
     return;
   }
+
 
   // rota interna para envio de notificações automáticas pelo Dashboard/API
   if (req.method === 'POST' && url.pathname === '/api/notificar') {
