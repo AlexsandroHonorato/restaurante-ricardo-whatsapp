@@ -80,8 +80,23 @@ class PedidoController extends Controller
             'observacao' => $request->input('observacao'),
         ]);
 
+        // Sincroniza o status conversacional ativo do cliente
+        if ($pedido->cliente && $pedido->cliente->telefone) {
+            \App\Models\StatusConversa::updateOrCreate(
+                ['telefone' => $pedido->cliente->telefone],
+                [
+                    'status_atual' => $statusNovo,
+                    'status_anterior' => $statusAnterior,
+                    'ultimo_contato_em' => Carbon::now(),
+                ]
+            );
+        }
+
         return response()->json([
             'message' => 'Status atualizado com sucesso',
+            'notificacao_whatsapp' => $statusNovo === 'saiu_para_entrega' 
+                ? "🛵💨 Temos uma ótima notícia! O seu pedido {$pedido->codigo_pedido} acabou de sair para entrega e está a caminho!" 
+                : null,
             'pedido' => $pedido->fresh(['cliente', 'endereco', 'itens', 'historicoStatus'])
         ]);
     }

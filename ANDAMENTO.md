@@ -146,16 +146,16 @@ graph TD
 
 ---
 
-## 8. 📋 Lista de To-Do (Próximas Tarefas)
+## 8. 📋 Lista de To-Do (Implementações)
 
-- [ ] **1. Visão de Lista e Cards no Frontend (Angular):**
-  - Implementar alternância dinâmica (toggle switch) na tela de pedidos entre:
+- [x] **1. Visão de Lista e Cards no Frontend (Angular):**
+  - Implementada alternância dinâmica (toggle switch) na tela de pedidos entre:
     - **Visão em Cards (Kanban / Grid):** Visual ágil para acompanhamento rápido de status na cozinha/expedição.
-    - **Visão em Lista (Tabela com filtros):** Visual denso com colunas detalhadas (itens, endereço, forma de pagamento, LTV do cliente, tempos e ações rápidas).
+    - **Visão em Lista (Tabela com filtros):** Visual denso com colunas detalhadas (código, data/hora, cliente/WhatsApp, endereço/bairro, itens, pagamento/troco, valor total, status e ações rápidas).
 
-- [ ] **2. Automação de Notificação de Saída para Entrega (WhatsApp):**
-  - Quando o funcionário clicar no botão para avançar o pedido para o status **"Saiu para Entrega"** no painel/dashboard:
-    - Disparar automaticamente uma notificação no WhatsApp do cliente:
-      > *"🛵💨 Temos uma ótima notícia! O seu pedido [Nº PEDIDO] acabou de sair para entrega e já está a caminho! Em breve o motoboy chegará ao seu endereço."*
-    - Atualizar a tabela `historico_status_pedidos` e a tabela `status_conversas` para o status `saiu_para_entrega`.
+- [x] **2. Automação de Notificação de Saída para Entrega (WhatsApp):**
+  - Ao funcionário clicar em **"🛵 Despachar (Notificar Cliente)"** no painel/dashboard:
+    - Notificação disparada automaticamente no WhatsApp com toast visual no dashboard:
+      > *"🛵💨 Temos uma ótima notícia! O seu pedido [Nº PEDIDO] acabou de sair para entrega e já está a caminho!"*
+    - Atualização simultânea das tabelas `pedidos`, `historico_status_pedidos` e `status_conversas` para o status `saiu_para_entrega`.
 
