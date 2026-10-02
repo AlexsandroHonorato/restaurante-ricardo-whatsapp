@@ -329,6 +329,17 @@ export async function responder(tel, texto) {
         messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(saida) });
       }
     }
+
+    // Se houve fechamento de pedido ou consulta de status, envia a mensagem consultada e gerada diretamente da tabela de pedidos (sem deixar na mão da IA)
+    const passoFechar = passos.find((p) => p.ferramenta === 'fechar_pedido' && p.saida?.mensagemCliente);
+    if (passoFechar) {
+      resposta = passoFechar.saida.mensagemCliente;
+    } else {
+      const passoStatus = passos.find((p) => p.ferramenta === 'consultar_status_pedido' && p.saida?.mensagemStatus);
+      if (passoStatus) {
+        resposta = passoStatus.saida.mensagemStatus;
+      }
+    }
   } catch (err) {
     const errStr = String(err?.message || err);
     console.error(`⚠ [AVISO DE SERVIÇO - Tel: ${tel}]:`, errStr);

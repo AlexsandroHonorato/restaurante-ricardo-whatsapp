@@ -101,11 +101,14 @@ graph TD
   - Chamada à API OpenRouter com `google/gemini-3.7-flash` e `max_tokens: 450`.
   - Tratamento resiliente e amigável para erros de API (402/429/limite de créditos com direcionamento para telefone da loja).
   - Serialização de concorrência por telefone (`responderNaFila`).
-  - Ferramentas: `fechar_pedido`, `consultar_status_pedido`, `chamar_atendente`.
+  - Máquina de estados conversacional (`STATUS_CONVERSA`) com ferramentas: `atualizar_status_conversa`, `fechar_pedido`, `consultar_status_pedido`, `chamar_atendente`.
+  - **Envio Direto da Tabela de Pedidos:** Ao fechar o pedido ou consultar o status, a resposta enviada ao cliente é consultada diretamente da tabela e formatada de forma determinística, sem deixar a geração do comprovante para a IA.
 * [pedidos.js](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.js):
-  - Banco de pedidos local ([pedidos.json](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.json)).
+  - Banco de pedidos persistido ([pedidos.json](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.json)) e sincronização REST com API Laravel/MySQL.
+  - Funções de busca direta na tabela: `obterPedidoPorId` e `obterUltimoPedidoPorTelefone`.
   - Geração de IDs (`PED-DDHHMM-XXX`).
   - Formatação e impressão térmica da comanda da cozinha (`formatarComanda`, `imprimirComanda`).
+  - Geração de mensagem oficial formatada para o cliente (`formatarMensagemConfirmacaoCliente` e `formatarMensagemStatusCliente`).
 * [agente.js](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/agente.js):
   - Servidor HTTP Node.js sem dependências para o webhook da Meta (`/webhook`).
   - Validação de assinatura HMAC-SHA256 (`x-hub-signature-256`) e deduplicação de mensagens.
