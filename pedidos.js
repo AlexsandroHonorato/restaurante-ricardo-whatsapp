@@ -46,6 +46,25 @@ export function registrarPedido({ id, telefone, nome, itens, endereco, formaPaga
   pedidos[novoId] = pedido;
   salvarPedidos(pedidos);
 
+  // Sincroniza em tempo real com o banco de dados MySQL via API Laravel
+  try {
+    fetch('http://127.0.0.1:8080/api/pedidos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        codigo_pedido: novoId,
+        telefone,
+        nome,
+        itens: Array.isArray(itens) ? itens : [itens],
+        endereco,
+        formaPagamento,
+        trocoPara,
+        total,
+        observacoes,
+      }),
+    }).catch(() => {});
+  } catch { /* não bloqueia a resposta ao cliente se a API estiver em boot */ }
+
   const comanda = formatarComanda(pedido);
   imprimirComanda(comanda);
 

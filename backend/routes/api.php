@@ -20,6 +20,7 @@ Route::prefix('dashboard')->group(function () {
 // Rotas de Pedidos
 Route::prefix('pedidos')->group(function () {
     Route::get('/', [PedidoController::class, 'index']);
+    Route::post('/', [PedidoController::class, 'store']);
     Route::get('/{id}', [PedidoController::class, 'show']);
     Route::patch('/{id}/status', [PedidoController::class, 'updateStatus']);
 });

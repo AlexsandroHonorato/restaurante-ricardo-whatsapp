@@ -85,4 +85,116 @@ class PedidoController extends Controller
             'pedido' => $pedido->fresh(['cliente', 'endereco', 'itens', 'historicoStatus'])
         ]);
     }
+
+    /**
+     * Registra novo pedido vindo do WhatsApp / Robô ou API
+     */
+    public function store(Request $request)
+    {
+        $tel = preg_replace('/\D/', '', $request->input('telefone', ''));
+        $nome = $request->input('nome', 'Cliente WhatsApp');
+
+        $cliente = \App\Models\Cliente::firstOrCreate(
+            ['telefone' => $tel ?: '5511900000000'],
+            [
+                'nome' => $nome,
+                'primeiro_contato_em' => Carbon::now(),
+                'ultimo_contato_em' => Carbon::now(),
+                'total_pedidos' => 0,
+                'total_gasto' => 0,
+            ]
+        );
+        $cliente->update(['ultimo_contato_em' => Carbon::now(), 'nome' => $nome]);
+
+        $enderecoStr = $request->input('endereco', 'Martim de Sá');
+        $bairro = 'Martim de Sá';
+        if (stripos($enderecoStr, 'centro') !== false) $bairro = 'Centro';
+        elseif (stripos($enderecoStr, 'indai') !== false) $bairro = 'Indaiá';
+        elseif (stripos($enderecoStr, 'prainha') !== false) $bairro = 'Prainha';
+        elseif (stripos($enderecoStr, 'porto') !== false) $bairro = 'Porto Novo';
+
+        $endereco = \App\Models\Endereco::create([
+            'cliente_id' => $cliente->id,
+            'logradouro' => $enderecoStr,
+            'numero' => 'S/N',
+            'bairro' => $bairro,
+            'cidade' => 'Caraguatatuba',
+            'estado' => 'SP',
+            'padrao' => true,
+        ]);
+
+        $totalRaw = $request->input('total', '0');
+        $totalLimpo = preg_replace('/[^\d,.]/', '', str_replace(['R$', ' '], '', $totalRaw));
+        $totalNum = (float) (str_contains($totalLimpo, ',') ? str_replace(',', '.', $totalLimpo) : $totalLimpo);
+        if ($totalNum <= 0) $totalNum = 30.00;
+
+        $trocoParaRaw = $request->input('trocoPara');
+        $trocoPara = $trocoParaRaw ? (float) preg_replace('/[^\d,.]/', '', str_replace(['R$', ' '], '', $trocoParaRaw)) : null;
+
+        $formaPag = strtolower($request->input('formaPagamento', 'pix'));
+        if (str_contains($formaPag, 'dinheiro')) $formaPag = 'dinheiro';
+        elseif (str_contains($formaPag, 'crédito') || str_contains($formaPag, 'credito')) $formaPag = 'cartao_credito';
+        elseif (str_contains($formaPag, 'débito') || str_contains($formaPag, 'debito')) $formaPag = 'cartao_debito';
+        else $formaPag = 'pix';
+
+        $codigo = $request->input('codigo_pedido') ?: 'PED-' . date('dHi') . '-' . strtoupper(substr(md5(uniqid()), 0, 3));
+
+        $pedido = Pedido::create([
+            'codigo_pedido' => $codigo,
+            'cliente_id' => $cliente->id,
+            'endereco_id' => $endereco->id,
+            'status' => 'em_preparo',
+            'forma_pagamento' => $formaPag,
+            'valor_subtotal' => max(0, $totalNum - 5.00),
+            'taxa_entrega' => 5.00,
+            'valor_total' => $totalNum,
+            'troco_para' => $trocoPara,
+            'valor_troco' => ($trocoPara && $trocoPara > $totalNum) ? ($trocoPara - $totalNum) : null,
+            'tempo_estimado_min' => 50,
+            'observacoes' => $request->input('observacoes'),
+            'origem' => 'whatsapp_ia',
+            'preparado_em' => Carbon::now(),
+        ]);
+
+        $itens = $request->input('itens', []);
+        foreach ($itens as $itemStr) {
+            $nomeItem = is_string($itemStr) ? $itemStr : json_encode($itemStr);
+            \App\Models\PedidoItem::create([
+                'pedido_id' => $pedido->id,
+                'nome_snapshot' => $nomeItem,
+                'tamanho_snapshot' => 'Padrão',
+                'quantidade' => 1,
+                'preco_unitario' => $totalNum,
+                'subtotal' => $totalNum,
+            ]);
+        }
+
+        $cliente->increment('total_pedidos');
+        $cliente->increment('total_gasto', $totalNum);
+
+        \App\Models\HistoricoStatusPedido::create([
+            'pedido_id' => $pedido->id,
+            'status_anterior' => 'pendente',
+            'status_novo' => 'em_preparo',
+            'alterado_por' => 'ia_bot',
+        ]);
+
+        \App\Models\Atendimento::create([
+            'cliente_id' => $cliente->id,
+            'pedido_id' => $pedido->id,
+            'inicio_em' => Carbon::now()->subMinutes(5),
+            'fim_em' => Carbon::now(),
+            'duracao_segundos' => 300,
+            'status' => 'finalizado_com_pedido',
+            'total_mensagens_cliente' => 4,
+            'total_mensagens_bot' => 4,
+            'transbordo_humano' => false,
+            'canal' => 'whatsapp',
+        ]);
+
+        return response()->json([
+            'message' => 'Pedido registrado com sucesso',
+            'pedido' => $pedido->load(['cliente', 'endereco', 'itens'])
+        ], 201);
+    }
 }

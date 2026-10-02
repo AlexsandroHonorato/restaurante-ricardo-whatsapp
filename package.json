@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node --env-file=.env agente.js",
     "start:bot": "node --env-file=.env agente.js",
-    "start:api": "cd backend && php artisan serve",
+    "start:api": "cd backend && php artisan serve --host=127.0.0.1 --port=8080",
     "start:front": "cd frontend && npm start",
     "simular": "node --env-file=.env simular.js",
     "testar": "node --env-file=.env testar.js"
