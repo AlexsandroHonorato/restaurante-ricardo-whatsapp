@@ -21,6 +21,9 @@ Chart.register(...registerables);
         </div>
 
         <div class="header-actions">
+          <button class="refresh-btn glass-card" (click)="carregarTudo()" title="Atualizar Métricas">
+            🔄 Atualizar
+          </button>
           <div class="period-toggle">
             <button class="period-btn" [class.active]="diasGrafico() === 7" (click)="setDias(7)">Últimos 7 dias</button>
             <button class="period-btn" [class.active]="diasGrafico() === 30" (click)="setDias(30)">30 dias</button>
@@ -569,11 +572,35 @@ Chart.register(...registerables);
       min-width: 70px;
       text-align: right;
     }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .refresh-btn {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
   `]
 })
 export class DashboardComponent implements OnInit, AfterViewInit {
   api = inject(ApiService);
   diasGrafico = signal<number>(7);
+  pollingInterval: any = null;
 
   topProdutos = signal<TopProduto[]>([]);
   mapaBairros = signal<MapaBairro[]>([]);
@@ -586,15 +613,33 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   paymentChartInstance: Chart | null = null;
 
   ngOnInit() {
+    this.carregarTudo();
+    // Auto-refresh a cada 10 segundos para acompanhar pedidos novos em tempo real
+    this.pollingInterval = setInterval(() => {
+      this.carregarDadosLeves();
+    }, 10000);
+  }
+
+  ngAfterViewInit() {
+    setTimeout(() => {
+      this.renderSalesChart();
+      this.renderPaymentChart();
+    }, 100);
+  }
+
+  carregarTudo() {
     this.api.getKpis().subscribe();
     this.carregarTopProdutos();
     this.carregarMapaBairros();
     this.carregarPagamentos();
+    if (this.salesCanvas) this.renderSalesChart();
+    if (this.paymentCanvas) this.renderPaymentChart();
   }
 
-  ngAfterViewInit() {
-    this.renderSalesChart();
-    this.renderPaymentChart();
+  carregarDadosLeves() {
+    this.api.getKpis().subscribe();
+    this.carregarTopProdutos();
+    this.carregarMapaBairros();
   }
 
   setDias(dias: number) {
@@ -616,14 +661,15 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   renderSalesChart() {
     this.api.getSalesChart(this.diasGrafico()).subscribe((vendas) => {
-      if (!this.salesCanvas) return;
+      if (!this.salesCanvas?.nativeElement) return;
       if (this.salesChartInstance) this.salesChartInstance.destroy();
 
       const labels = vendas.map((v) => {
-        const [ano, mes, dia] = v.data.split('-');
-        return `${dia}/${mes}`;
+        if (!v.data) return '';
+        const partes = v.data.split('-');
+        return partes.length === 3 ? `${partes[2]}/${partes[1]}` : v.data;
       });
-      const dataFaturamento = vendas.map((v) => Number(v.faturamento));
+      const dataFaturamento = vendas.map((v) => Number(v.faturamento) || 0);
 
       this.salesChartInstance = new Chart(this.salesCanvas.nativeElement, {
         type: 'line',
@@ -673,7 +719,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   renderPaymentChart() {
     this.api.getPaymentMethods().subscribe((pagamentos) => {
-      if (!this.paymentCanvas) return;
+      if (!this.paymentCanvas?.nativeElement) return;
       if (this.paymentChartInstance) this.paymentChartInstance.destroy();
 
       const formatLabel = (tipo: string) => {
@@ -687,7 +733,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       };
 
       const labels = pagamentos.map((p) => formatLabel(p.forma_pagamento));
-      const data = pagamentos.map((p) => Number(p.faturamento));
+      const data = pagamentos.map((p) => Number(p.faturamento) || 0);
 
       this.paymentChartInstance = new Chart(this.paymentCanvas.nativeElement, {
         type: 'doughnut',
@@ -715,3 +761,4 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     });
   }
 }
+
