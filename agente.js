@@ -86,5 +86,27 @@ createServer((req, res) => {
     return;
   }
 
+  // rota interna para envio de notificações automáticas pelo Dashboard/API
+  if (req.method === 'POST' && url.pathname === '/api/notificar') {
+    const partes = [];
+    req.on('data', (p) => partes.push(p));
+    req.on('end', async () => {
+      try {
+        const { para, texto } = JSON.parse(Buffer.concat(partes).toString('utf8'));
+        if (!para || !texto) {
+          res.writeHead(400, { 'Content-Type': 'application/json' }).end(JSON.stringify({ erro: 'Informe "para" e "texto"' }));
+          return;
+        }
+        await enviarTexto(para, texto);
+        console.log(`📢 [NOTIFICAÇÃO DISPARADA] WhatsApp: ${para}\nTexto: ${texto}\n`);
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, enviado: true, para }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ erro: err.message }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' }).end('agente no ar');
 }).listen(PORTA, () => console.log(`✅ Agente Restaurante Família Ricardo ouvindo na porta ${PORTA}`));
+
