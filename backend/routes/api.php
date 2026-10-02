@@ -37,7 +37,13 @@ Route::prefix('cardapio')->group(function () {
     Route::patch('/produtos/{id}/toggle', [CardapioController::class, 'toggleProdutoStatus']);
 });
 
-// Rotas de Atendimentos
+// Rotas de Atendimentos & Status Conversacional
 Route::prefix('atendimentos')->group(function () {
     Route::get('/', [AtendimentoController::class, 'index']);
 });
+
+Route::prefix('status-conversa')->group(function () {
+    Route::get('/', [AtendimentoController::class, 'getStatusConversas']);
+    Route::post('/sync', [AtendimentoController::class, 'syncStatus']);
+});
+

@@ -150,4 +150,11 @@ export class ApiService {
       catchError(() => of({ data: [] }))
     );
   }
+
+  getStatusConversas(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/status-conversa`).pipe(
+      catchError(() => of([]))
+    );
+  }
 }
+

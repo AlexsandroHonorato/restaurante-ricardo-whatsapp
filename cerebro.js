@@ -29,6 +29,23 @@ function salvarMemoria() {
   salvando = setTimeout(() => writeFileSync(ARQ_MEMORIA, JSON.stringify(memoria, null, 2)), 300);
 }
 
+export function sincronizarStatusBanco(tel, status, rascunho = {}, extras = {}) {
+  try {
+    fetch('http://127.0.0.1:8080/api/status-conversa/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        telefone: tel,
+        status: status || STATUS_CONVERSA.INICIADA,
+        rascunho: rascunho || {},
+        transbordo: extras.transbordo || false,
+        motivo_transbordo: extras.motivo_transbordo || null,
+        nome: extras.nome || null,
+      }),
+    }).catch(() => {});
+  } catch { /* API em boot */ }
+}
+
 export function obterEstadoCliente(tel) {
   let c = memoria[tel];
   if (!c) {
@@ -40,8 +57,14 @@ export function obterEstadoCliente(tel) {
     };
     memoria[tel] = c;
     salvarMemoria();
+    sincronizarStatusBanco(tel, c.status, c.rascunho);
     return c;
   }
+
+  // Garante propriedades em chaves legadas
+  if (!c.status) c.status = STATUS_CONVERSA.INICIADA;
+  if (!c.rascunho) c.rascunho = { pratos: [], bebidas: [], endereco: null, formaPagamento: null, trocoPara: null, total: null };
+  if (!c.msgs) c.msgs = [];
 
   // Verifica tempo de inatividade
   const tempoInativoMs = Date.now() - (c.atualizado || 0);
@@ -63,18 +86,20 @@ export function obterEstadoCliente(tel) {
     c.msgs = [];
     c.atualizado = Date.now();
     salvarMemoria();
+    sincronizarStatusBanco(tel, STATUS_CONVERSA.CANCELADO_30MIN, c.rascunho);
   }
 
   return c;
 }
 
-export function atualizarStatusCliente(tel, novoStatus, dadosRascunho = {}) {
+export function atualizarStatusCliente(tel, novoStatus, dadosRascunho = {}, extras = {}) {
   const c = obterEstadoCliente(tel);
   c.status = novoStatus;
   c.rascunho = { ...(c.rascunho || {}), ...dadosRascunho };
   c.atualizado = Date.now();
   memoria[tel] = c;
   salvarMemoria();
+  sincronizarStatusBanco(tel, novoStatus, c.rascunho, extras);
   return c;
 }
 
@@ -353,8 +378,16 @@ export async function responder(tel, texto) {
     }
   }
 
+  // Se o cliente manifestou intenção clara de pedir e estava no início, avança status
+  const estado = obterEstadoCliente(tel);
+  if (estado.status === STATUS_CONVERSA.INICIADA && /pedido|pedir|card[aá]pio|quero|comprar|fazer um pedido/i.test(texto)) {
+    estado.status = STATUS_CONVERSA.PRATOS;
+    atualizarStatusCliente(tel, STATUS_CONVERSA.PRATOS, estado.rascunho);
+  }
+
   lembrar(tel, 'user', texto);
   lembrar(tel, 'assistant', resposta);
+  sincronizarStatusBanco(tel, memoria[tel]?.status, memoria[tel]?.rascunho);
   appendFileSync('conversas.log', JSON.stringify({ quando: new Date().toISOString(), tel, status: memoria[tel]?.status, texto, passos, resposta }) + '\n');
   return resposta;
 }
