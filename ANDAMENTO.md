@@ -175,4 +175,9 @@ graph TD
     - Toggle visual e ágil de "Ativo / Pausado" por card e tabela.
     - Filtros por categoria e busca textual em tempo real.
 
+- [x] **4. Visão em Lista e Cards no Monitor de Atendimentos IA (Angular):**
+  - Implementado alternador de visualização (`modoVisao`: Cards vs Lista) na tela [atendimentos.component.ts](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/frontend/src/app/pages/atendimentos/atendimentos.component.ts).
+  - **Visão em Lista:** Tabela com Telefone/Avatar, data/hora do último contato, badge de estágio da IA, tags inline do rascunho (pratos, bebidas, endereço e pagamento), horário de expiração de 30 minutos e botão de ação rápida para abertura da conversa no WhatsApp.
+
+
 
