@@ -437,3 +437,12 @@ Alterações desta etapa ainda sem novo commit.
 ## 28. Consolidação do dashboard e filtro de datas em Git — 02/10/2026
 
 - Consolidadas as seções 26–27: cards/gráficos conforme imagem enviada, Datepicker Material com tema próprio, intervalo histórico na API e regressões. Commit local solicitado pelo usuário; validações registradas na seção 27. As anotações sem commit anteriores representam o estado histórico de cada etapa.
+
+## 29. Anel de pagamentos com segmentos sobrepostos — 03/10/2026
+
+- Referência: imagem codex-clipboard-fe7b95be-75d9-4a91-b7cd-c3ded9e5028d.png. Substituído desenho padrão dos segmentos por plugin Chart.js anelSobreposto, com pontas circulares, ordem de pintura em camadas e segmento principal roxo por cima das junções, ligeiramente mais espesso e com sombra.
+- Mantidos geometria/valores reais, percentual central, filtros, legendas e detecção de segmentos do Chart.js; valores zero não geram arco. Legendas usam marcadores quadrados arredondados. Conferido no navegador com API real; sem alterações de dados. Sem novo commit.
+
+## 30. Gráfico de vendas sem preenchimento — 03/10/2026
+
+- A pedido do usuário, removido preenchimento da série de faturamento e restaurada linha com espessura de 3px. Ticket médio permanece sem preenchimento. Valores, pontos, tooltip e filtros preservados. Sem novo commit.

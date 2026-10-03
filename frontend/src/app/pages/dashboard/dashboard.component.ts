@@ -1,4 +1,5 @@
 import { PedidosRecentesComponent } from '../../shared/ui/pedidos-recentes.component';
+import { anelSobreposto } from '../../shared/ui/anel-sobreposto';
 import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -783,8 +784,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
               const gradient=context.chart.ctx.createLinearGradient(area.left,0,area.right,0);
               gradient.addColorStop(0,'rgba(96,92,255,.5)');gradient.addColorStop(1,'rgba(255,105,180,.38)');return gradient;
             },
-            borderWidth: 0,
-            fill: true,
+            borderWidth: 3,
+            fill: false,
             tension: 0.4,
             pointBackgroundColor: '#383849',
             pointBorderColor: '#FF69B4',
@@ -855,6 +856,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       this.paymentChartInstance = new Chart(this.paymentCanvas.nativeElement, {
         type: 'doughnut',
+        plugins: [anelSobreposto],
         data: {
           labels,
           datasets: [{
@@ -872,10 +874,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           plugins: {
             legend: {
               position: 'bottom',
-              labels: { color: '#D1D5DB', padding: 14, font: { size: 12 } }
+              labels: { color: '#B1AFC2', padding: 18, usePointStyle: true, pointStyle: 'rectRounded', font: { size: 12 } }
             }
           },
-          cutout: '78%'
+          layout: { padding: 10 },
+          cutout: '76%'
         }
       });
     }));
