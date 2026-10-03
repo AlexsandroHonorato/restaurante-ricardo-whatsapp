@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, tap, EMPTY, finalize } from 'rxjs';
 import {
+  AnalisesDashboard,
   DashboardKpis,
   VendaGrafico,
   TopProduto,
@@ -10,7 +11,9 @@ import {
   Pedido,
   Cliente,
   CategoriaCardapio,
-  Atendimento
+  Atendimento,
+  HorarioAtendimento,
+  HorariosAtendimentoResponse
 } from '../models/dashboard.model';
 
 @Injectable({
@@ -19,6 +22,8 @@ import {
 export class ApiService {
   private http = inject(HttpClient);
   private baseUrl = 'http://127.0.0.1:8080/api';
+
+  horariosAtendimento = signal<HorarioAtendimento[] | null>(null);
 
   erro = signal<string | null>(null);
 
@@ -57,8 +62,12 @@ export class ApiService {
     );
   }
 
-  getTopProducts(): Observable<TopProduto[]> {
-    return this.http.get<TopProduto[]>(`${this.baseUrl}/dashboard/top-produtos`).pipe(
+  getAnalises(dias: number): Observable<AnalisesDashboard> {
+    return this.http.get<AnalisesDashboard>(`${this.baseUrl}/dashboard/analises?dias=${dias}`);
+  }
+
+  getTopProducts(dias: number = 7): Observable<TopProduto[]> {
+    return this.http.get<TopProduto[]>(`${this.baseUrl}/dashboard/top-produtos?dias=${dias}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
@@ -86,8 +95,8 @@ export class ApiService {
     );
   }
 
-  updatePedidoStatus(id: number, status: string): Observable<any> {
-    return this.http.patch(`${this.baseUrl}/pedidos/${id}/status`, { status });
+  updatePedidoStatus(id: number, status: string, motivo_cancelamento?: string): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/pedidos/${id}/status`, { status, motivo_cancelamento });
   }
 
   getClientes(busca?: string): Observable<{ data: Cliente[] }> {
@@ -95,6 +104,10 @@ export class ApiService {
     return this.http.get<{ data: Cliente[] }>(`${this.baseUrl}/clientes${qs}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
+  }
+
+  getCardapioConfiguracao(): Observable<CategoriaCardapio[]> {
+    return this.http.get<CategoriaCardapio[]>(`${this.baseUrl}/cardapio`);
   }
 
   getCardapio(): Observable<CategoriaCardapio[]> {
@@ -137,5 +150,17 @@ export class ApiService {
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
+  getHorariosAtendimento(): Observable<HorariosAtendimentoResponse> {
+    return this.http.get<HorariosAtendimentoResponse>(`${this.baseUrl}/horarios-atendimento`).pipe(
+      tap(res => this.horariosAtendimento.set(res.horarios))
+    );
+  }
+
+  atualizarHorarioAtendimento(dia: number, dados: Pick<HorarioAtendimento, 'ativo' | 'hora_inicio' | 'hora_fim'>): Observable<{ horario: HorarioAtendimento }> {
+    return this.http.put<{ horario: HorarioAtendimento }>(`${this.baseUrl}/horarios-atendimento/${dia}`, dados).pipe(
+      tap(res => this.horariosAtendimento.update(horarios => horarios?.map(h => h.dia_semana === dia ? res.horario : h) ?? null))
+    );
+  }
+
 }
 

@@ -283,3 +283,16 @@ CREATE TABLE `status_conversas` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- Configuração semanal: 1 = segunda-feira, 7 = domingo (America/Sao_Paulo).
+CREATE TABLE IF NOT EXISTS `horarios_atendimento` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `dia_semana` TINYINT UNSIGNED NOT NULL,
+  `ativo` TINYINT(1) NOT NULL DEFAULT 0,
+  `hora_inicio` TIME NULL,
+  `hora_fim` TIME NULL,
+  `created_at` TIMESTAMP NULL,
+  `updated_at` TIMESTAMP NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_horarios_dia_semana` (`dia_semana`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

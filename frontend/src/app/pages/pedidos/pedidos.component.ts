@@ -10,6 +10,16 @@ import { Pedido } from '../../core/models/dashboard.model';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="pedidos-page">
+      @if (cancelando(); as pedido) {
+        <section class="glass-card" style="padding:20px" aria-label="Cancelar pedido">
+          <h3>Cancelar {{ pedido.codigo_pedido }}</h3>
+          <label for="motivo-cancelamento">Motivo do cancelamento</label>
+          <input id="motivo-cancelamento" class="form-input" [(ngModel)]="motivoCancelamento" maxlength="255" placeholder="Informe o motivo" />
+          <button class="btn btn-secondary" [disabled]="salvandoCancelamento()" (click)="cancelando.set(null)">Voltar</button>
+          <button class="btn btn-primary" [disabled]="!motivoCancelamento.trim() || salvandoCancelamento()" (click)="confirmarCancelamento()">Confirmar cancelamento</button>
+          @if (erroCancelamento()) {<p role="alert">{{ erroCancelamento() }}</p>}
+        </section>
+      }
       <!-- Toast de Notificação -->
       @if (toastMensagem()) {
         <div class="toast-notification glass-card animate-fade-in">
@@ -130,6 +140,7 @@ import { Pedido } from '../../core/models/dashboard.model';
 
               <!-- Ações de Status da Cozinha e Despacho -->
               <div class="order-actions">
+                @if (pedido.status !== 'entregue' && pedido.status !== 'cancelado') {<button class="btn btn-secondary btn-sm" (click)="abrirCancelamento(pedido)">Cancelar</button>}
                 @if (pedido.status === 'pendente') {
                   <button class="btn btn-primary btn-sm full" (click)="alterarStatus(pedido, 'em_preparo')">
                     👨‍🍳 Iniciar Preparo na Cozinha
@@ -235,7 +246,8 @@ import { Pedido } from '../../core/models/dashboard.model';
                   </td>
                   <td>
                     <div class="action-cell">
-                      @if (pedido.status === 'pendente') {
+                      @if (pedido.status !== 'entregue' && pedido.status !== 'cancelado') {<button class="btn btn-secondary btn-sm" (click)="abrirCancelamento(pedido)">Cancelar</button>}
+                @if (pedido.status === 'pendente') {
                         <button class="btn btn-primary btn-xs" (click)="alterarStatus(pedido, 'em_preparo')">
                           👨‍🍳 Preparar
                         </button>
@@ -760,6 +772,18 @@ import { Pedido } from '../../core/models/dashboard.model';
   `]
 })
 export class PedidosComponent implements OnInit {
+  cancelando = signal<Pedido | null>(null);
+  motivoCancelamento = '';
+  salvandoCancelamento = signal(false);
+  erroCancelamento = signal<string | null>(null);
+  abrirCancelamento(pedido: Pedido) {this.cancelando.set(pedido);this.motivoCancelamento='';this.erroCancelamento.set(null);}
+  confirmarCancelamento() {
+    const pedido=this.cancelando();const motivo=this.motivoCancelamento.trim();
+    if(!pedido || !motivo || this.salvandoCancelamento()) return;
+    this.salvandoCancelamento.set(true);
+    this.api.updatePedidoStatus(pedido.id,'cancelado',motivo).subscribe({next:()=>{this.cancelando.set(null);this.salvandoCancelamento.set(false);this.carregarPedidos();this.api.getKpis().subscribe();},error:()=>{this.salvandoCancelamento.set(false);this.erroCancelamento.set('Não foi possível cancelar. Tente novamente.');}});
+  }
+
   api = inject(ApiService);
   pedidos = signal<Pedido[]>([]);
   filtroStatus = signal<string>('');

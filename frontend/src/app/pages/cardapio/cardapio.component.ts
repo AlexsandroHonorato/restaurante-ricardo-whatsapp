@@ -1,3 +1,4 @@
+import { DIAS_CARDAPIO, lerDiasCardapio, gravarDiasCardapio, nomeDiasCardapio } from '../../core/models/dias-cardapio';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { finalize } from 'rxjs';
@@ -72,7 +73,8 @@ interface VariacaoForm {
                     </div>
                   </div>
 
-                  <!-- Variações e Preços -->
+                  <span class="prod-desc">{{ nomeDias(prod.dias_disponiveis) }}</span>
+              <!-- Variações e Preços -->
                   <div class="prod-variations">
                     @for (v of prod.variacoes; track v.id) {
                       <span class="var-badge">
@@ -152,6 +154,13 @@ interface VariacaoForm {
                 />
               </div>
 
+              <fieldset class="form-group" style="border:1px solid var(--border-color);padding:12px;border-radius:8px">
+                <legend>Dias disponíveis *</legend>
+                <div style="display:flex;flex-wrap:wrap;gap:12px">
+                  @for(dia of diasSemana; track dia.valor) {<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" style="width:auto" [checked]="formDias.includes(dia.valor)" (change)="alternarDia(dia.valor)" [disabled]="salvando()" />{{dia.nome}}</label>}
+                </div>
+                @if(!formDias.length){<p role="alert">Selecione pelo menos um dia.</p>}
+              </fieldset>
               <!-- Variações de Tamanhos e Preços -->
               <div class="form-group">
                 <div class="variations-header">
@@ -623,6 +632,11 @@ interface VariacaoForm {
 })
 export class CardapioComponent implements OnInit {
   api = inject(ApiService);
+  diasSemana = DIAS_CARDAPIO;
+  formDias = lerDiasCardapio('todos');
+  nomeDias = nomeDiasCardapio;
+  alternarDia(dia: string) {this.formDias = this.formDias.includes(dia) ? this.formDias.filter(d=>d!==dia) : [...this.formDias,dia];}
+
   cardapio = signal<CategoriaCardapio[]>([]);
   categorias = signal<any[]>([]);
 
@@ -658,6 +672,7 @@ export class CardapioComponent implements OnInit {
     this.modoEdicao.set(false);
     this.editandoId = null;
     this.formCategoriaId = this.categorias()[0]?.id || null;
+    this.formDias = lerDiasCardapio('todos');
     this.formNome = '';
     this.formDescricao = '';
     this.formVariacoes = [{ tamanho: 'Padrão', preco: 25.00 }];
@@ -668,6 +683,7 @@ export class CardapioComponent implements OnInit {
     this.modoEdicao.set(true);
     this.editandoId = prod.id;
     this.formCategoriaId = categoriaId;
+    this.formDias = lerDiasCardapio(prod.dias_disponiveis);
     this.formNome = prod.nome;
     this.formDescricao = prod.descricao || '';
     this.formVariacoes = prod.variacoes.map((v) => ({
@@ -698,6 +714,7 @@ export class CardapioComponent implements OnInit {
     return !!(
       this.formCategoriaId &&
       this.formNome.trim() &&
+      this.formDias.length > 0 &&
       this.formVariacoes.length > 0 &&
       this.formVariacoes.every((v) => v.tamanho.trim() && Number.isFinite(Number(v.preco)) && v.preco >= 0)
     );
@@ -710,6 +727,7 @@ export class CardapioComponent implements OnInit {
       categoria_id: this.formCategoriaId,
       nome: this.formNome.trim(),
       descricao: this.formDescricao.trim(),
+      dias_disponiveis: gravarDiasCardapio(this.formDias),
       variacoes: this.formVariacoes
     };
     const requisicao = this.modoEdicao() && this.editandoId

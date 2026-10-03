@@ -54,6 +54,11 @@ import { ApiService } from '../../core/services/api.service';
           <span class="nav-icon">📋</span>
           <span class="nav-label">Cardápio & Preços</span>
         </a>
+        <div class="nav-section-title">ADMINISTRAÇÃO</div>
+        <a routerLink="/configuracoes" routerLinkActive="active" class="nav-item">
+          <span class="nav-icon" aria-hidden="true">⚙️</span>
+          <span class="nav-label">Configurações</span>
+        </a>
       </nav>
 
       <!-- Bot Status Card -->
@@ -228,6 +233,13 @@ import { ApiService } from '../../core/services/api.service';
 
     .bot-stat strong {
       color: var(--success);
+    }
+    @media (max-width: 768px) {
+      .sidebar { width: 100%; height: auto; position: static; padding: 12px; }
+      .brand, .bot-card, .nav-section-title { display: none; }
+      .nav-list { flex-direction: row; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+      .nav-item { flex-shrink: 0; padding: 10px; }
+      .nav-label { font-size: .78rem; }
     }
   `]
 })

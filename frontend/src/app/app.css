@@ -16,3 +16,8 @@
   padding: 28px 32px;
   overflow-y: auto;
 }
+
+@media (max-width: 768px) {
+  .app-container { flex-direction: column; }
+  .content-area { padding: 20px 16px; }
+}

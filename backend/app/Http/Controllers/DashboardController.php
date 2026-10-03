@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\DashboardAnalise;
 use App\Models\Atendimento;
 use App\Models\Cliente;
 use App\Models\Pedido;
@@ -66,26 +67,21 @@ class DashboardController extends Controller
     public function getSalesChart(Request $request)
     {
         $dias = max(1, min(365, (int) $request->query('dias', 7)));
-        $dataInicio = Carbon::today()->subDays($dias - 1);
 
-        $vendas = Pedido::select(
-            DB::raw('DATE(created_at) as data'),
-            DB::raw('COUNT(id) as total_pedidos'),
-            DB::raw('SUM(CASE WHEN status != "cancelado" THEN valor_total ELSE 0 END) as faturamento')
-        )
-            ->where('created_at', '>=', $dataInicio)
-            ->groupBy('data')
-            ->orderBy('data', 'ASC')
-            ->get();
+        return response()->json(app(DashboardAnalise::class)->calcular($dias)['vendas']);
+    }
 
-        return response()->json($vendas);
+    public function getAnalises(Request $request)
+    {
+        return response()->json(app(DashboardAnalise::class)->calcular(max(1, min(365, (int) $request->query('dias', 7)))));
     }
 
     /**
      * Ranking dos produtos mais vendidos
      */
-    public function getTopProducts()
+    public function getTopProducts(Request $request)
     {
+        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(max(1, min(365, (int) $request->query('dias', 7))));
         $top = PedidoItem::select(
             'nome_snapshot as produto',
             'tamanho_snapshot as tamanho',
@@ -93,6 +89,7 @@ class DashboardController extends Controller
             DB::raw('SUM(subtotal) as total_faturado')
         )
             ->join('pedidos', 'pedido_itens.pedido_id', '=', 'pedidos.id')
+            ->where('pedidos.created_at', '>=', $inicio)->where('pedidos.created_at', '<', $fim)
             ->where('pedidos.status', '!=', 'cancelado')
             ->groupBy('nome_snapshot', 'tamanho_snapshot')
             ->orderBy('total_quantidade', 'DESC')

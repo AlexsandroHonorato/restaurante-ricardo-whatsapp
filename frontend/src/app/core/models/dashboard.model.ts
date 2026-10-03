@@ -19,6 +19,7 @@ export interface DashboardKpis {
 }
 
 export interface VendaGrafico {
+  ticket_medio?: number | null;
   data: string;
   total_pedidos: number;
   faturamento: number;
@@ -149,3 +150,26 @@ export interface Atendimento {
   cliente?: Cliente;
   pedido?: Pedido;
 }
+
+export interface HorarioAtendimento {
+  id: number;
+  dia_semana: number;
+  nome_dia: string;
+  ativo: boolean;
+  hora_inicio: string | null;
+  hora_fim: string | null;
+}
+
+export interface HorariosAtendimentoResponse {
+  fuso: string;
+  horarios: HorarioAtendimento[];
+}
+
+export interface AnalisesDashboard {
+ dias: number; fuso: string; pedidos_fora_agenda: number;
+ demanda: {dia: number; horas: {hora: number; pedidos: number; atendimento: boolean}[]}[];
+ tempos: {tipo: string; minutos: number | null; amostras: number}[];
+ atendimentos: {total: number; conversao: number | null; status: ContagemAnalise[]; abandonos: ContagemAnalise[]};
+ cancelamentos: ContagemAnalise[];
+}
+export interface ContagemAnalise {nome: string; total: number;}

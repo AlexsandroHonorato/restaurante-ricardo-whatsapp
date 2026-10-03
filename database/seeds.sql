@@ -145,3 +145,13 @@ INSERT INTO `produto_variacoes` (`produto_id`, `tamanho`, `preco`) VALUES
 (25, 'Unidade', 10.00),
 (26, '2 Litros', 14.00),
 (27, '2 Litros', 20.00);
+
+-- Horário inicial; preserva configurações já existentes.
+INSERT IGNORE INTO `horarios_atendimento` (`dia_semana`, `ativo`, `hora_inicio`, `hora_fim`, `created_at`, `updated_at`) VALUES
+(1, 1, '11:00:00', '14:30:00', NOW(), NOW()),
+(2, 1, '11:00:00', '14:30:00', NOW(), NOW()),
+(3, 1, '11:00:00', '14:30:00', NOW(), NOW()),
+(4, 1, '11:00:00', '14:30:00', NOW(), NOW()),
+(5, 1, '11:00:00', '14:30:00', NOW(), NOW()),
+(6, 1, '11:00:00', '14:30:00', NOW(), NOW()),
+(7, 0, NULL, NULL, NOW(), NOW());

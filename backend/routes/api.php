@@ -4,11 +4,13 @@ use App\Http\Controllers\AtendimentoController;
 use App\Http\Controllers\CardapioController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HorarioAtendimentoController;
 use App\Http\Controllers\PedidoController;
 use Illuminate\Support\Facades\Route;
 
 // Rotas do Dashboard
 Route::prefix('dashboard')->group(function () {
+    Route::get('/analises', [DashboardController::class, 'getAnalises']);
     Route::get('/kpis', [DashboardController::class, 'getKpis']);
     Route::get('/vendas-grafico', [DashboardController::class, 'getSalesChart']);
     Route::get('/top-produtos', [DashboardController::class, 'getTopProducts']);
@@ -54,3 +56,6 @@ Route::prefix('status-conversa')->group(function () {
     Route::get('/', [AtendimentoController::class, 'getStatusConversas']);
     Route::post('/sync', [AtendimentoController::class, 'syncStatus']);
 });
+
+Route::get('/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
+Route::put('/horarios-atendimento/{dia}', [HorarioAtendimentoController::class, 'update'])->where('dia', '[1-7]');

@@ -12,6 +12,7 @@ class Pedido extends Model
     protected $table = 'pedidos';
 
     protected $fillable = [
+        'motivo_cancelamento',
         'codigo_pedido',
         'cliente_id',
         'endereco_id',

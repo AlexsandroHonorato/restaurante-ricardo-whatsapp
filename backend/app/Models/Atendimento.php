@@ -12,6 +12,7 @@ class Atendimento extends Model
     protected $table = 'atendimentos';
 
     protected $fillable = [
+        'etapa_abandono',
         'cliente_id',
         'pedido_id',
         'inicio_em',

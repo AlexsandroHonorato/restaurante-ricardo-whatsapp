@@ -15,9 +15,9 @@ import { ApiService } from '../../core/services/api.service';
         <div class="store-status">
           <span class="status-badge" [class.open]="aberto()" [class.closed]="!aberto()">
             <span class="live-indicator"></span>
-            Restaurante {{ aberto() ? 'Aberto' : 'Fechado' }} • Caraguatatuba/SP
+            {{ api.horariosAtendimento() ? (aberto() ? 'Restaurante Aberto' : 'Restaurante Fechado') : 'Consultando agenda' }} • Caraguatatuba/SP
           </span>
-          <span class="hours">Segunda a Sábado, 11h00 às 14h30</span>
+          <span class="hours">{{ horarioHoje()?.ativo ? 'Hoje: ' + horarioHoje()?.hora_inicio?.slice(0, 5) + ' às ' + horarioHoje()?.hora_fim?.slice(0, 5) : (api.horariosAtendimento() ? 'Hoje sem atendimento' : 'Horários em Configurações') }}</span>
         </div>
       </div>
 
@@ -145,6 +145,13 @@ import { ApiService } from '../../core/services/api.service';
       font-size: 0.7rem;
       color: var(--text-muted);
     }
+    @media (max-width: 768px) {
+      .header { height: auto; padding: 14px 16px; flex-wrap: wrap; gap: 12px; }
+      .store-status { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .status-badge { font-size: .72rem; padding: 6px 10px; }
+      .user-pill, .header-meta { display: none; }
+      .header-right { margin-left: auto; }
+    }
   `]
 })
 export class HeaderComponent implements OnDestroy {
@@ -152,13 +159,23 @@ export class HeaderComponent implements OnDestroy {
   private agora = signal(new Date());
   private relogio = setInterval(() => this.agora.set(new Date()), 60000);
 
+  constructor() {
+    this.api.getHorariosAtendimento().subscribe({ error: () => {} });
+  }
+
+  horarioHoje() {
+    const dia = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo', weekday: 'short' }).format(this.agora());
+    const numero = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(dia) + 1;
+    return this.api.horariosAtendimento()?.find(h => h.dia_semana === numero);
+  }
+
   aberto(): boolean {
-    const partes = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Sao_Paulo', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
-    }).formatToParts(this.agora());
-    const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value || '';
-    const minutos = Number(valor('hour')) * 60 + Number(valor('minute'));
-    return valor('weekday') !== 'Sun' && minutos >= 660 && minutos < 870;
+    const horario = this.horarioHoje();
+    if (!horario?.ativo || !horario.hora_inicio || !horario.hora_fim) return false;
+    const hora = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).format(this.agora());
+    return hora >= horario.hora_inicio.slice(0, 5) && hora < horario.hora_fim.slice(0, 5);
   }
 
   ngOnDestroy() { clearInterval(this.relogio); }

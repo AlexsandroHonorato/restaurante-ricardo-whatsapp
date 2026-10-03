@@ -265,3 +265,77 @@ Esta seção continua o histórico alimentado pelo Antigravity. O arquivo existe
 - Regressão adicionada: `DashboardKpisTest` verifica resposta HTTP 200, pedidos/faturamento e limites exatos do dia local. Teste aprovado (5 assertions).
 - Verificação na API em execução: dez endpoints de dashboard e telas operacionais retornaram HTTP 200. Dados reais não foram alterados; consultas de validação foram somente leitura.
 - Alteração posterior ao commit `dc67f79`; ainda sem novo commit. Recarregar o painel para obter os dados novamente.
+
+
+## 11. Configuração semanal de atendimento — 02/10/2026
+
+- Criada e migrada no MySQL a tabela `horarios_atendimento`: `id`, `dia_semana` único (1=segunda a 7=domingo), `ativo`, `hora_inicio`, `hora_fim`, `created_at`, `updated_at`.
+- Dados iniciais: segunda a sábado de 11:00 a 14:30; domingo fechado com horários nulos. Fuso de interpretação: America/Sao_Paulo.
+- Model `HorarioAtendimento` inclui nome do dia para exibição. API: `GET /api/horarios-atendimento` lista a semana; `PUT /api/horarios-atendimento/{dia}` atualiza um dia com `{ativo, hora_inicio, hora_fim}` (HH:mm).
+- Validação: dia 1 a 7, horários obrigatórios em dia ativo, fim posterior ao início; dia fechado limpa os horários. Intervalos que atravessam meia-noite não são suportados nesta versão.
+- Migration aplicada isoladamente, sem executar outras migrations pendentes. SQL standalone atualizado; seed usa INSERT IGNORE para preservar configurações existentes.
+- Testes: 3 regressões aprovadas, 16 assertions (sete dias, edição, fechamento e rejeição de intervalos inválidos). Consulta à API real confirmou os sete registros.
+- Próxima integração: formulário no painel e leitura desses horários pelo cabeçalho/bot. A criação da tabela/API não substitui ainda os horários fixos nesses consumidores. Sem novo commit.
+
+
+## 12. Menu Configurações e edição da agenda — 02/10/2026
+
+- Adicionado menu **Configurações** na navegação, com rota lazy `/configuracoes`.
+- Tela `frontend/src/app/pages/configuracoes/` lista segunda a domingo, permite abrir/fechar cada dia, editar início/fim e salvar por dia via API existente.
+- Horários `HH:mm:ss` são normalizados para `HH:mm` no formulário. Dia fechado envia horários nulos; ativar um dia sugere 11:00–14:30, permanecendo pendente até salvar.
+- Feedback de carregamento, tentativa novamente, alterações pendentes, sucesso por dia e erros da API; salva somente linhas alteradas, bloqueia envio repetido e impede intervalos invertidos. Falha mantém a edição para nova tentativa.
+- Tipos e métodos de API adicionados. Cabeçalho lê a agenda persistida e reage aos horários salvos, substituindo a regra fixa de segunda a sábado. O bot ainda precisa consumir a agenda dinâmica.
+- Ajustado layout do menu/cabeçalho em telas estreitas, mantendo campos com labels e foco visível.
+- Validação: 8 testes Angular aprovados (4 existentes + 4 da nova tela), build aprovado e conferência no navegador com sete dias reais; edição inválida bloqueou Salvar e mostrou a mensagem esperada. Valores do banco não foram alterados na conferência visual.
+- Prévia: `http://localhost:4200/configuracoes`. Histórico preservado; alterações ainda sem novo commit.
+
+
+## 13. Indicadores do dashboard e tarefas consolidadas — 02/10/2026
+
+### Recomendações de gráficos
+
+- [x] Pedidos por hora e dia da semana: mapa de calor 7 × 24, fuso São Paulo, contorno da agenda atual e contagem fora do horário. Inclui pedidos cancelados para medir demanda; agenda atual não reconstrói agendas históricas.
+- [x] Faturamento e ticket médio diário: duas séries, dias sem pedidos preenchidos, cancelados excluídos; ticket sem vendas é nulo. API temporal agora utiliza o mesmo fuso dos KPIs.
+- [x] Produtos mais vendidos: ranking de quantidade e receita por produto/tamanho respeita 7/30 dias; variantes têm identificadores de renderização distintos.
+- [x] Tempos de preparo, entrega e total: médias dos intervalos completos e não negativos, quantidade de amostras visível; ausência de timestamps não vira zero. Preparo mede entrada na cozinha até despacho.
+- [x] Conversão: distribuição dos atendimentos iniciados no período e proporção finalizado_com_pedido / total, incluindo os ainda em andamento. Continua baseada nos registros de atendimento existentes, cuja consolidação de sessões é tarefa pendente abaixo.
+- [x] Abandono por etapa: novo campo etapa_abandono, API e bot enviam etapa anterior à expiração; histórico sem etapa aparece como Não registrado.
+- [x] Cancelamentos por motivo: novo campo motivo_cancelamento, API compatível com clientes antigos e ação Cancelar nas visões de cards/lista, exigindo motivo no formulário. Erro preserva edição; envio duplicado bloqueado.
+- [x] Extrair cálculos para DashboardAnalise; novo GET /api/dashboard/analises?dias=7 (limite 1–365), componente Angular próprio, cancelamento de requisição ao trocar filtro/desmontar e tentativa novamente.
+- [x] Aplicar migration aditiva isolada no MySQL, preservando registros existentes. Migrations Laravel são a fonte destas alterações; SQL standalone ainda precisa unificação.
+- [x] Validar: 18 testes Laravel / 92 assertions, 15 Node, 8 Angular; build final aprovado, Pint aplicado, diff sem erro de whitespace. API real retornou 200 com dados operacionais; painel exibiu todos os indicadores. Nenhum pedido operacional foi cancelado para testar.
+
+### Tarefas remanescentes de todas as recomendações anteriores
+
+- [ ] Alta: autenticação Sanctum, perfis operador/admin e credencial do bot; proteger rotas antes de exposição pública.
+- [ ] Alta: resolver produto/variação por ID no servidor, validar preço, disponibilidade por dia e estoque na transação; migrar contrato do bot com compatibilidade.
+- [ ] Alta: inbox/outbox persistente, deduplicação por ID, backoff e rastreamento de entrega das mensagens.
+- [ ] Consolidar atendimentos com ID estável de sessão após fechamento/reset/transbordo e idempotência dos eventos; revisar contagens históricas antes de tratar conversão como taxa de clientes únicos.
+- [ ] Integrar impressão térmica real e console de atendimento humano com pausar/retomar e alerta confirmado.
+- [ ] Unificar database/schema.sql/views.sql com migrations e timestamps Laravel; não aplicar views antigas diretamente.
+- [ ] Consumir agenda configurável no bot, substituindo horários fixos. Cabeçalho já integrado.
+- [ ] Paginação visível nas listas, cancelamento das buscas antigas e erros independentes por endpoint; revisar foco/teclado dos formulários de cancelamento e modais.
+- [ ] Centralizar arquivos JSON para múltiplos workers e configurar retenção/anonymização de dados e logs.
+- [ ] Visibilidade de sincronizações pendentes, dead-letter/revisão manual de 422 e importação auditada dos registros legados.
+- [ ] Acompanhar cobertura dos timestamps, motivos e etapas nos novos eventos; não inventar histórico faltante. Reiniciar o bot para carregar envio de etapa_abandono.
+- [ ] Avaliar índices/agregações no banco quando o volume crescer; hoje a consulta carrega os registros da janela limitada em memória.
+- [ ] Homologar integrações Meta/OpenRouter, impressão e túnel em ambiente controlado.
+
+Alterações desta etapa ainda sem novo commit.
+
+
+## 14. Configuração dos pratos por dia da semana — 02/10/2026
+
+- [x] Grade em Configurações → Pratos por dia da semana, segunda a domingo, edição e salvamento individual por produto.
+- [x] Cadastro/edição no Cardápio permite selecionar um ou vários dias; lista mostra nomes dos dias. Novos produtos começam com todos os dias selecionados.
+- [x] Reutilizado produtos.dias_disponiveis; não foi necessária migration nem mudança dos dias já cadastrados. Compatibilidade de leitura com seg/ter/qua/qui/sex/sab/dom e nomes completos; gravação usa nomes completos ou todos.
+- [x] API valida os valores e rejeita dia inválido/seleção vazia; edição somente dos dias preserva variações, preços e ativo/pausado.
+- [x] Mensagens de carregamento, erro/retry e confirmação; bloqueio de salvamento repetido e sem alteração. Falha preserva seleção.
+- [x] Texto existente do cardápio para o bot recebe os dias cadastrados. Não implementado bloqueio determinístico de pedidos fora do dia; continua na tarefa de validar disponibilidade por IDs no servidor (seção 13).
+- [x] Regressão Laravel comprova persistência, preservação de preço/status, informação ao bot e rejeição de valores inválidos; regressões Angular cobrem seleção legada, envio parcial, duplicidade e falha. Grade conferida com dados reais, incluindo Feijoada quarta/sábado; nenhuma configuração operacional alterada para testar.
+- Alterações ainda sem novo commit.
+
+## 15. Consolidação em Git — 02/10/2026
+
+- Configurações semanais de atendimento e pratos, indicadores do dashboard, cancelamento com motivo e testes consolidados no commit desta etapa. As referências anteriores a alterações sem commit descrevem o estado no momento de cada registro.
+

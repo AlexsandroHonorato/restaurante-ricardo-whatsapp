@@ -42,6 +42,7 @@ class AtendimentoController extends Controller
             'nome' => 'nullable|string|max:150',
             'motivo_transbordo' => 'nullable|string|max:255',
             'expirou' => 'nullable|boolean',
+            'etapa_abandono' => 'nullable|string|max:80',
             'registrar_mensagem' => 'nullable|boolean',
         ]);
 
@@ -114,6 +115,7 @@ class AtendimentoController extends Controller
             $atendimento->save();
         } elseif ($statusAtual === 'cancelado_apos_30_minutos' || $request->boolean('expirou')) {
             $atendimento->status = 'abandonado';
+            $atendimento->etapa_abandono = $request->input('etapa_abandono') ?: $statusAnterior;
             $atendimento->fim_em = Carbon::now();
             $atendimento->save();
         }

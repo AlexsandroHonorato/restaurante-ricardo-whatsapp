@@ -41,6 +41,7 @@ export function sincronizarStatusBanco(tel, status, rascunho = {}, extras = {}) 
     transbordo: extras.transbordo || false, motivo_transbordo: extras.motivo_transbordo || null,
     nome: extras.nome || null, expirou: extras.expirou || false,
     registrar_mensagem: extras.registrar_mensagem || false,
+    etapa_abandono: extras.etapa_abandono || null,
   });
   const anterior = filasSincronizacao.get(tel) || Promise.resolve();
   const tarefa = anterior.catch(() => {}).then(async () => {
@@ -98,7 +99,7 @@ export function obterEstadoCliente(tel) {
     c.msgs = [];
     c.atualizado = Date.now();
     salvarMemoria();
-    sincronizarStatusBanco(tel, STATUS_CONVERSA.INICIADA, c.rascunho, { expirou: true });
+    sincronizarStatusBanco(tel, STATUS_CONVERSA.INICIADA, c.rascunho, { expirou: true, etapa_abandono: c.statusAnterior });
   }
 
   return c;

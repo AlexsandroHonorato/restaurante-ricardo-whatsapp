@@ -5,12 +5,14 @@ import { ApiService } from '../../core/services/api.service';
 import { Chart, registerables } from 'chart.js';
 import { TopProduto, MapaBairro, FormaPagamentoStat } from '../../core/models/dashboard.model';
 
+import { DashboardAnalisesComponent } from './dashboard-analises.component';
+
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, DashboardAnalisesComponent],
   template: `
     <div class="dashboard-page">
       <!-- Top Title & Quick Filter -->
@@ -53,7 +55,7 @@ Chart.register(...registerables);
             <span class="kpi-label">Faturamento Total</span>
             <h2 class="kpi-value">{{ (api.kpis()?.faturamento_total ?? 0) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</h2>
             <div class="kpi-subtext">
-              <span>{{ api.kpis()?.total_pedidos ?? 0 }} pedidos concluídos</span>
+              <span>{{ api.kpis()?.total_pedidos ?? 0 }} pedidos registrados</span>
             </div>
           </div>
         </div>
@@ -75,9 +77,9 @@ Chart.register(...registerables);
           <div class="kpi-icon-wrap purple">🤖</div>
           <div class="kpi-content">
             <span class="kpi-label">Conversão da IA</span>
-            <h2 class="kpi-value">{{ (api.kpis()?.taxa_conversao_ia ?? 82.4) }}%</h2>
+            <h2 class="kpi-value">{{ (api.kpis()?.taxa_conversao_ia ?? 0) }}%</h2>
             <div class="kpi-subtext positive">
-              <span>{{ api.kpis()?.taxa_transbordo ?? 14.3 }}% transbordo humano</span>
+              <span>{{ api.kpis()?.taxa_transbordo ?? 0 }}% transbordo humano</span>
             </div>
           </div>
         </div>
@@ -145,6 +147,8 @@ Chart.register(...registerables);
         </div>
       </div>
 
+      <app-dashboard-analises [dias]="diasGrafico()" [atualizacao]="atualizacao()" />
+
       <!-- Bottom Tables & Rankings Row -->
       <div class="bottom-grid">
         <!-- Top Products Leaderboard -->
@@ -154,7 +158,7 @@ Chart.register(...registerables);
             <span class="badge badge-prep">Top Ranking</span>
           </div>
           <div class="rank-list">
-            @for (item of topProdutos(); track item.produto; let i = $index) {
+            @for (item of topProdutos(); track item.produto + item.tamanho; let i = $index) {
               <div class="rank-item">
                 <div class="rank-pos">{{ i + 1 }}</div>
                 <div class="rank-info">
@@ -600,6 +604,7 @@ Chart.register(...registerables);
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   api = inject(ApiService);
   diasGrafico = signal<number>(7);
+  atualizacao = signal(0);
   pollingInterval: any = null;
 
   topProdutos = signal<TopProduto[]>([]);
@@ -634,6 +639,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   carregarTudo() {
+    this.atualizacao.update(v => v + 1);
     this.api.getKpis().subscribe();
     this.carregarTopProdutos();
     this.carregarMapaBairros();
@@ -650,11 +656,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setDias(dias: number) {
     this.diasGrafico.set(dias);
+    this.carregarTopProdutos();
     this.renderSalesChart();
   }
 
   carregarTopProdutos() {
-    this.api.getTopProducts().subscribe((res) => this.topProdutos.set(res));
+    this.api.getTopProducts(this.diasGrafico()).subscribe((res) => this.topProdutos.set(res));
   }
 
   carregarMapaBairros() {
@@ -692,13 +699,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             pointBackgroundColor: '#F59E0B',
             pointRadius: 4,
             pointHoverRadius: 6,
-          }]
+          }, {label: 'Ticket médio (R$)', data: vendas.map(v => v.ticket_medio ?? null), borderColor: '#34D399', backgroundColor: '#34D399', tension: 0.2, fill: false}]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: false },
+            legend: { display: true, labels: { color: '#D1D5DB' } },
             tooltip: {
               callbacks: {
                 label: (ctx) => ` R$ ${Number(ctx.raw).toFixed(2).replace('.', ',')}`

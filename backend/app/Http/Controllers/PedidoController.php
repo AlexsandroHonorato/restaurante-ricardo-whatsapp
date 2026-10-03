@@ -61,6 +61,7 @@ class PedidoController extends Controller
             'status' => 'required|in:pendente,confirmado,em_preparo,saiu_para_entrega,entregue,cancelado',
             'alterado_por' => 'nullable|string',
             'observacao' => 'nullable|string',
+            'motivo_cancelamento' => 'nullable|string|max:255',
         ]);
 
         [$pedido, $alterado] = DB::transaction(function () use ($request, $id) {
@@ -81,6 +82,9 @@ class PedidoController extends Controller
                 throw ValidationException::withMessages(['status' => 'Transição de status inválida.']);
             }
             $pedido->status = $novo;
+            if ($novo === 'cancelado') {
+                $pedido->motivo_cancelamento = $request->input('motivo_cancelamento') ?: $request->input('observacao');
+            }
             $campo = ['em_preparo' => 'preparado_em', 'saiu_para_entrega' => 'saiu_entrega_em', 'entregue' => 'entregue_em', 'cancelado' => 'cancelado_em'][$novo] ?? null;
             if ($campo && ! $pedido->$campo) {
                 $pedido->$campo = now();
