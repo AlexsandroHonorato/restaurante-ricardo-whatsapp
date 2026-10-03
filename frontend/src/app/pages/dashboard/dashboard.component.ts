@@ -32,8 +32,8 @@ Chart.register(...registerables);
         </div>
 
         <div class="header-actions">
-          <button class="refresh-btn glass-card" (click)="carregarTudo()" title="Atualizar Métricas">
-            🔄 Atualizar
+          <button class="refresh-btn" (click)="carregarTudo()" [disabled]="api.loading()" [class.carregando]="api.loading()" [attr.aria-busy]="api.loading()" title="Atualizar indicadores">
+            <svg class="refresh-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 2M4 16l2 2a7 7 0 0 0 12-1"/></svg> {{api.loading() ? 'Atualizando…' : 'Atualizar'}}
           </button>
           <div class="period-toggle">
             <button class="period-btn" [class.active]="!periodo() && diasGrafico() === 7" [attr.aria-pressed]="!periodo() && diasGrafico() === 7" (click)="setDias(7)">Últimos 7 dias</button>
@@ -640,6 +640,8 @@ Chart.register(...registerables);
       background: rgba(255, 255, 255, 0.1);
     }
 
+    .refresh-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;background:var(--primary-glow);border:1px solid var(--primary);border-radius:10px;color:var(--primary-text);white-space:nowrap}
+    .refresh-btn:hover:not(:disabled){background:rgba(var(--primary-rgb),.24);transform:translateY(-1px)}.refresh-btn:active:not(:disabled){transform:translateY(0)}.refresh-btn:disabled{cursor:wait;opacity:.7}.carregando .refresh-icon{animation:refresh-giro .8s linear infinite}@keyframes refresh-giro{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.refresh-icon{animation:none!important}}
     .filtro-datas{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.filtro-datas mat-form-field{width:310px;max-width:100%}.erro-datas{color:var(--danger);font-size:.8rem}.periodo-descricao{font-size:.8rem;color:var(--text-muted)}
     /* Composição da referência visual enviada pelo usuário. */
     :host { --bg-card:#383849; --bg-surface-elevated:#444456; --border-color:#48485a; --text-muted:#b1afc2; }
@@ -871,6 +873,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          animation: false,
           plugins: {
             legend: {
               position: 'bottom',

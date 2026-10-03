@@ -446,3 +446,30 @@ Alterações desta etapa ainda sem novo commit.
 ## 30. Gráfico de vendas sem preenchimento — 03/10/2026
 
 - A pedido do usuário, removido preenchimento da série de faturamento e restaurada linha com espessura de 3px. Ticket médio permanece sem preenchimento. Valores, pontos, tooltip e filtros preservados. Sem novo commit.
+
+## 31. Espessura dos segmentos por valor — 03/10/2026
+
+- Anel de pagamentos agora calcula espessura proporcional ao faturamento de cada segmento: maior valor mais grosso, menores progressivamente mais finos, iguais com mesma espessura. Ordem de desenho crescente garante maiores por cima das junções, independentemente da ordem da API; segmentos ocultos/zero são excluídos. Valores, cores, percentuais e filtros preservados. Sem novo commit.
+
+## 32. Hambúrguer simples com rotação reversível — 03/10/2026
+
+- Restaurado botão/ícone SVG anterior, removendo profundidade, relevo e flutuação 3D. Ao recolher menu, ícone gira de 0° a 360°; ao reabrir retorna de 360° a 0° no sentido inverso, em 650ms. prefers-reduced-motion desativa transição. Funcionamento e acessibilidade mantidos. Sem novo commit.
+
+## 33. Anel de pagamentos sem animação de rotação — 03/10/2026
+
+- Desativada animação do doughnut (animation: false), eliminando giro ao carregar e nas atualizações automáticas. Dados, sobreposição, espessuras e filtros mantidos. Sem novo commit.
+
+## 34. Acabamento dos botões de atualização — 03/10/2026
+
+- Atualizar Dados usa botão roxo preenchido; Atualizar do dashboard usa variante contornada. Ambos têm ícone SVG, espaçamento/radius consistentes, hover e estado desabilitado/carregando com aria-busy. Ícone gira somente enquanto API indica loading; reduced-motion preservado. Fluxos de atualização existentes mantidos. Sem novo commit.
+
+## 35. Configurações separadas e cardápio semanal simplificado — 03/10/2026
+
+- Menu Configurações expansível com submenus Horário de atendimento (/configuracoes/horarios) e Pratos por dia da semana (/configuracoes/pratos-semana). URL anterior /configuracoes redireciona para horários; páginas carregam independentemente.
+- Pratos usa cartões responsivos, busca sem distinguir acentos, filtro por categoria, dias selecionáveis com aria-pressed e atalhos Todos os dias/Segunda a sexta. Salvar/Desfazer individuais, contador de alterações pendentes, validação de seleção vazia e mensagens de sucesso/erro.
+- Contrato preservado: salva somente dias_disponiveis, conserva preços/variações/status pausado e mantém seleção após falha. Horários continuam com regras e fluxo anteriores.
+- Validação: 22 testes Angular/build aprovados; navegador confirmou submenus, busca de Feijoada, seleção e desfazer sem salvar dados reais, e tela de horários sem cardápio. Prévia pratos-semana-refatorado.png salva. Servidor Angular recarregado e ativo na porta 4200. Sem novo commit.
+
+## 36. Ícones nos tipos do cardápio semanal — 03/10/2026
+
+- Categorias dos cartões exibem ícones SVG: talheres para pratos diários, calendário para pratos do dia, porção, adicionais, bebidas e cervejas. Mantidos nomes textuais e ícones decorativos aria-hidden, com paleta roxa do sistema. Sem novo commit.

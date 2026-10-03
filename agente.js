@@ -19,14 +19,24 @@ if (!WHATSAPP_APP_SECRET) console.warn('⚠ sem WHATSAPP_APP_SECRET: webhooks se
 
 // ---------------------------------------------------------------- enviar pelo WhatsApp
 async function graph(corpo) {
-  const r = await fetch(`${GRAPH}/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const r = await fetch(`${GRAPH}/${phoneId}/messages`, {
     signal: AbortSignal.timeout(15000),
     method: 'POST',
-    headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', ...corpo }),
   });
-  if (!r.ok) throw new Error(`WhatsApp retornou HTTP ${r.status}`);
-  return r.json();
+  const data = await r.json().catch(() => null);
+  if (!r.ok) {
+    if (r.status === 401 || data?.error?.code === 190) {
+      console.error('🚨 [TOKEN META EXPIRADO] O WHATSAPP_TOKEN expirou no .env! Por favor, gere um novo token de 24h ou crie um System User Token permanente no Meta Developers.');
+    } else {
+      console.error(`❌ [ERRO WHATSAPP HTTP ${r.status}]:`, JSON.stringify(data));
+    }
+    throw new Error(`WhatsApp HTTP ${r.status}: ${data?.error?.message || 'Erro de envio'}`);
+  }
+  return data;
 }
 const enviarTexto = (para, texto) => graph({ recipient_type: 'individual', to: para, type: 'text', text: { preview_url: false, body: texto } });
 // marca como lida na Meta Cloud API

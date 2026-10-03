@@ -1,4 +1,3 @@
-import { CardapioSemanalComponent } from './cardapio-semanal.component';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -15,7 +14,7 @@ interface DiaEditavel extends HorarioAtendimento {
 @Component({
   selector: 'app-configuracoes',
   standalone: true,
-  imports: [FormsModule, CardapioSemanalComponent],
+  imports: [FormsModule],
   templateUrl: './configuracoes.component.html',
   styleUrl: './configuracoes.component.css'
 })

@@ -56,10 +56,15 @@ import { ApiService } from '../../core/services/api.service';
           <span class="nav-label">Cardápio & Preços</span>
         </a>
         <div class="nav-section-title">ADMINISTRAÇÃO</div>
-        <a routerLink="/configuracoes" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
-          <app-icon nome="configuracoes" />
-          <span class="nav-label">Configurações</span>
-        </a>
+        <div class="config-menu">
+          <button type="button" class="nav-item config-toggle" (click)="configuracoesAbertas = !configuracoesAbertas" [attr.aria-expanded]="configuracoesAbertas" aria-controls="submenu-configuracoes">
+            <app-icon nome="configuracoes"/><span class="nav-label">Configurações</span><span class="chevron" aria-hidden="true">{{configuracoesAbertas ? '⌄' : '›'}}</span>
+          </button>
+          <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
+            <a routerLink="/configuracoes/horarios" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">Horário de atendimento</a>
+            <a routerLink="/configuracoes/pratos-semana" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">Pratos por dia da semana</a>
+          </div>
+        </div>
       </nav>
 
       <!-- Bot Status Card -->
@@ -77,6 +82,7 @@ import { ApiService } from '../../core/services/api.service';
     </aside>
   `,
   styles: [`
+    .config-toggle{width:100%;text-align:left;font-family:inherit;background:transparent;border:0;cursor:pointer}.chevron{margin-left:auto}.submenu{margin:4px 0 0 18px;border-left:1px solid var(--border-color);padding-left:8px}.submenu[hidden]{display:none}.submenu .nav-item{font-size:.78rem;padding:10px 8px}.config-menu{flex-shrink:0}
     .sidebar {
       width: 260px;
       background: var(--bg-surface);
@@ -245,5 +251,6 @@ import { ApiService } from '../../core/services/api.service';
   `]
 })
 export class SidebarComponent {
+  configuracoesAbertas = true;
   api = inject(ApiService);
 }

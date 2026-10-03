@@ -1,0 +1,24 @@
+<section class="semanal-page">
+ <div><span class="eyebrow">CONFIGURAÇÕES</span><h1 class="page-title">Pratos por dia da semana</h1><p class="page-subtitle">Escolha os dias de cada prato e salve as alterações no cartão.</p></div>
+ <div class="filtros glass-card">
+  <label>Buscar prato<input type="search" placeholder="Digite o nome do prato" [value]="busca()" (input)="busca.set($any($event.target).value)"></label>
+  <label>Categoria<select [value]="categoria()" (change)="categoria.set($any($event.target).value)"><option value="">Todas as categorias</option>@for(c of categorias();track c){<option [value]="c">{{c}}</option>}</select></label>
+  <span role="status">{{filtradas().length}} itens · {{pendentes()}} alterações pendentes</span>
+ </div>
+ @if(erro()){<p role="alert">{{erro()}} <button class="btn btn-secondary" (click)="carregar()">Tentar novamente</button></p>}
+ @if(carregando()){<p role="status">Carregando cardápio…</p>}
+ <div class="pratos-grid">
+ @for(l of filtradas();track l.produto.id){
+ <article class="prato-card glass-card" [class.pendente]="assinatura(l)!==l.original">
+  <div class="prato-header"><div><h2>{{l.produto.nome}}</h2><p class="tipo-prato"><span class="tipo-icone" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path [attr.d]="iconeCategoria(l.categoria)"/></svg></span>{{l.categoria}}</p></div><span class="estado" [class.pausado]="!l.produto.ativo">{{l.produto.ativo ? 'Ativo' : 'Pausado'}}</span></div>
+  <fieldset [disabled]="l.salvando"><legend>Dias em que este prato é oferecido</legend><div class="dias">
+   @for(d of semana;track d.valor){<button type="button" class="dia" [class.selecionado]="l.dias.includes(d.valor)" [attr.aria-pressed]="l.dias.includes(d.valor)" [attr.aria-label]="l.produto.nome + ' — ' + d.nome" (click)="alternar(l,d.valor)"><span aria-hidden="true">{{l.dias.includes(d.valor) ? '✓' : '+'}}</span>{{d.nome}}</button>}
+  </div><div class="atalhos"><button type="button" (click)="selecionar(l)">Todos os dias</button><button type="button" (click)="selecionar(l,true)">Segunda a sexta</button></div></fieldset>
+  <div class="acoes"><span>{{assinatura(l)!==l.original ? 'Alteração não salva' : 'Dias configurados'}}</span><button class="btn btn-secondary btn-sm" [disabled]="l.salvando || assinatura(l)===l.original" (click)="desfazer(l)">Desfazer</button><button class="btn btn-primary btn-sm" [disabled]="l.salvando || !l.dias.length || assinatura(l)===l.original" (click)="salvar(l)" [attr.aria-label]="'Salvar dias de ' + l.produto.nome">{{l.salvando?'Salvando…':'Salvar dias'}}</button></div>
+  @if(!l.dias.length){<p class="mensagem erro" role="alert">Selecione pelo menos um dia.</p>}
+  @if(l.mensagem){<p class="mensagem" [class.erro]="l.erro" [attr.role]="l.erro?'alert':'status'">{{l.mensagem}}</p>}
+  @if(!l.produto.ativo){<small>O prato continuará pausado ao salvar os dias.</small>}
+ </article>
+ } @empty { @if(!carregando() && !erro()){<p class="vazio">{{linhas().length ? 'Nenhum prato encontrado. Ajuste a busca ou a categoria.' : 'Nenhum produto cadastrado. Cadastre os pratos no menu Cardápio.'}}</p>} }
+ </div>
+</section>

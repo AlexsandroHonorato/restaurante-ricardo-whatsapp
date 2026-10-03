@@ -28,7 +28,11 @@ export const routes: Routes = [
   },
   {
     path: 'configuracoes',
-    loadComponent: () => import('./pages/configuracoes/configuracoes.component').then(m => m.ConfiguracoesComponent)
+    children: [
+      {path: '', redirectTo: 'horarios', pathMatch: 'full'},
+      {path: 'horarios', loadComponent: () => import('./pages/configuracoes/configuracoes.component').then(m => m.ConfiguracoesComponent)},
+      {path: 'pratos-semana', loadComponent: () => import('./pages/configuracoes/cardapio-semanal.component').then(m => m.CardapioSemanalComponent)}
+    ]
   },
   {
     path: '**',

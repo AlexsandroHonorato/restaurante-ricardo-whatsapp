@@ -17,7 +17,6 @@ describe('Configurações de atendimento', () => {
   function carregar() {
     const fixture = TestBed.createComponent(ConfiguracoesComponent);
     fixture.detectChanges();
-    http.expectOne('http://127.0.0.1:8080/api/cardapio').flush([]);
     http.expectOne(baseUrl).flush({ fuso: 'America/Sao_Paulo', horarios: [segunda] });
     fixture.detectChanges();
     return fixture;
@@ -66,7 +65,6 @@ describe('Configurações de atendimento', () => {
   it('informa falha no carregamento e oferece nova tentativa', () => {
     const fixture = TestBed.createComponent(ConfiguracoesComponent);
     fixture.detectChanges();
-    http.expectOne('http://127.0.0.1:8080/api/cardapio').flush([]);
     http.expectOne(baseUrl).flush({}, { status: 503, statusText: 'Unavailable' });
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Tentar novamente');

@@ -12,8 +12,8 @@ import { ApiService } from '../../core/services/api.service';
     }
     <header class="header">
       <div class="header-left">
-        <button class="menu-toggle btn btn-secondary" [class.menu-aberto]="menuAberto" type="button" (click)="alternarMenu.emit()" [attr.aria-label]="menuAberto ? 'Esconder menu' : 'Mostrar menu'" [attr.aria-expanded]="menuAberto" aria-controls="menu-principal">
-          <span class="hamburguer-3d" aria-hidden="true"><span></span><span></span><span></span></span>
+        <button class="menu-toggle btn btn-secondary" [class.menu-girado]="!menuAberto" type="button" (click)="alternarMenu.emit()" [attr.aria-label]="menuAberto ? 'Esconder menu' : 'Mostrar menu'" [attr.aria-expanded]="menuAberto" aria-controls="menu-principal">
+          <svg class="hamburguer-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <div class="store-status">
           <span class="status-badge" [class.open]="aberto()" [class.closed]="!aberto()">
@@ -26,8 +26,8 @@ import { ApiService } from '../../core/services/api.service';
 
       <div class="header-right">
         <!-- Atualizar Dados -->
-        <button class="btn btn-secondary btn-sm" (click)="refresh()" [disabled]="api.loading()">
-          <span>🔄</span>
+        <button class="btn refresh-dados" (click)="refresh()" [disabled]="api.loading()" [class.carregando]="api.loading()" [attr.aria-busy]="api.loading()">
+          <svg class="refresh-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 2M4 16l2 2a7 7 0 0 0 12-1"/></svg>
           <span>{{ api.loading() ? 'Atualizando...' : 'Atualizar Dados' }}</span>
         </button>
 
@@ -49,42 +49,17 @@ import { ApiService } from '../../core/services/api.service';
     </header>
   `,
   styles: [`
-    .menu-toggle {
-      width: 46px; height: 44px; padding: 10px; flex-shrink: 0; margin-right: 14px;
-      perspective: 180px; overflow: visible;
-      background: linear-gradient(145deg, var(--bg-surface-elevated), var(--bg-surface));
-      border: 1px solid var(--primary-text); color: var(--primary-text);
-      box-shadow: 0 4px 0 var(--border-color), 0 7px 12px rgba(0,0,0,.22);
-      transition: transform .2s ease, box-shadow .2s ease;
-    }
-    .hamburguer-3d {
-      display: block; position: relative; width: 24px; height: 20px;
-      transform-style: preserve-3d;
-      transform: rotateY(-22deg) rotateX(12deg);
-      transition: transform .65s cubic-bezier(.2,.8,.2,1);
-      animation: hamburguer-flutuar 4s ease-in-out infinite;
-    }
-    .hamburguer-3d span {
-      position: absolute; left: 0; width: 24px; height: 3px; border-radius: 3px;
-      background: currentColor; transform: translateZ(5px);
-      box-shadow: 1px 1px 0 var(--primary), 2px 2px 0 var(--primary), 3px 3px 0 var(--primary-hover), 4px 4px 5px rgba(0,0,0,.3);
-    }
-    .hamburguer-3d span:nth-child(1) { top: 0; }
-    .hamburguer-3d span:nth-child(2) { top: 8px; }
-    .hamburguer-3d span:nth-child(3) { top: 16px; }
-    .menu-aberto .hamburguer-3d { transform: rotateY(22deg) rotateX(-12deg); }
-    .menu-toggle:hover .hamburguer-3d, .menu-toggle:focus-visible .hamburguer-3d { animation-play-state: paused; }
-    .menu-toggle:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--border-color), 0 10px 16px rgba(0,0,0,.25); }
-    .menu-toggle:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--border-color); }
-    @keyframes hamburguer-flutuar {
-      0%, 100% { translate: 0 0; rotate: y -10deg; }
-      50% { translate: 0 -2px; rotate: y 10deg; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .hamburguer-3d { animation: none; }
-      .hamburguer-3d, .menu-toggle { transition: none; }
-      .menu-toggle:hover, .menu-toggle:active { transform: none; }
-    }
+    .refresh-dados { background:var(--primary);color:var(--on-primary);border:1px solid transparent;gap:8px;padding:10px 16px;border-radius:10px;box-shadow:0 4px 12px var(--primary-glow);white-space:nowrap; }
+    .refresh-dados:hover:not(:disabled){background:var(--primary-hover);transform:translateY(-1px)}
+    .refresh-dados:active:not(:disabled){transform:translateY(0)}
+    .refresh-dados:disabled{cursor:wait;opacity:.7}
+    .carregando .refresh-icon{animation:refresh-giro .8s linear infinite}
+    @keyframes refresh-giro{to{transform:rotate(360deg)}}
+    @media(prefers-reduced-motion:reduce){.refresh-icon{animation:none!important}}
+    .menu-toggle { padding: 10px; flex-shrink: 0; margin-right: 14px; }
+    .hamburguer-icon { display: block; transform: rotate(0deg); transition: transform .65s cubic-bezier(.4,0,.2,1); }
+    .menu-girado .hamburguer-icon { transform: rotate(360deg); }
+    @media (prefers-reduced-motion: reduce) { .hamburguer-icon { transition: none; } }
     .status-badge.closed .live-indicator {background:var(--danger);box-shadow:none;animation:none;}
     .header {
       height: 70px;
