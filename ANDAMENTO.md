@@ -417,3 +417,23 @@ Alterações desta etapa ainda sem novo commit.
 
 - Consolidado o estado final das seções 16–24: Design System, gráficos/indicadores e filtros, modal de cancelamento, bloqueio da IA fora da agenda e menu com animação 3D. As anotações anteriores de sem commit registram o estado histórico de cada etapa.
 - Validações realizadas: 19 testes Node, 18 Angular, 3 testes Laravel/26 assertivas e build de produção aprovados. Commit local; sem publicação remota.
+
+## 26. Cards e gráficos alinhados à imagem enviada — 02/10/2026
+
+- Referência visual direta: imagem codex-clipboard-c7f161c9-1c3b-4180-9fa3-8011b2ec2113.png fornecida pelo usuário; prevalece sobre aproximações anteriores.
+- Dashboard usa cards cinza-violeta #383849, raio de 8px, sem borda/sombra, quatro KPIs compactos com ícones SVG circulares roxo/verde/rosa; valor aparece antes do nome. Layout responsivo em 4/2/1 colunas.
+- Gráficos logo abaixo dos KPIs; pedidos recentes continuam disponíveis depois dos gráficos. Vendas usa área suave com degradê horizontal roxo→rosa, pontos vazados e grid discreto; preservada série de ticket médio.
+- Pagamentos usa anel fino com pontas arredondadas e cores roxo/verde/rosa/neutro; centro informa participação real da primeira forma de pagamento retornada pela API e seu nome, sem percentual fictício do template. Sem registros mostra Sem dados.
+- Situação operacional, filtros, valores/API e demais fluxos preservados. Validação: 18 testes Angular/build aprovados; conferência visual com API real e prévia dashboard-modelo-ajustado.png salva. Sem novo commit.
+
+## 27. Intervalo personalizado com Angular Material Datepicker — 02/10/2026
+
+- Adicionados @angular/material e @angular/cdk 22, campo de intervalo inicial/final, calendário navegável por mês/ano e botão Aplicar datas. Atalhos 7/30 dias limpam o intervalo e restauram consultas recentes.
+- Tema em frontend/src/material-theme.scss: cinza-violeta, marca roxa, radius 8px e DM Sans. Locale/ações do calendário em português; DataBrasileiraAdapter interpreta DD/MM/AAAA e rejeita dias inexistentes. Aplicação exige duas datas válidas, ordem correta e janela máxima de 365 dias.
+- Intervalo aplicado a vendas, pagamentos, ranking, bairros e análises (tempos/conversão/grade/cancelamentos). API aceita data_inicio/data_fim mantendo compatibilidade com dias; início à meia-noite local e fim exclusivo à meia-noite do dia seguinte, em America/Sao_Paulo. Resposta das análises identifica as datas efetivamente exibidas.
+- KPIs de hoje/todos os períodos, situação dos pedidos e pedidos recentes mantêm escopo indicado. Atualização automática conserva intervalo; respostas antigas continuam canceladas.
+- Validação: 21 testes Angular, 4 testes Laravel/38 assertivas e build aprovados. Casos cobrem mês anterior, retorno ao atalho, data inválida, limite de janela e fronteira UTC/São Paulo no último dia. Navegador confirmou agosto completo, calendário escuro e retorno a 7 dias; prévia datepicker-dashboard.png salva. Servidor Angular reiniciado para carregar novo tema/dependências, ativo na porta 4200. Nenhum dado operacional alterado; sem novo commit.
+
+## 28. Consolidação do dashboard e filtro de datas em Git — 02/10/2026
+
+- Consolidadas as seções 26–27: cards/gráficos conforme imagem enviada, Datepicker Material com tema próprio, intervalo histórico na API e regressões. Commit local solicitado pelo usuário; validações registradas na seção 27. As anotações sem commit anteriores representam o estado histórico de cada etapa.

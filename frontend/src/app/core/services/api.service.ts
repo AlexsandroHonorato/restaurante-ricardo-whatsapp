@@ -16,6 +16,8 @@ import {
   HorariosAtendimentoResponse
 } from '../models/dashboard.model';
 
+export interface PeriodoDashboard { inicio: string; fim: string; }
+
 @Injectable({
   providedIn: 'root'
 })
@@ -53,8 +55,10 @@ export class ApiService {
     );
   }
 
-  getSalesChart(dias: number = 7): Observable<VendaGrafico[]> {
-    return this.http.get<VendaGrafico[]>(`${this.baseUrl}/dashboard/vendas-grafico?dias=${dias}`).pipe(
+  private queryPeriodo(dias: number, periodo?: PeriodoDashboard | null) { return periodo ? `data_inicio=${periodo.inicio}&data_fim=${periodo.fim}` : `dias=${dias}`; }
+
+  getSalesChart(dias: number = 7, periodo?: PeriodoDashboard | null): Observable<VendaGrafico[]> {
+    return this.http.get<VendaGrafico[]>(`${this.baseUrl}/dashboard/vendas-grafico?${this.queryPeriodo(dias, periodo)}`).pipe(
       catchError(() => {
         this.registrarFalha();
         return EMPTY;
@@ -62,24 +66,24 @@ export class ApiService {
     );
   }
 
-  getAnalises(dias: number): Observable<AnalisesDashboard> {
-    return this.http.get<AnalisesDashboard>(`${this.baseUrl}/dashboard/analises?dias=${dias}`);
+  getAnalises(dias: number, periodo?: PeriodoDashboard | null): Observable<AnalisesDashboard> {
+    return this.http.get<AnalisesDashboard>(`${this.baseUrl}/dashboard/analises?${this.queryPeriodo(dias, periodo)}`);
   }
 
-  getTopProducts(dias: number = 7): Observable<TopProduto[]> {
-    return this.http.get<TopProduto[]>(`${this.baseUrl}/dashboard/top-produtos?dias=${dias}`).pipe(
+  getTopProducts(dias: number = 7, periodo?: PeriodoDashboard | null): Observable<TopProduto[]> {
+    return this.http.get<TopProduto[]>(`${this.baseUrl}/dashboard/top-produtos?${this.queryPeriodo(dias, periodo)}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
-  getDeliveryHeatmap(dias: number = 7): Observable<MapaBairro[]> {
-    return this.http.get<MapaBairro[]>(`${this.baseUrl}/dashboard/mapa-bairros?dias=${dias}`).pipe(
+  getDeliveryHeatmap(dias: number = 7, periodo?: PeriodoDashboard | null): Observable<MapaBairro[]> {
+    return this.http.get<MapaBairro[]>(`${this.baseUrl}/dashboard/mapa-bairros?${this.queryPeriodo(dias, periodo)}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
-  getPaymentMethods(dias: number = 7): Observable<FormaPagamentoStat[]> {
-    return this.http.get<FormaPagamentoStat[]>(`${this.baseUrl}/dashboard/formas-pagamento?dias=${dias}`).pipe(
+  getPaymentMethods(dias: number = 7, periodo?: PeriodoDashboard | null): Observable<FormaPagamentoStat[]> {
+    return this.http.get<FormaPagamentoStat[]>(`${this.baseUrl}/dashboard/formas-pagamento?${this.queryPeriodo(dias, periodo)}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }

@@ -38,3 +38,7 @@ A busca neste checkout não encontrou RestauranteId/restaurante_id, modelo Resta
 Foco visível, labels de ações, texto de status independente de cor, scroll horizontal de tabelas, layout móvel e respeito a prefers-reduced-motion. Estados indisponíveis não são preenchidos com dados demonstrativos. O status real da conexão Meta não possui endpoint de saúde; sidebar passa a informar somente a integração, sem afirmar conexão ativa.
 
 Indicadores (seção 21 do ANDAMENTO): conversão usa anel SVG inspirado nos gráficos circulares de Design System → Charts, node 950-3111; tempos usam barras arredondadas com tokens roxo/rosa/verde e trilhas elevadas. São adaptações aos dados reais, sem exportação autenticada ou equivalência pixel a pixel. Evitar accent-color como única estilização de meter nativo.
+
+Referência atual de cards/gráficos: imagem anexada em 02/10/2026 (seção 26 do ANDAMENTO). Dashboard usa superfície #383849 e radius 8px, ícones circulares, área com degradê roxo/rosa e donut arredondado com participação real no centro. Dados do restaurante e nomes de indicadores preservados.
+
+Datepicker: Angular Material 22 com tema escuro em src/material-theme.scss, superfície #383849, seleção #605CFF, fonte DM Sans e radius 8px. Calendar/date range em pt-BR, formato DD/MM/AAAA; mantém atalhos 7/30 dias e usa intervalo personalizado no dashboard.

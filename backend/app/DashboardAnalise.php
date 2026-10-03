@@ -9,16 +9,20 @@ use Carbon\Carbon;
 
 class DashboardAnalise
 {
-    public function intervalo(int $dias): array
+    public function intervalo(int $dias, ?string $dataInicio = null, ?string $dataFim = null): array
     {
+        if ($dataInicio && $dataFim) {
+            return [Carbon::parse($dataInicio, 'America/Sao_Paulo')->startOfDay()->utc(), Carbon::parse($dataFim, 'America/Sao_Paulo')->startOfDay()->addDay()->utc()];
+        }
         $fim = Carbon::now('America/Sao_Paulo')->startOfDay()->addDay();
 
         return [$fim->copy()->subDays($dias)->utc(), $fim->copy()->utc()];
     }
 
-    public function calcular(int $dias): array
+    public function calcular(int $dias, ?string $dataInicio = null, ?string $dataFim = null): array
     {
-        [$inicio,$fim] = $this->intervalo($dias);
+        [$inicio,$fim] = $this->intervalo($dias, $dataInicio, $dataFim);
+        $dias = (int) $inicio->copy()->timezone('America/Sao_Paulo')->diffInDays($fim->copy()->timezone('America/Sao_Paulo'));
         $pedidos = Pedido::where('created_at', '>=', $inicio)->where('created_at', '<', $fim)->get();
         $agenda = HorarioAtendimento::all()->keyBy('dia_semana');
         $vendas = [];
@@ -75,6 +79,6 @@ class DashboardAnalise
         $abandonos = $atendimentos->where('status', 'abandonado')->countBy(fn ($a) => $a->etapa_abandono ?: 'Não registrado');
         $linhas = fn ($contagens) => collect($contagens)->map(fn ($total, $nome) => ['nome' => $nome, 'total' => $total])->sortByDesc('total')->values()->all();
 
-        return ['dias' => $dias, 'fuso' => 'America/Sao_Paulo', 'vendas' => array_values($vendas), 'demanda' => array_map(fn ($d, $horas) => ['dia' => $d, 'horas' => array_values($horas)], array_keys($mapa), array_values($mapa)), 'pedidos_fora_agenda' => $fora, 'tempos' => $tempos, 'atendimentos' => ['total' => $atendimentos->count(), 'conversao' => $atendimentos->count() ? round(($status['finalizado_com_pedido'] ?? 0) / $atendimentos->count() * 100, 1) : null, 'status' => $linhas($status), 'abandonos' => $linhas($abandonos)], 'cancelamentos' => $linhas($motivos)];
+        return ['data_inicio' => $dataInicio, 'data_fim' => $dataFim, 'dias' => $dias, 'fuso' => 'America/Sao_Paulo', 'vendas' => array_values($vendas), 'demanda' => array_map(fn ($d, $horas) => ['dia' => $d, 'horas' => array_values($horas)], array_keys($mapa), array_values($mapa)), 'pedidos_fora_agenda' => $fora, 'tempos' => $tempos, 'atendimentos' => ['total' => $atendimentos->count(), 'conversao' => $atendimentos->count() ? round(($status['finalizado_com_pedido'] ?? 0) / $atendimentos->count() * 100, 1) : null, 'status' => $linhas($status), 'abandonos' => $linhas($abandonos)], 'cancelamentos' => $linhas($motivos)];
     }
 }

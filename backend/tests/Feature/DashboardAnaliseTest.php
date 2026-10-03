@@ -12,6 +12,23 @@ class DashboardAnaliseTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_intervalo_historico_inclui_dia_final_no_fuso_local(): void
+    {
+        $cliente = Cliente::create(['telefone' => '5512999999876', 'nome' => 'Datas']);
+        foreach ([['DENTRO', '2026-09-01 02:59:59'], ['FORA', '2026-09-01 03:00:00']] as [$codigo, $data]) {
+            $pedido = Pedido::create(['codigo_pedido' => $codigo, 'cliente_id' => $cliente->id, 'forma_pagamento' => 'pix', 'status' => 'entregue', 'valor_total' => 50]);
+            $pedido->created_at = $data;
+            $pedido->save();
+        }
+        $query = '?data_inicio=2026-08-01&data_fim=2026-08-31';
+        $this->getJson('/api/dashboard/analises'.$query)->assertOk()->assertJsonPath('data_inicio', '2026-08-01')->assertJsonPath('dias', 31)->assertJsonCount(31, 'vendas')->assertJsonPath('vendas.30.faturamento', 50);
+        $this->getJson('/api/dashboard/formas-pagamento'.$query)->assertOk()->assertJsonPath('0.quantidade', 1);
+        $this->getJson('/api/dashboard/mapa-bairros'.$query)->assertOk()->assertJsonPath('0.total_pedidos', 1);
+        $this->getJson('/api/dashboard/analises?data_inicio=2026-08-31&data_fim=2026-08-01')->assertUnprocessable();
+        $this->getJson('/api/dashboard/analises?data_inicio=2026-08-01')->assertUnprocessable();
+        $this->getJson('/api/dashboard/analises?data_inicio=2025-01-01&data_fim=2026-08-01')->assertUnprocessable();
+    }
+
     public function test_periodo_filtra_pagamentos_e_bairros(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-10-02 15:00:00', 'UTC'));

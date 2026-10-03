@@ -167,6 +167,7 @@ export interface HorariosAtendimentoResponse {
 }
 
 export interface AnalisesDashboard {
+ data_inicio?: string | null; data_fim?: string | null;
  dias: number; fuso: string; pedidos_fora_agenda: number;
  demanda: {dia: number; horas: {hora: number; pedidos: number; atendimento: boolean}[]}[];
  tempos: {tipo: string; minutos: number | null; amostras: number}[];

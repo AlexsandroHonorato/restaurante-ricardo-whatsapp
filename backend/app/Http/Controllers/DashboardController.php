@@ -10,9 +10,28 @@ use App\Models\PedidoItem;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
+    private function periodo(Request $request): array
+    {
+        $dados = $request->validate([
+            'data_inicio' => 'nullable|required_with:data_fim|date_format:Y-m-d',
+            'data_fim' => 'nullable|required_with:data_inicio|date_format:Y-m-d|after_or_equal:data_inicio',
+        ]);
+        if (! empty($dados['data_inicio']) && ! empty($dados['data_fim'])) {
+            $dias = (int) Carbon::parse($dados['data_inicio'])->diffInDays(Carbon::parse($dados['data_fim'])) + 1;
+            if ($dias > 365) {
+                throw ValidationException::withMessages(['data_fim' => 'Selecione um intervalo de até 365 dias.']);
+            }
+
+            return [$dias, $dados['data_inicio'], $dados['data_fim']];
+        }
+
+        return [max(1, min(365, (int) $request->query('dias', 7))), null, null];
+    }
+
     /**
      * Retorna os KPIs consolidados em tempo real
      */
@@ -66,14 +85,12 @@ class DashboardController extends Controller
      */
     public function getSalesChart(Request $request)
     {
-        $dias = max(1, min(365, (int) $request->query('dias', 7)));
-
-        return response()->json(app(DashboardAnalise::class)->calcular($dias)['vendas']);
+        return response()->json(app(DashboardAnalise::class)->calcular(...$this->periodo($request))['vendas']);
     }
 
     public function getAnalises(Request $request)
     {
-        return response()->json(app(DashboardAnalise::class)->calcular(max(1, min(365, (int) $request->query('dias', 7)))));
+        return response()->json(app(DashboardAnalise::class)->calcular(...$this->periodo($request)));
     }
 
     /**
@@ -81,7 +98,7 @@ class DashboardController extends Controller
      */
     public function getTopProducts(Request $request)
     {
-        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(max(1, min(365, (int) $request->query('dias', 7))));
+        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(...$this->periodo($request));
         $top = PedidoItem::select(
             'nome_snapshot as produto',
             'tamanho_snapshot as tamanho',
@@ -104,7 +121,7 @@ class DashboardController extends Controller
      */
     public function getDeliveryByNeighborhood(Request $request)
     {
-        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(max(1, min(365, (int) $request->query('dias', 7))));
+        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(...$this->periodo($request));
         $bairros = DB::table('pedidos')
             ->leftJoin('enderecos', 'pedidos.endereco_id', '=', 'enderecos.id')
             ->select(
@@ -125,7 +142,7 @@ class DashboardController extends Controller
      */
     public function getPaymentMethods(Request $request)
     {
-        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(max(1, min(365, (int) $request->query('dias', 7))));
+        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(...$this->periodo($request));
         $pagamentos = Pedido::select(
             'forma_pagamento',
             DB::raw('COUNT(id) as quantidade'),

@@ -1,9 +1,14 @@
 import { PedidosRecentesComponent } from '../../shared/ui/pedidos-recentes.component';
 import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { Subscription } from 'rxjs';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { MatDatepickerModule, MatDatepickerIntl } from '@angular/material/datepicker';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { provideNativeDateAdapter, MAT_DATE_LOCALE, DateAdapter } from '@angular/material/core';
+import { DataBrasileiraAdapter, calendarioPortugues } from '../../core/date-adapter';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../core/services/api.service';
+import { ApiService, PeriodoDashboard } from '../../core/services/api.service';
 import { Chart, registerables } from 'chart.js';
 import { TopProduto, MapaBairro, FormaPagamentoStat } from '../../core/models/dashboard.model';
 
@@ -14,7 +19,8 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, DashboardAnalisesComponent, PedidosRecentesComponent],
+  imports: [CommonModule, RouterModule, DashboardAnalisesComponent, PedidosRecentesComponent, ReactiveFormsModule, MatDatepickerModule, MatFormFieldModule],
+  providers: [provideNativeDateAdapter(), {provide: DateAdapter, useClass: DataBrasileiraAdapter}, {provide: MatDatepickerIntl, useFactory: calendarioPortugues}, {provide: MAT_DATE_LOCALE, useValue: 'pt-BR'}],
   template: `
     <div class="dashboard-page">
       <!-- Top Title & Quick Filter -->
@@ -29,10 +35,25 @@ Chart.register(...registerables);
             🔄 Atualizar
           </button>
           <div class="period-toggle">
-            <button class="period-btn" [class.active]="diasGrafico() === 7" [attr.aria-pressed]="diasGrafico() === 7" (click)="setDias(7)">Últimos 7 dias</button>
-            <button class="period-btn" [class.active]="diasGrafico() === 30" [attr.aria-pressed]="diasGrafico() === 30" (click)="setDias(30)">30 dias</button>
+            <button class="period-btn" [class.active]="!periodo() && diasGrafico() === 7" [attr.aria-pressed]="!periodo() && diasGrafico() === 7" (click)="setDias(7)">Últimos 7 dias</button>
+            <button class="period-btn" [class.active]="!periodo() && diasGrafico() === 30" [attr.aria-pressed]="!periodo() && diasGrafico() === 30" (click)="setDias(30)">30 dias</button>
           </div>
         </div>
+      </div>
+      <div class="filtro-datas">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Período personalizado</mat-label>
+          <mat-date-range-input [formGroup]="datas" [rangePicker]="calendario">
+            <input matStartDate formControlName="inicio" placeholder="Data inicial" aria-label="Data inicial">
+            <input matEndDate formControlName="fim" placeholder="Data final" aria-label="Data final">
+          </mat-date-range-input>
+          <mat-datepicker-toggle matIconSuffix [for]="calendario"></mat-datepicker-toggle>
+          <mat-date-range-picker #calendario panelClass="calendario-restaurante"></mat-date-range-picker>
+        </mat-form-field>
+        <button class="btn btn-primary" type="button" [disabled]="datas.invalid || !datas.value.inicio || !datas.value.fim" (click)="aplicarDatas()">Aplicar datas</button>
+        @if (erroDatas()) {<span role="alert" class="erro-datas">{{erroDatas()}}</span>}
+        @if (datas.invalid && datas.touched) {<span role="alert" class="erro-datas">Informe datas válidas em DD/MM/AAAA, com o fim igual ou posterior ao início.</span>}
+        <span class="periodo-descricao">{{rotuloPeriodo()}}</span>
       </div>
 
       <!-- Live Order Status Flow -->
@@ -75,7 +96,7 @@ Chart.register(...registerables);
       <div class="kpi-grid">
         <!-- Faturamento Hoje -->
         <div class="glass-card kpi-card highlight">
-          <div class="kpi-icon-wrap amber">💰</div>
+          <div class="kpi-icon-wrap amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3zM3 10h18M7 15h3"/></svg></div>
           <div class="kpi-content">
             <span class="kpi-label">Faturamento Hoje</span>
             <h2 class="kpi-value">{{ (api.kpis()?.faturamento_hoje ?? 0) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</h2>
@@ -88,7 +109,7 @@ Chart.register(...registerables);
 
         <!-- Faturamento Acumulado -->
         <div class="glass-card kpi-card">
-          <div class="kpi-icon-wrap emerald">📈</div>
+          <div class="kpi-icon-wrap emerald"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16M7 14l4-4 4 2 5-7"/></svg></div>
           <div class="kpi-content">
             <span class="kpi-label">Faturamento Total</span>
             <h2 class="kpi-value">{{ (api.kpis()?.faturamento_total ?? 0) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</h2>
@@ -100,7 +121,7 @@ Chart.register(...registerables);
 
         <!-- Ticket Médio -->
         <div class="glass-card kpi-card">
-          <div class="kpi-icon-wrap blue">🏷️</div>
+          <div class="kpi-icon-wrap blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8l10 10-8 8L3 11z"/><circle cx="7.5" cy="7.5" r="1"/></svg></div>
           <div class="kpi-content">
             <span class="kpi-label">Ticket Médio</span>
             <h2 class="kpi-value">{{ (api.kpis()?.ticket_medio ?? 0) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</h2>
@@ -112,7 +133,7 @@ Chart.register(...registerables);
 
         <!-- Conversão IA -->
         <div class="glass-card kpi-card">
-          <div class="kpi-icon-wrap purple">🤖</div>
+          <div class="kpi-icon-wrap purple"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v13H5zM12 3v4M2 11v5m20-5v5M9 16h6"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/></svg></div>
           <div class="kpi-content">
             <span class="kpi-label">Conversão da IA</span>
             <h2 class="kpi-value">{{ (api.kpis()?.taxa_conversao_ia ?? 0) }}%</h2>
@@ -123,7 +144,7 @@ Chart.register(...registerables);
         </div>
       </div>
 
-      <app-pedidos-recentes [atualizacao]="atualizacao()" />
+
 
       <!-- Charts Row -->
       <div class="charts-row">
@@ -132,7 +153,7 @@ Chart.register(...registerables);
           <div class="chart-header">
             <div>
               <h3>Evolução de Vendas & Faturamento</h3>
-              <p>Faturamento e ticket médio · últimos {{diasGrafico()}} dias</p>
+              <p>Faturamento e ticket médio · {{rotuloPeriodo()}}</p>
               <div class="chart-key"><span><i class="key-receita"></i>Faturamento</span><span><i class="key-ticket"></i>Ticket médio</span></div>
             </div>
           </div>
@@ -146,16 +167,19 @@ Chart.register(...registerables);
           <div class="chart-header">
             <div>
               <h3>Formas de Pagamento</h3>
-              <p>Distribuição do faturamento por método · últimos {{diasGrafico()}} dias</p>
+              <p>Distribuição do faturamento por método · {{rotuloPeriodo()}}</p>
             </div>
           </div>
           <div class="chart-canvas-wrap doughnut">
             <canvas #paymentCanvas></canvas>
+            @if (pagamentos().length) {<div class="donut-centro"><strong>{{participacaoPrincipal()}}%</strong><span>{{nomePagamento(pagamentos()[0].forma_pagamento)}}</span></div>} @else {<div class="donut-centro"><span>Sem dados</span></div>}
           </div>
         </div>
       </div>
 
-      <app-dashboard-analises [dias]="diasGrafico()" [atualizacao]="atualizacao()" />
+      <app-pedidos-recentes [atualizacao]="atualizacao()" />
+
+      <app-dashboard-analises [dias]="diasGrafico()" [periodo]="periodo()" [atualizacao]="atualizacao()" />
 
       <!-- Bottom Tables & Rankings Row -->
       <div class="bottom-grid">
@@ -163,7 +187,7 @@ Chart.register(...registerables);
         <div class="glass-card table-card">
           <div class="card-header-clean">
             <h3>Pratos e Bebidas Mais Vendidos</h3>
-            <span class="badge badge-prep">Últimos {{diasGrafico()}} dias</span>
+            <span class="badge badge-prep">{{rotuloPeriodo()}}</span>
           </div>
           <div class="rank-list">
             @for (item of topProdutos(); track item.produto + item.tamanho; let i = $index) {
@@ -191,7 +215,7 @@ Chart.register(...registerables);
         <div class="glass-card table-card">
           <div class="card-header-clean">
             <h3>Entregas por Bairro (Caraguatatuba)</h3>
-            <span class="badge badge-delivery">Últimos {{diasGrafico()}} dias</span>
+            <span class="badge badge-delivery">{{rotuloPeriodo()}}</span>
           </div>
           <div class="bairros-list">
             @for (b of mapaBairros(); track b.bairro) {
@@ -614,11 +638,46 @@ Chart.register(...registerables);
     .refresh-btn:hover {
       background: rgba(255, 255, 255, 0.1);
     }
+
+    .filtro-datas{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.filtro-datas mat-form-field{width:310px;max-width:100%}.erro-datas{color:var(--danger);font-size:.8rem}.periodo-descricao{font-size:.8rem;color:var(--text-muted)}
+    /* Composição da referência visual enviada pelo usuário. */
+    :host { --bg-card:#383849; --bg-surface-elevated:#444456; --border-color:#48485a; --text-muted:#b1afc2; }
+    .glass-card { background:#383849; border:0; border-radius:8px; box-shadow:none; }
+    .kpi-grid { grid-template-columns:repeat(4,minmax(0,1fr));gap:22px; }
+    .kpi-card { padding:22px;gap:16px;min-height:100px; }
+    .kpi-card.highlight { background:#383849;border:0; }
+    .kpi-icon-wrap { width:44px;height:44px;border-radius:50%; }
+    .kpi-icon-wrap svg { width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+    .kpi-icon-wrap.amber,.kpi-icon-wrap.purple { background:rgba(96,92,255,.3);color:#8b84ff;border:0; }
+    .kpi-icon-wrap.emerald {background:rgba(47,229,167,.25);color:#2fe5a7;border:0;}
+    .kpi-icon-wrap.blue {background:rgba(255,105,180,.25);color:#ff69b4;border:0;}
+    .kpi-content {min-width:0;}.kpi-value {order:-1;font-size:1.1rem;margin:0 0 4px;overflow-wrap:anywhere;}
+    .kpi-label {text-transform:none;letter-spacing:0;font-size:.76rem;}.kpi-subtext {font-size:.65rem;margin-top:4px;color:var(--text-muted);}.kpi-subtext.positive{color:var(--text-muted)}
+    .charts-row {grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:22px;}
+    .chart-card {padding:22px 20px;}.chart-header h3{font-size:.95rem;font-weight:500;}.chart-header p{font-size:.72rem;}
+    .chart-canvas-wrap.doughnut {position:relative;}.donut-centro{position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;pointer-events:none;gap:2px;}.donut-centro strong{font-size:1.6rem}.donut-centro span{font-size:.8rem;color:var(--text-secondary)}
+    @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:800px){.charts-row{grid-template-columns:1fr}}
+    @media(max-width:480px){.kpi-grid{grid-template-columns:1fr}}
   `]
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   api = inject(ApiService);
   diasGrafico = signal<number>(7);
+  periodo = signal<PeriodoDashboard | null>(null);
+  erroDatas = signal<string | null>(null);
+  datas = new FormGroup({inicio: new FormControl<Date | null>(null), fim: new FormControl<Date | null>(null)});
+  private dataLocal(data: Date) { return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}-${String(data.getDate()).padStart(2,'0')}`; }
+  rotuloPeriodo() { const p=this.periodo();return p ? `${p.inicio.split('-').reverse().join('/')} a ${p.fim.split('-').reverse().join('/')}` : `Últimos ${this.diasGrafico()} dias`; }
+  aplicarDatas() {
+    const {inicio,fim}=this.datas.getRawValue();
+    this.erroDatas.set(null);
+    if (this.datas.invalid || !inicio || !fim || !Number.isFinite(inicio.getTime()) || !Number.isFinite(fim.getTime())) return;
+    const dias=(Date.UTC(fim.getFullYear(),fim.getMonth(),fim.getDate())-Date.UTC(inicio.getFullYear(),inicio.getMonth(),inicio.getDate()))/86400000+1;
+    if(dias < 1 || dias > 365){this.erroDatas.set('Selecione um intervalo de 1 a 365 dias.');return;}
+    this.periodo.set({inicio:this.dataLocal(inicio),fim:this.dataLocal(fim)});
+    this.carregarTopProdutos();this.carregarMapaBairros();this.renderSalesChart();this.renderPaymentChart();
+  }
   atualizacao = signal(0);
   pollingInterval: any = null;
   private consultas = new Map<string, Subscription>();
@@ -678,6 +737,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setDias(dias: number) {
     if (dias !== 7 && dias !== 30) return;
+    this.periodo.set(null);
+    this.erroDatas.set(null);
+    this.datas.reset();
     this.diasGrafico.set(dias);
     this.carregarTopProdutos();
     this.renderSalesChart();
@@ -687,17 +749,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   carregarTopProdutos() {
     this.cancelarConsulta('produtos');
-    this.consultas.set('produtos', this.api.getTopProducts(this.diasGrafico()).subscribe((res) => this.topProdutos.set(res)));
+    this.consultas.set('produtos', this.api.getTopProducts(this.diasGrafico(), this.periodo()).subscribe((res) => this.topProdutos.set(res)));
   }
 
   carregarMapaBairros() {
     this.cancelarConsulta('bairros');
-    this.consultas.set('bairros', this.api.getDeliveryHeatmap(this.diasGrafico()).subscribe((res) => this.mapaBairros.set(res)));
+    this.consultas.set('bairros', this.api.getDeliveryHeatmap(this.diasGrafico(), this.periodo()).subscribe((res) => this.mapaBairros.set(res)));
   }
 
   renderSalesChart() {
     this.cancelarConsulta('vendas');
-    this.consultas.set('vendas', this.api.getSalesChart(this.diasGrafico()).subscribe((vendas) => {
+    this.consultas.set('vendas', this.api.getSalesChart(this.diasGrafico(), this.periodo()).subscribe((vendas) => {
       if (!this.salesCanvas?.nativeElement) return;
       if (this.salesChartInstance) this.salesChartInstance.destroy();
 
@@ -718,14 +780,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             borderColor: '#8B84FF',
             backgroundColor: (context) => {
               const area=context.chart.chartArea;if(!area)return 'rgba(96,92,255,.15)';
-              const gradient=context.chart.ctx.createLinearGradient(0,area.top,0,area.bottom);
-              gradient.addColorStop(0,'rgba(96,92,255,.38)');gradient.addColorStop(1,'rgba(96,92,255,0)');return gradient;
+              const gradient=context.chart.ctx.createLinearGradient(area.left,0,area.right,0);
+              gradient.addColorStop(0,'rgba(96,92,255,.5)');gradient.addColorStop(1,'rgba(255,105,180,.38)');return gradient;
             },
-            borderWidth: 3,
+            borderWidth: 0,
             fill: true,
             tension: 0.4,
-            pointBackgroundColor: '#8B84FF',
-            pointRadius: 0,
+            pointBackgroundColor: '#383849',
+            pointBorderColor: '#FF69B4',
+            pointBorderWidth: 2,
+            pointRadius: 4,
             pointHoverRadius: 5,
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2,
@@ -767,9 +831,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }));
   }
 
+  nomePagamento(tipo: string) { return ({pix:'Pix',cartao_credito:'Crédito',cartao_debito:'Débito',dinheiro:'Dinheiro'} as Record<string,string>)[tipo] || tipo; }
+  participacaoPrincipal() { const total=this.pagamentos().reduce((s,p)=>s+Number(p.faturamento),0);return total>0?Math.round(Number(this.pagamentos()[0]?.faturamento ?? 0)/total*100):0; }
   renderPaymentChart() {
     this.cancelarConsulta('pagamentos');
-    this.consultas.set('pagamentos', this.api.getPaymentMethods(this.diasGrafico()).subscribe((pagamentos) => {
+    this.consultas.set('pagamentos', this.api.getPaymentMethods(this.diasGrafico(), this.periodo()).subscribe((pagamentos) => {
       this.pagamentos.set(pagamentos);
       if (!this.paymentCanvas?.nativeElement) return;
       if (this.paymentChartInstance) this.paymentChartInstance.destroy();
@@ -793,10 +859,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           labels,
           datasets: [{
             data,
-            backgroundColor: ['#605CFF', '#FF69B4', '#2FE5A7', '#FFBE55', '#7CB8FF'],
-            borderColor: '#242B3A',
-            borderWidth: 5,
-            borderRadius: 8,
+            backgroundColor: ['#605CFF', '#2FE5A7', '#FF69B4', '#B1AFC2', '#7CB8FF'],
+            borderColor: '#383849',
+            borderWidth: 0,
+            borderRadius: 20,
             hoverOffset: 5
           }]
         },
@@ -809,7 +875,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
               labels: { color: '#D1D5DB', padding: 14, font: { size: 12 } }
             }
           },
-          cutout: '76%'
+          cutout: '78%'
         }
       });
     }));

@@ -1,0 +1,21 @@
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme((color: (theme-type: dark, primary: mat.$violet-palette), typography: 'DM Sans', density: -2));
+  @include mat.datepicker-overrides((
+    calendar-container-background-color: #383849,
+    calendar-container-text-color: #ffffff,
+    calendar-date-selected-state-background-color: #605cff,
+    calendar-date-selected-state-text-color: #ffffff,
+    calendar-date-today-outline-color: #b5b2ff,
+    calendar-date-in-range-state-background-color: rgba(96, 92, 255, .22),
+  ));
+  @include mat.form-field-overrides((
+    outlined-container-shape: 8px,
+    outlined-focus-outline-color: #605cff,
+    outlined-focus-label-text-color: #b5b2ff,
+    outlined-input-text-color: #ffffff,
+  ));
+}
+
+.calendario-restaurante { font-family: 'DM Sans', sans-serif; }
