@@ -255,3 +255,13 @@ Esta seção continua o histórico alimentado pelo Antigravity. O arquivo existe
 ### Resultado final desta revisão
 
 **31 testes aprovados:** 15 no Node, 12 no Laravel (55 assertions) e 4 no Angular. Build de produção Angular aprovado, sintaxe Node válida, Pint aplicado e `git diff --check` sem erros de whitespace. Nenhuma publicação, envio de WhatsApp real ou operação destrutiva de banco foi realizada. Os resultados cobrem testes locais/mocks; homologação integrada com Meta/OpenRouter/MySQL operacional permanece pendente.
+
+
+## 10. Correção de erro 500 no dashboard — 02/10/2026
+
+- Relato: aviso "Não foi possível atualizar os dados. Verifique a conexão com a API." no painel.
+- Causa confirmada no Laravel: `Undefined variable $hoje` em `DashboardController::getKpis`; a contagem de pedidos ainda referenciava a variável removida na revisão anterior.
+- Correção: `pedidos_hoje` usa o mesmo intervalo de São Paulo convertido para UTC de `faturamento_hoje`.
+- Regressão adicionada: `DashboardKpisTest` verifica resposta HTTP 200, pedidos/faturamento e limites exatos do dia local. Teste aprovado (5 assertions).
+- Verificação na API em execução: dez endpoints de dashboard e telas operacionais retornaram HTTP 200. Dados reais não foram alterados; consultas de validação foram somente leitura.
+- Alteração posterior ao commit `dc67f79`; ainda sem novo commit. Recarregar o painel para obter os dados novamente.

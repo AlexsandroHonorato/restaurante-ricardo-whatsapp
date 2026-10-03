@@ -24,7 +24,7 @@ class DashboardController extends Controller
         $faturamentoHoje = Pedido::where('status', '!=', 'cancelado')->where('created_at', '>=', $inicioHoje)->where('created_at', '<', $fimHoje)->sum('valor_total');
 
         $totalPedidos = Pedido::count();
-        $pedidosHoje = Pedido::whereDate('created_at', $hoje)->count();
+        $pedidosHoje = Pedido::where('created_at', '>=', $inicioHoje)->where('created_at', '<', $fimHoje)->count();
 
         $ticketMedio = Pedido::where('status', '!=', 'cancelado')->avg('valor_total') ?? 0;
         $totalClientes = Cliente::count();
