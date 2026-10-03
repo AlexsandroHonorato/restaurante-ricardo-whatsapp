@@ -5,6 +5,20 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 
 describe('App', () => {
+  it('esconde e reabre o menu pelo botão acessível', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    const button = element.querySelector('.menu-toggle') as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+    expect(element.querySelector('app-sidebar')?.hasAttribute('hidden')).toBe(true);
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    button.click();
+    fixture.detectChanges();
+    expect(element.querySelector('app-sidebar')?.hasAttribute('hidden')).toBe(false);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+  });
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],

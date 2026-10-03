@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/ui/icon.component';
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -6,7 +7,7 @@ import { ApiService } from '../../core/services/api.service';
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, IconComponent],
   template: `
     <aside class="sidebar">
       <!-- Logo & Brand -->
@@ -22,21 +23,21 @@ import { ApiService } from '../../core/services/api.service';
       <nav class="nav-list">
         <div class="nav-section-title">PRINCIPAL</div>
 
-        <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">📊</span>
+        <a routerLink="/dashboard" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+          <app-icon nome="dashboard" />
           <span class="nav-label">Dashboard Geral</span>
         </a>
 
-        <a routerLink="/pedidos" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">🛍️</span>
+        <a routerLink="/pedidos" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+          <app-icon nome="pedidos" />
           <span class="nav-label">Pedidos & Cozinha</span>
           @if (api.kpis()?.pedidos_por_status?.em_preparo) {
             <span class="nav-pill prep">{{ api.kpis()?.pedidos_por_status?.em_preparo }}</span>
           }
         </a>
 
-        <a routerLink="/atendimentos" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">🤖</span>
+        <a routerLink="/atendimentos" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+          <app-icon nome="atendimentos" />
           <span class="nav-label">Atendimentos IA</span>
           @if (api.kpis()?.total_transbordo_humano) {
             <span class="nav-pill alert">{{ api.kpis()?.total_transbordo_humano }}</span>
@@ -45,18 +46,18 @@ import { ApiService } from '../../core/services/api.service';
 
         <div class="nav-section-title">CADASTROS</div>
 
-        <a routerLink="/clientes" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">👥</span>
+        <a routerLink="/clientes" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+          <app-icon nome="clientes" />
           <span class="nav-label">Clientes & LTV</span>
         </a>
 
-        <a routerLink="/cardapio" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon">📋</span>
+        <a routerLink="/cardapio" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+          <app-icon nome="cardapio" />
           <span class="nav-label">Cardápio & Preços</span>
         </a>
         <div class="nav-section-title">ADMINISTRAÇÃO</div>
-        <a routerLink="/configuracoes" routerLinkActive="active" class="nav-item">
-          <span class="nav-icon" aria-hidden="true">⚙️</span>
+        <a routerLink="/configuracoes" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item">
+          <app-icon nome="configuracoes" />
           <span class="nav-label">Configurações</span>
         </a>
       </nav>
@@ -64,13 +65,13 @@ import { ApiService } from '../../core/services/api.service';
       <!-- Bot Status Card -->
       <div class="bot-card">
         <div class="bot-header">
-          <span class="live-indicator"></span>
-          <span class="bot-title">WhatsApp Bot Ativo</span>
+          <span aria-hidden="true">◉</span>
+          <span class="bot-title">Atendimento WhatsApp</span>
         </div>
-        <p class="bot-desc">Meta Cloud API conectada</p>
+        <p class="bot-desc">Integração Meta Cloud API</p>
         <div class="bot-stat">
           <span>Taxa de Conversão:</span>
-          <strong>{{ api.kpis()?.taxa_conversao_ia ?? 82.4 }}%</strong>
+          <strong>{{ api.kpis() ? api.kpis()?.taxa_conversao_ia + '%' : 'Sem dados' }}</strong>
         </div>
       </div>
     </aside>
@@ -100,7 +101,7 @@ import { ApiService } from '../../core/services/api.service';
 
     .brand-icon {
       font-size: 1.8rem;
-      background: rgba(245, 158, 11, 0.15);
+      background: var(--primary-glow);
       border-radius: var(--radius-md);
       padding: 8px;
     }
@@ -114,7 +115,7 @@ import { ApiService } from '../../core/services/api.service';
     .brand-badge {
       font-size: 0.7rem;
       font-weight: 700;
-      color: var(--primary);
+      color: var(--primary-text);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -154,8 +155,8 @@ import { ApiService } from '../../core/services/api.service';
     }
 
     .nav-item.active {
-      background: rgba(245, 158, 11, 0.12);
-      color: var(--primary);
+      background: var(--primary-glow);
+      color: var(--primary-text);
       font-weight: 600;
     }
 

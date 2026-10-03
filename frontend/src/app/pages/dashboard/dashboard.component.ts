@@ -1,4 +1,6 @@
+import { PedidosRecentesComponent } from '../../shared/ui/pedidos-recentes.component';
 import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
@@ -12,14 +14,14 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, DashboardAnalisesComponent],
+  imports: [CommonModule, RouterModule, DashboardAnalisesComponent, PedidosRecentesComponent],
   template: `
     <div class="dashboard-page">
       <!-- Top Title & Quick Filter -->
       <div class="page-header">
         <div>
-          <h1 class="page-title">Painel Executivo & Métricas do WhatsApp</h1>
-          <p class="page-subtitle">Acompanhamento em tempo real de vendas, entregas, comanda e conversões do bot</p>
+          <h1 class="page-title">Operação do restaurante</h1>
+          <p class="page-subtitle">Pedidos, cozinha e entregas em um só lugar</p>
         </div>
 
         <div class="header-actions">
@@ -27,9 +29,45 @@ Chart.register(...registerables);
             🔄 Atualizar
           </button>
           <div class="period-toggle">
-            <button class="period-btn" [class.active]="diasGrafico() === 7" (click)="setDias(7)">Últimos 7 dias</button>
-            <button class="period-btn" [class.active]="diasGrafico() === 30" (click)="setDias(30)">30 dias</button>
+            <button class="period-btn" [class.active]="diasGrafico() === 7" [attr.aria-pressed]="diasGrafico() === 7" (click)="setDias(7)">Últimos 7 dias</button>
+            <button class="period-btn" [class.active]="diasGrafico() === 30" [attr.aria-pressed]="diasGrafico() === 30" (click)="setDias(30)">30 dias</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Live Order Status Flow -->
+      <div class="status-funnel-card glass-card">
+        <div class="funnel-header">
+          <h3>Situação dos pedidos</h3>
+          <a routerLink="/pedidos" class="btn btn-secondary btn-sm">Ver Todos os Pedidos ➔</a>
+        </div>
+        <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:12px">Todos os pedidos registrados · posição atual</p>
+        <div class="funnel-grid">
+          <div class="funnel-item pending">
+            <span class="funnel-dot"></span>
+            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.pendente ?? 0 }}</span>
+            <span class="funnel-label">Aguardando confirmação</span>
+          </div>
+          <div class="funnel-arrow">➜</div>
+          <div class="funnel-item confirmed"><span class="funnel-count">{{api.kpis()?.pedidos_por_status?.confirmado ?? 0}}</span><span class="funnel-label">Confirmados</span></div>
+          <div class="funnel-item prep">
+            <span class="funnel-dot"></span>
+            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.em_preparo ?? 0 }}</span>
+            <span class="funnel-label">Em preparação</span>
+          </div>
+          <div class="funnel-arrow">➜</div>
+          <div class="funnel-item delivery">
+            <span class="funnel-dot"></span>
+            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.saiu_para_entrega ?? 0 }}</span>
+            <span class="funnel-label">Em Rota</span>
+          </div>
+          <div class="funnel-arrow">➜</div>
+          <div class="funnel-item delivered">
+            <span class="funnel-dot"></span>
+            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.entregue ?? 0 }}</span>
+            <span class="funnel-label">Entregues</span>
+          </div>
+          <div class="funnel-item canceled"><span class="funnel-count">{{api.kpis()?.pedidos_por_status?.cancelado ?? 0}}</span><span class="funnel-label">Cancelados</span></div>
         </div>
       </div>
 
@@ -67,7 +105,7 @@ Chart.register(...registerables);
             <span class="kpi-label">Ticket Médio</span>
             <h2 class="kpi-value">{{ (api.kpis()?.ticket_medio ?? 0) | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</h2>
             <div class="kpi-subtext">
-              <span>Base em {{ api.kpis()?.total_clientes ?? 0 }} clientes únicos</span>
+              <span>Pedidos sem cancelamento · todos os períodos</span>
             </div>
           </div>
         </div>
@@ -85,38 +123,7 @@ Chart.register(...registerables);
         </div>
       </div>
 
-      <!-- Live Order Status Flow -->
-      <div class="status-funnel-card glass-card">
-        <div class="funnel-header">
-          <h3>Fluxo Operacional dos Pedidos em Tempo Real</h3>
-          <a routerLink="/pedidos" class="btn btn-secondary btn-sm">Ver Todos os Pedidos ➔</a>
-        </div>
-        <div class="funnel-grid">
-          <div class="funnel-item pending">
-            <span class="funnel-dot"></span>
-            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.pendente ?? 0 }}</span>
-            <span class="funnel-label">Pendentes</span>
-          </div>
-          <div class="funnel-arrow">➜</div>
-          <div class="funnel-item prep">
-            <span class="funnel-dot"></span>
-            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.em_preparo ?? 0 }}</span>
-            <span class="funnel-label">Na Cozinha</span>
-          </div>
-          <div class="funnel-arrow">➜</div>
-          <div class="funnel-item delivery">
-            <span class="funnel-dot"></span>
-            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.saiu_para_entrega ?? 0 }}</span>
-            <span class="funnel-label">Em Rota</span>
-          </div>
-          <div class="funnel-arrow">➜</div>
-          <div class="funnel-item delivered">
-            <span class="funnel-dot"></span>
-            <span class="funnel-count">{{ api.kpis()?.pedidos_por_status?.entregue ?? 0 }}</span>
-            <span class="funnel-label">Entregues</span>
-          </div>
-        </div>
-      </div>
+      <app-pedidos-recentes [atualizacao]="atualizacao()" />
 
       <!-- Charts Row -->
       <div class="charts-row">
@@ -125,7 +132,8 @@ Chart.register(...registerables);
           <div class="chart-header">
             <div>
               <h3>Evolução de Vendas & Faturamento</h3>
-              <p>Receita diária gerada pelo delivery via WhatsApp</p>
+              <p>Faturamento e ticket médio · últimos {{diasGrafico()}} dias</p>
+              <div class="chart-key"><span><i class="key-receita"></i>Faturamento</span><span><i class="key-ticket"></i>Ticket médio</span></div>
             </div>
           </div>
           <div class="chart-canvas-wrap">
@@ -138,7 +146,7 @@ Chart.register(...registerables);
           <div class="chart-header">
             <div>
               <h3>Formas de Pagamento</h3>
-              <p>Distribuição do faturamento por método</p>
+              <p>Distribuição do faturamento por método · últimos {{diasGrafico()}} dias</p>
             </div>
           </div>
           <div class="chart-canvas-wrap doughnut">
@@ -155,7 +163,7 @@ Chart.register(...registerables);
         <div class="glass-card table-card">
           <div class="card-header-clean">
             <h3>Pratos e Bebidas Mais Vendidos</h3>
-            <span class="badge badge-prep">Top Ranking</span>
+            <span class="badge badge-prep">Últimos {{diasGrafico()}} dias</span>
           </div>
           <div class="rank-list">
             @for (item of topProdutos(); track item.produto + item.tamanho; let i = $index) {
@@ -183,7 +191,7 @@ Chart.register(...registerables);
         <div class="glass-card table-card">
           <div class="card-header-clean">
             <h3>Entregas por Bairro (Caraguatatuba)</h3>
-            <span class="badge badge-delivery">Logística</span>
+            <span class="badge badge-delivery">Últimos {{diasGrafico()}} dias</span>
           </div>
           <div class="bairros-list">
             @for (b of mapaBairros(); track b.bairro) {
@@ -254,7 +262,7 @@ Chart.register(...registerables);
 
     .period-btn.active {
       background: var(--primary);
-      color: #111827;
+      color: var(--on-primary);
     }
 
     .kpi-grid {
@@ -271,8 +279,8 @@ Chart.register(...registerables);
     }
 
     .kpi-card.highlight {
-      border-color: rgba(245, 158, 11, 0.4);
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(17, 24, 39, 0.85));
+      border-color: var(--primary);
+      background: var(--bg-card);
     }
 
     .kpi-icon-wrap {
@@ -286,7 +294,7 @@ Chart.register(...registerables);
       flex-shrink: 0;
     }
 
-    .kpi-icon-wrap.amber { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .kpi-icon-wrap.amber { background: var(--primary-glow); border: 1px solid var(--primary); }
     .kpi-icon-wrap.emerald { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); }
     .kpi-icon-wrap.blue { background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); }
     .kpi-icon-wrap.purple { background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); }
@@ -340,7 +348,8 @@ Chart.register(...registerables);
     }
 
     .funnel-grid {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       align-items: center;
       justify-content: space-between;
       gap: 12px;
@@ -349,7 +358,7 @@ Chart.register(...registerables);
 
     .funnel-item {
       flex: 1;
-      min-width: 140px;
+      min-width: 0;
       background: var(--bg-surface-elevated);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
@@ -361,6 +370,10 @@ Chart.register(...registerables);
       gap: 4px;
     }
 
+    @media(max-width:1200px){.funnel-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:600px){.funnel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .funnel-item.confirmed { border-color: var(--primary); }
+    .funnel-item.canceled { border-color: var(--danger); }
     .funnel-item.pending { border-color: rgba(245, 158, 11, 0.3); }
     .funnel-item.prep { border-color: rgba(59, 130, 246, 0.3); }
     .funnel-item.delivery { border-color: rgba(168, 85, 247, 0.3); }
@@ -380,6 +393,7 @@ Chart.register(...registerables);
     }
 
     .funnel-arrow {
+      display: none;
       color: var(--text-muted);
       font-size: 1.2rem;
     }
@@ -396,6 +410,7 @@ Chart.register(...registerables);
       }
     }
 
+    .chart-key{display:flex;gap:20px;margin-top:14px;font-size:.75rem;color:var(--text-secondary)}.chart-key span{display:flex;align-items:center;gap:8px}.chart-key i{width:9px;height:9px;border-radius:50%;display:inline-block}.key-receita{background:#8b84ff}.key-ticket{background:#ff69b4}
     .chart-card {
       padding: 22px;
       display: flex;
@@ -512,7 +527,7 @@ Chart.register(...registerables);
 
     .rank-bar-fill {
       height: 100%;
-      background: linear-gradient(90deg, #F59E0B, #FBBF24);
+      background: var(--primary);
       border-radius: 9999px;
       transition: width 0.8s ease-in-out;
     }
@@ -606,6 +621,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   diasGrafico = signal<number>(7);
   atualizacao = signal(0);
   pollingInterval: any = null;
+  private consultas = new Map<string, Subscription>();
+  private inicializacao?: ReturnType<typeof setTimeout>;
+  private cancelarConsulta(chave: string) { this.consultas.get(chave)?.unsubscribe(); }
 
   topProdutos = signal<TopProduto[]>([]);
   mapaBairros = signal<MapaBairro[]>([]);
@@ -619,6 +637,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     clearInterval(this.pollingInterval);
+    clearTimeout(this.inicializacao);
+    this.consultas.forEach(consulta => consulta.unsubscribe());
     this.salesChartInstance?.destroy();
     this.paymentChartInstance?.destroy();
   }
@@ -632,7 +652,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit() {
-    setTimeout(() => {
+    this.inicializacao = setTimeout(() => {
       this.renderSalesChart();
       this.renderPaymentChart();
     }, 100);
@@ -643,37 +663,41 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.api.getKpis().subscribe();
     this.carregarTopProdutos();
     this.carregarMapaBairros();
-    this.carregarPagamentos();
     if (this.salesCanvas) this.renderSalesChart();
     if (this.paymentCanvas) this.renderPaymentChart();
   }
 
   carregarDadosLeves() {
+    this.atualizacao.update(v=>v+1);
     this.api.getKpis().subscribe();
     this.carregarTopProdutos();
     this.carregarMapaBairros();
+    this.renderSalesChart();
+    this.renderPaymentChart();
   }
 
   setDias(dias: number) {
+    if (dias !== 7 && dias !== 30) return;
     this.diasGrafico.set(dias);
     this.carregarTopProdutos();
     this.renderSalesChart();
+    this.carregarMapaBairros();
+    this.renderPaymentChart();
   }
 
   carregarTopProdutos() {
-    this.api.getTopProducts(this.diasGrafico()).subscribe((res) => this.topProdutos.set(res));
+    this.cancelarConsulta('produtos');
+    this.consultas.set('produtos', this.api.getTopProducts(this.diasGrafico()).subscribe((res) => this.topProdutos.set(res)));
   }
 
   carregarMapaBairros() {
-    this.api.getDeliveryHeatmap().subscribe((res) => this.mapaBairros.set(res));
-  }
-
-  carregarPagamentos() {
-    this.api.getPaymentMethods().subscribe((res) => this.pagamentos.set(res));
+    this.cancelarConsulta('bairros');
+    this.consultas.set('bairros', this.api.getDeliveryHeatmap(this.diasGrafico()).subscribe((res) => this.mapaBairros.set(res)));
   }
 
   renderSalesChart() {
-    this.api.getSalesChart(this.diasGrafico()).subscribe((vendas) => {
+    this.cancelarConsulta('vendas');
+    this.consultas.set('vendas', this.api.getSalesChart(this.diasGrafico()).subscribe((vendas) => {
       if (!this.salesCanvas?.nativeElement) return;
       if (this.salesChartInstance) this.salesChartInstance.destroy();
 
@@ -691,47 +715,62 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           datasets: [{
             label: 'Faturamento (R$)',
             data: dataFaturamento,
-            borderColor: '#F59E0B',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            borderColor: '#8B84FF',
+            backgroundColor: (context) => {
+              const area=context.chart.chartArea;if(!area)return 'rgba(96,92,255,.15)';
+              const gradient=context.chart.ctx.createLinearGradient(0,area.top,0,area.bottom);
+              gradient.addColorStop(0,'rgba(96,92,255,.38)');gradient.addColorStop(1,'rgba(96,92,255,0)');return gradient;
+            },
             borderWidth: 3,
             fill: true,
             tension: 0.4,
-            pointBackgroundColor: '#F59E0B',
-            pointRadius: 4,
-            pointHoverRadius: 6,
-          }, {label: 'Ticket médio (R$)', data: vendas.map(v => v.ticket_medio ?? null), borderColor: '#34D399', backgroundColor: '#34D399', tension: 0.2, fill: false}]
+            pointBackgroundColor: '#8B84FF',
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHoverBorderColor: '#fff',
+            pointHoverBorderWidth: 2,
+            pointHitRadius: 20,
+          }, {label: 'Ticket médio (R$)', data: vendas.map(v => v.ticket_medio ?? null), borderColor: '#FF69B4', backgroundColor: 'rgba(255,105,180,.05)', borderWidth: 2, tension: 0.4, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 20, fill: false}]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {mode:'index',intersect:false},
+          animation: {duration:350},
           plugins: {
-            legend: { display: true, labels: { color: '#D1D5DB' } },
+            legend: { display: false },
             tooltip: {
+              backgroundColor:'#151B28',titleColor:'#fff',bodyColor:'#D8DDF0',padding:14,cornerRadius:10,borderColor:'#424B60',borderWidth:1,displayColors:true,usePointStyle:true,
               callbacks: {
-                label: (ctx) => ` R$ ${Number(ctx.raw).toFixed(2).replace('.', ',')}`
+                label: (ctx) => ` ${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}`
               }
             }
           },
           scales: {
             x: {
-              grid: { color: 'rgba(255, 255, 255, 0.05)' },
-              ticks: { color: '#9CA3AF' }
+              border: {display:false},
+              grid: {display:false},
+              ticks: { color: '#AAB6CC',maxTicksLimit:7,maxRotation:0,padding:12 }
             },
             y: {
-              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              beginAtZero:true,
+              border: {display:false,dash:[4,6]},
+              grid: { color: 'rgba(170,182,204,.12)',drawTicks:false },
               ticks: {
-                color: '#9CA3AF',
+                color: '#AAB6CC',maxTicksLimit:5,padding:12,
                 callback: (val) => `R$ ${val}`
               }
             }
           }
         }
       });
-    });
+    }));
   }
 
   renderPaymentChart() {
-    this.api.getPaymentMethods().subscribe((pagamentos) => {
+    this.cancelarConsulta('pagamentos');
+    this.consultas.set('pagamentos', this.api.getPaymentMethods(this.diasGrafico()).subscribe((pagamentos) => {
+      this.pagamentos.set(pagamentos);
       if (!this.paymentCanvas?.nativeElement) return;
       if (this.paymentChartInstance) this.paymentChartInstance.destroy();
 
@@ -754,9 +793,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           labels,
           datasets: [{
             data,
-            backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6'],
-            borderWidth: 0,
-            hoverOffset: 6
+            backgroundColor: ['#605CFF', '#FF69B4', '#2FE5A7', '#FFBE55', '#7CB8FF'],
+            borderColor: '#242B3A',
+            borderWidth: 5,
+            borderRadius: 8,
+            hoverOffset: 5
           }]
         },
         options: {
@@ -768,10 +809,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
               labels: { color: '#D1D5DB', padding: 14, font: { size: 12 } }
             }
           },
-          cutout: '70%'
+          cutout: '76%'
         }
       });
-    });
+    }));
   }
 }
 

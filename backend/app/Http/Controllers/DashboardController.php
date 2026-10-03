@@ -102,8 +102,9 @@ class DashboardController extends Controller
     /**
      * Mapa de calor / entregas por bairro
      */
-    public function getDeliveryByNeighborhood()
+    public function getDeliveryByNeighborhood(Request $request)
     {
+        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(max(1, min(365, (int) $request->query('dias', 7))));
         $bairros = DB::table('pedidos')
             ->leftJoin('enderecos', 'pedidos.endereco_id', '=', 'enderecos.id')
             ->select(
@@ -111,6 +112,7 @@ class DashboardController extends Controller
                 DB::raw('COUNT(pedidos.id) as total_pedidos'),
                 DB::raw('SUM(CASE WHEN pedidos.status != "cancelado" THEN pedidos.valor_total ELSE 0 END) as total_faturamento')
             )
+            ->where('pedidos.created_at', '>=', $inicio)->where('pedidos.created_at', '<', $fim)
             ->groupBy('bairro')
             ->orderBy('total_pedidos', 'DESC')
             ->get();
@@ -121,14 +123,16 @@ class DashboardController extends Controller
     /**
      * Distribuição de formas de pagamento
      */
-    public function getPaymentMethods()
+    public function getPaymentMethods(Request $request)
     {
+        [$inicio, $fim] = app(DashboardAnalise::class)->intervalo(max(1, min(365, (int) $request->query('dias', 7))));
         $pagamentos = Pedido::select(
             'forma_pagamento',
             DB::raw('COUNT(id) as quantidade'),
             DB::raw('SUM(valor_total) as faturamento')
         )
             ->where('status', '!=', 'cancelado')
+            ->where('created_at', '>=', $inicio)->where('created_at', '<', $fim)
             ->groupBy('forma_pagamento')
             ->orderBy('quantidade', 'DESC')
             ->get();

@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { PedidoStatusComponent } from '../../shared/ui/pedido-status.component';
+import { Component, OnInit, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
@@ -7,19 +8,21 @@ import { Pedido } from '../../core/models/dashboard.model';
 @Component({
   selector: 'app-pedidos',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PedidoStatusComponent],
   template: `
     <div class="pedidos-page">
-      @if (cancelando(); as pedido) {
-        <section class="glass-card" style="padding:20px" aria-label="Cancelar pedido">
-          <h3>Cancelar {{ pedido.codigo_pedido }}</h3>
-          <label for="motivo-cancelamento">Motivo do cancelamento</label>
-          <input id="motivo-cancelamento" class="form-input" [(ngModel)]="motivoCancelamento" maxlength="255" placeholder="Informe o motivo" />
-          <button class="btn btn-secondary" [disabled]="salvandoCancelamento()" (click)="cancelando.set(null)">Voltar</button>
-          <button class="btn btn-primary" [disabled]="!motivoCancelamento.trim() || salvandoCancelamento()" (click)="confirmarCancelamento()">Confirmar cancelamento</button>
-          @if (erroCancelamento()) {<p role="alert">{{ erroCancelamento() }}</p>}
-        </section>
-      }
+      <dialog #cancelamentoDialog class="cancelamento-dialog" aria-labelledby="cancelamento-titulo" aria-describedby="cancelamento-descricao" (cancel)="aoCancelarDialog($event)" (close)="cancelando.set(null)">
+        <form (ngSubmit)="confirmarCancelamento()" class="cancelamento-form">
+          <div class="cancelamento-heading"><span class="cancelamento-icon" aria-hidden="true">×</span><button type="button" class="cancelamento-fechar" aria-label="Fechar cancelamento" [disabled]="salvandoCancelamento()" (click)="fecharCancelamento()">×</button></div>
+          <h2 id="cancelamento-titulo">Cancelar pedido</h2>
+          <p id="cancelamento-descricao">{{cancelando()?.codigo_pedido}} · Informe o motivo para registrar o cancelamento deste pedido.</p>
+          <label for="motivo-cancelamento">Motivo do cancelamento <span aria-hidden="true">*</span></label>
+          <textarea id="motivo-cancelamento" name="motivoCancelamento" [(ngModel)]="motivoCancelamento" maxlength="255" required rows="4" autofocus placeholder="Ex.: cliente desistiu do pedido" [disabled]="salvandoCancelamento()"></textarea>
+          <small class="cancelamento-contador">{{motivoCancelamento.length}} / 255 caracteres</small>
+          @if (erroCancelamento()) {<p role="alert" class="cancelamento-erro">{{ erroCancelamento() }}</p>}
+          <div class="cancelamento-footer"><button type="button" class="btn btn-secondary" [disabled]="salvandoCancelamento()" (click)="fecharCancelamento()">Voltar</button><button type="submit" class="btn btn-primary" [disabled]="!motivoCancelamento.trim() || salvandoCancelamento()">{{salvandoCancelamento()?'Cancelando…':'Confirmar cancelamento'}}</button></div>
+        </form>
+      </dialog>
       <!-- Toast de Notificação -->
       @if (toastMensagem()) {
         <div class="toast-notification glass-card animate-fade-in">
@@ -93,9 +96,7 @@ import { Pedido } from '../../core/models/dashboard.model';
                   <span class="order-code">{{ pedido.codigo_pedido }}</span>
                   <span class="order-time">{{ pedido.created_at | date:'HH:mm • dd/MM' }}</span>
                 </div>
-                <span class="badge" [ngClass]="getBadgeClass(pedido.status)">
-                  {{ formatStatus(pedido.status) }}
-                </span>
+                <app-pedido-status [status]="pedido.status" />
               </div>
 
               <!-- Cliente & Endereço -->
@@ -240,9 +241,7 @@ import { Pedido } from '../../core/models/dashboard.model';
                     <strong>{{ pedido.valor_total | currency:'BRL':'symbol':'1.2-2':'pt-BR' }}</strong>
                   </td>
                   <td>
-                    <span class="badge" [ngClass]="getBadgeClass(pedido.status)">
-                      {{ formatStatus(pedido.status) }}
-                    </span>
+                    <app-pedido-status [status]="pedido.status" />
                   </td>
                   <td>
                     <div class="action-cell">
@@ -292,6 +291,10 @@ import { Pedido } from '../../core/models/dashboard.model';
     </div>
   `,
   styles: [`
+    .cancelamento-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--border-highlight);border-radius:var(--radius-lg);background:var(--bg-surface);color:var(--text-primary);box-shadow:0 24px 80px rgba(0,0,0,.45);overflow-y:auto}
+    .cancelamento-dialog::backdrop{background:rgba(9,13,24,.75);backdrop-filter:blur(4px)}
+    .cancelamento-form{padding:28px}.cancelamento-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.cancelamento-icon{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--danger-glow);color:var(--danger);font-size:28px}.cancelamento-fechar{border:0;background:transparent;color:var(--text-secondary);font-size:28px;width:36px;height:36px;cursor:pointer}.cancelamento-form h2{font-size:1.3rem}.cancelamento-form p{margin:8px 0 24px;color:var(--text-secondary);font-size:.875rem}.cancelamento-form label{display:block;margin-bottom:8px;font-weight:600;font-size:.875rem}.cancelamento-form textarea{display:block;width:100%;resize:vertical;padding:12px 14px;border:1px solid var(--border-highlight);border-radius:var(--radius-md);background:var(--bg-main);color:var(--text-primary);line-height:1.5;min-height:110px}.cancelamento-contador{display:block;text-align:right;color:var(--text-muted);margin-top:6px;font-size:.75rem}.cancelamento-footer{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}.cancelamento-form .cancelamento-erro{color:var(--danger);margin:12px 0 0}@media(max-width:480px){.cancelamento-form{padding:20px}.cancelamento-footer{flex-direction:column-reverse}.cancelamento-footer button{width:100%}}
+
     .pedidos-page {
       display: flex;
       flex-direction: column;
@@ -615,8 +618,8 @@ import { Pedido } from '../../core/models/dashboard.model';
     }
 
     .dispatch-btn {
-      background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
-      color: #111827 !important;
+      background: var(--primary) !important;
+      color: var(--on-primary) !important;
       font-weight: 700 !important;
       border: none !important;
     }
@@ -776,12 +779,20 @@ export class PedidosComponent implements OnInit {
   motivoCancelamento = '';
   salvandoCancelamento = signal(false);
   erroCancelamento = signal<string | null>(null);
-  abrirCancelamento(pedido: Pedido) {this.cancelando.set(pedido);this.motivoCancelamento='';this.erroCancelamento.set(null);}
+  @ViewChild('cancelamentoDialog') cancelamentoDialog!: ElementRef<HTMLDialogElement>;
+  abrirCancelamento(pedido: Pedido) {
+    this.cancelando.set(pedido);this.motivoCancelamento='';this.erroCancelamento.set(null);
+    this.cancelamentoDialog.nativeElement.showModal();
+    this.cancelamentoDialog.nativeElement.querySelector('textarea')?.focus();
+  }
+  fecharCancelamento(){if(this.salvandoCancelamento())return;this.cancelamentoDialog.nativeElement.close();this.cancelando.set(null);}
+  aoCancelarDialog(event:Event){if(this.salvandoCancelamento()){event.preventDefault();return;}this.cancelando.set(null);}
+
   confirmarCancelamento() {
     const pedido=this.cancelando();const motivo=this.motivoCancelamento.trim();
     if(!pedido || !motivo || this.salvandoCancelamento()) return;
     this.salvandoCancelamento.set(true);
-    this.api.updatePedidoStatus(pedido.id,'cancelado',motivo).subscribe({next:()=>{this.cancelando.set(null);this.salvandoCancelamento.set(false);this.carregarPedidos();this.api.getKpis().subscribe();},error:()=>{this.salvandoCancelamento.set(false);this.erroCancelamento.set('Não foi possível cancelar. Tente novamente.');}});
+    this.api.updatePedidoStatus(pedido.id,'cancelado',motivo).subscribe({next:()=>{this.salvandoCancelamento.set(false);this.fecharCancelamento();this.carregarPedidos();this.api.getKpis().subscribe();},error:()=>{this.salvandoCancelamento.set(false);this.erroCancelamento.set('Não foi possível cancelar. Tente novamente.');}});
   }
 
   api = inject(ApiService);
@@ -867,27 +878,4 @@ export class PedidosComponent implements OnInit {
   }
 
 
-  formatStatus(status: string): string {
-    const map: Record<string, string> = {
-      pendente: 'Pendente',
-      confirmado: 'Confirmado',
-      em_preparo: 'Na Cozinha',
-      saiu_para_entrega: 'Em Rota',
-      entregue: 'Entregue',
-      cancelado: 'Cancelado'
-    };
-    return map[status] || status;
-  }
-
-  getBadgeClass(status: string): string {
-    const map: Record<string, string> = {
-      pendente: 'badge-pending',
-      confirmado: 'badge-pending',
-      em_preparo: 'badge-prep',
-      saiu_para_entrega: 'badge-delivery',
-      entregue: 'badge-delivered',
-      cancelado: 'badge-canceled'
-    };
-    return map[status] || 'badge-pending';
-  }
 }

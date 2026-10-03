@@ -72,16 +72,20 @@ export class ApiService {
     );
   }
 
-  getDeliveryHeatmap(): Observable<MapaBairro[]> {
-    return this.http.get<MapaBairro[]>(`${this.baseUrl}/dashboard/mapa-bairros`).pipe(
+  getDeliveryHeatmap(dias: number = 7): Observable<MapaBairro[]> {
+    return this.http.get<MapaBairro[]>(`${this.baseUrl}/dashboard/mapa-bairros?dias=${dias}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
   }
 
-  getPaymentMethods(): Observable<FormaPagamentoStat[]> {
-    return this.http.get<FormaPagamentoStat[]>(`${this.baseUrl}/dashboard/formas-pagamento`).pipe(
+  getPaymentMethods(dias: number = 7): Observable<FormaPagamentoStat[]> {
+    return this.http.get<FormaPagamentoStat[]>(`${this.baseUrl}/dashboard/formas-pagamento?dias=${dias}`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
     );
+  }
+
+  getPedidosRecentes(): Observable<{data: Pedido[]}> {
+    return this.http.get<{data: Pedido[]}>(`${this.baseUrl}/pedidos?per_page=5`);
   }
 
   getPedidos(status?: string, busca?: string): Observable<{ data: Pedido[] }> {

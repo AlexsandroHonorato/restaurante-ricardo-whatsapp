@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url';
 import { readFileSync, appendFileSync } from 'node:fs';
 import { criarFilaPorChave } from './lib/fila.js';
+import { consultarAtendimento } from './lib/horario-atendimento.js';
 import { lerJson, gravarJson } from './lib/persistencia.js';
 import { registrarPedido, consultarStatusPedido } from './pedidos.js';
 
@@ -389,6 +390,8 @@ async function chamarModelo(messages) {
 
 // ---------------------------------------------------------------- responder
 export async function responder(tel, texto) {
+  const atendimento = await consultarAtendimento();
+  if (!atendimento.aberto) return atendimento.mensagem;
   obterEstadoCliente(tel); // valida inatividade e carrega estado
   const cardapioTexto = await obterCardapioAtivo();
   const messages = [{ role: 'system', content: promptDeSistema(tel, cardapioTexto) }, ...historico(tel), { role: 'user', content: texto }];

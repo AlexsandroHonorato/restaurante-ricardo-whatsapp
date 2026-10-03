@@ -1,0 +1,32 @@
+/* Figma Free Admin Dashboard: observed dark brand and surface tokens.
+   Semantic colors/contrast adaptations are documented in docs/DESIGN_SYSTEM.md. */
+:root {
+ --primary-rgb: 96, 92, 255;
+  --ds-brand:#605cff;--ds-brand-hover:#5149ea;--ds-secondary:#ff69b4;--ds-accent:#2fe5a7;
+ --ds-background:#1a202c;--ds-surface:#242b3a;--ds-elevated:#30394b;--ds-border:#2c3240;
+ --ds-space-1:4px;--ds-space-2:8px;--ds-space-3:12px;--ds-space-4:16px;--ds-space-6:24px;--ds-space-8:32px;
+ --bg-main:var(--ds-background);--bg-surface:var(--ds-surface);--bg-surface-elevated:var(--ds-elevated);--bg-card:var(--ds-surface);--bg-card-hover:var(--ds-elevated);
+ --border-color:#424b60;--border-highlight:#66728e;
+ --primary-text:#b5b2ff;--primary:var(--ds-brand);--primary-hover:var(--ds-brand-hover);--on-primary:#fff;--primary-glow:rgba(96,92,255,.16);
+ --success:#2fe5a7;--success-glow:rgba(47,229,167,.15);--info:#7cb8ff;--info-glow:rgba(124,184,255,.15);--warning:#fbbf24;--danger:#ff8c99;--danger-glow:rgba(255,140,153,.15);
+ --text-primary:#fff;--text-secondary:#c0c9da;--text-muted:#aab6cc;
+ --radius-sm:6px;--radius-md:10px;--radius-lg:14px;--radius-xl:20px;
+ --shadow-subtle:0 4px 18px rgba(0,0,0,.08);--shadow-glow:0 0 0 1px var(--primary-glow);
+ --font-heading:'DM Sans',system-ui,sans-serif;--font-body:'DM Sans',system-ui,sans-serif;
+ --transition-fast:.15s ease;--transition-normal:.2s ease;
+}
+button,input,select,textarea{font:inherit}
+button:disabled{opacity:.55;cursor:not-allowed}
+:where(button,a,input,select,textarea):focus-visible{outline:3px solid #b5b2ff;outline-offset:3px}
+.badge-confirmed{color:#b5b2ff;background:rgba(96,92,255,.15);border:1px solid rgba(181,178,255,.3)}
+.ds-section-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.ds-table-scroll{overflow-x:auto;max-width:100%}
+.ds-table{width:100%;border-collapse:collapse;text-align:left;font-size:.85rem}
+.ds-table th{color:var(--text-secondary);font-weight:500;background:var(--bg-surface-elevated);white-space:nowrap}
+.ds-table th,.ds-table td{padding:14px 16px;border-bottom:1px solid var(--border-color)}
+.ds-table small{display:block;color:var(--text-muted);margin-top:4px}
+.ds-table tbody tr:hover{background:var(--bg-card-hover)}
+.ds-sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.btn{text-decoration:none}

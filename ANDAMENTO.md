@@ -313,7 +313,7 @@ Esta seção continua o histórico alimentado pelo Antigravity. O arquivo existe
 - [ ] Consolidar atendimentos com ID estável de sessão após fechamento/reset/transbordo e idempotência dos eventos; revisar contagens históricas antes de tratar conversão como taxa de clientes únicos.
 - [ ] Integrar impressão térmica real e console de atendimento humano com pausar/retomar e alerta confirmado.
 - [ ] Unificar database/schema.sql/views.sql com migrations e timestamps Laravel; não aplicar views antigas diretamente.
-- [ ] Consumir agenda configurável no bot, substituindo horários fixos. Cabeçalho já integrado.
+- [x] Consumir agenda configurável no bot para bloquear IA fora do atendimento (seção 19). Cabeçalho já integrado.
 - [ ] Paginação visível nas listas, cancelamento das buscas antigas e erros independentes por endpoint; revisar foco/teclado dos formulários de cancelamento e modais.
 - [ ] Centralizar arquivos JSON para múltiplos workers e configurar retenção/anonymização de dados e logs.
 - [ ] Visibilidade de sincronizações pendentes, dead-letter/revisão manual de 422 e importação auditada dos registros legados.
@@ -339,3 +339,81 @@ Alterações desta etapa ainda sem novo commit.
 
 - Configurações semanais de atendimento e pratos, indicadores do dashboard, cancelamento com motivo e testes consolidados no commit desta etapa. As referências anteriores a alterações sem commit descrevem o estado no momento de cada registro.
 
+## 16. Design System do Figma aplicado ao domínio — 02/10/2026
+
+- Referência recebida: Free Admin Dashboard (Community), arquivo bTVUDIZAGX09EtJnfQTaRv, node 2-3. Páginas Style Guide, Design System e UI Designs inspecionadas no navegador; nenhum comentário/edição enviado ao Figma.
+- [x] Documentar mapeamento, tokens observados e adaptações em docs/DESIGN_SYSTEM.md. Implementação da versão escura: marca roxa, tipografia DM Sans, superfícies sólidas, bordas e contraste ajustados. Spacing/radius são decisões locais documentadas, não exportação exata do inspector.
+- [x] Centralizar tokens em frontend/src/design-system.css com compatibilidade de classes existentes; navegação, formulários, cards, botões, tabelas e módulos preservam seus fluxos. Foco visível e prefers-reduced-motion incluídos.
+- [x] Componentes reutilizáveis IconComponent (SVG), PedidoStatusComponent (texto/símbolo/cor) e PedidosRecentesComponent (dados reais, erro/retry, empty/loading, cancelamento de requisições).
+- [x] Dashboard prioriza situação operacional nos seis status existentes, indicadores e tabela dos últimos cinco pedidos antes das análises. Confirmados/cancelados passam a aparecer; posição atual inclui todos os registros e está identificada assim. Não criar os estados Novo/Pronto sem contrato/regra de negócio.
+- [x] Pedidos usa o mesmo badge do dashboard. Categorias, dias do cardápio, preços, configurações, conversas, clientes e transições de status preservados.
+- [x] Sidebar sem conversão fictícia 82.4% quando indisponível e sem afirmar Bot Ativo/Meta conectada sem endpoint de saúde. Restaurante fechado usa indicador sem animação de atividade.
+- [x] Verificação Angular: 12 testes aprovados, incluindo falha/retry sem pedidos fictícios e cancelamento da consulta ao desmontar. Compilação de produção aprovada. Navegador: dashboard com API real, 15 badges na tela de pedidos, cardápio e grade de configuração carregam; console sem erros na operação verificada. Viewport 390px não apresentou overflow horizontal do documento; tabelas têm scroll próprio.
+- [ ] Multi-restaurante: o texto recebido menciona RestauranteId/restaurante-ricardo-familia, mas o checkout restaurante-ricardo-whatsapp não contém tenant/restaurante_id/modelo Restaurante nas camadas pesquisadas. Não foi inventado seletor ou isolamento. Confirmar checkout/arquitetura multi-restaurante antes de migrar dados/permissões.
+- [ ] Saúde real da conexão WhatsApp e histórico de mensagens seguem dependentes de endpoints próprios; não simular telemetria nem funcionalidades do template.
+- Sem alterações de backend/banco nesta etapa; nenhum pedido operacional modificado para a conferência. Sem novo commit.
+
+## 17. Correção da grade semanal piscando — 02/10/2026
+
+- Causa: DashboardAnalisesComponent zerava dados em cada consulta, inclusive polling de 10 segundos, desmontando a grade e mostrando o estado inicial de carregamento.
+- Corrigido: conservar a última resposta durante atualização; atualizar os dados ao concluir a consulta sem remover a seção. Falha conserva a grade e informa que mostra a última atualização. aria-busy comunica atualização sem substituir o conteúdo.
+- Modelo preferido pelo usuário preservado: grade segunda–domingo × 24 horas, células amarelas por intensidade, contorno da agenda atual e zeros como pontos.
+- O texto do período usa a janela da resposta exibida; só muda ao chegar o resultado de 7/30 dias, evitando rotular dados antigos com o novo filtro.
+- Validação: 14 testes Angular aprovados, incluindo permanência do mesmo elemento DOM durante atualização/falha/troca de período; build aprovado e grade conferida no navegador. Sem alteração de API ou dados operacionais.
+- Sem novo commit.
+
+## 18. Gráficos modernizados e modal de cancelamento — 02/10/2026
+
+- [x] Gráfico de vendas com curvas roxa/rosa, preenchimento roxo em degradê, pontos somente no hover, grid horizontal discreto e tooltip com nome da série/valor BRL. Legenda externa compacta; preservados faturamento, ticket médio, períodos e API real. Estilo adaptado à paleta do Figma; não houve exportação autenticada do componente original.
+- [x] Pagamentos com anel mais fino, segmentos separados/arredondados e paleta roxa/rosa/verde/amarela. Valores e legendas continuam vinculados à API. Grade semanal amarela preferida pelo usuário preservada.
+- [x] Substituído bloco inline de cancelamento por dialog nativo centralizado com backdrop, textarea de 255 caracteres, contador, identificação do pedido, botões Voltar/Confirmar e fechamento.
+- [x] Foco inicial no motivo; dialog limita interação ao modal e devolve foco ao acionador ao fechar. Escape fecha sem gravar; durante envio, Escape/fechamento ficam bloqueados. Motivo vazio e envio duplicado são impedidos; erro mantém modal/motivo e permite retentar; sucesso fecha/recarrega dados.
+- [x] Validação: 16 testes Angular aprovados (dois novos de cancelamento), build aprovado. JSDOM usa stub somente para showModal/close; abertura real, foco no textarea e Escape/retorno ao botão foram conferidos no navegador. Modal de 344px cabe no viewport de 390px; console sem erros no dashboard verificado. Nenhum pedido real cancelado.
+- Prévia salva de gráficos e modal. Sem novo commit.
+
+## 19. Paleta, bloqueio fora do atendimento e menu recolhível — 02/10/2026
+
+- [x] Grade Pedidos por dia da semana e hora usa intensidade roxa da marca; preservados 7 dias × 24 horas, valores, contornos da agenda, rolagem e atualização sem piscar. Medidores e conversão das análises também usam os tokens centrais.
+- [x] Alinhados destaques de faturamento do dashboard, valores em Clientes e botão de despacho. Cores semânticas de alerta/status preservadas.
+- [x] Bot consulta /api/horarios-atendimento antes de carregar sessão, cardápio ou chamar OpenRouter. Fora da agenda responde mensagem amigável determinística com próximo dia/intervalo configurado; sem horários ativos informa indisponibilidade.
+- [x] Regra isolada em lib/horario-atendimento.js: fuso retornado pela API, início inclusivo/fim exclusivo, consulta a cada mensagem sem cache para refletir alterações imediatamente. Timeout de 5 segundos; erro/agenda inválida bloqueia IA e retorna mensagem de indisponibilidade, com log estruturado.
+- [x] Botão hambúrguer no cabeçalho esconde/reabre sidebar e libera espaço do conteúdo, com aria-expanded/aria-controls e nome acessível. Funciona também no layout responsivo existente.
+- [x] Validação: 19 testes Node e 17 Angular aprovados; build de produção aprovado. Regressão comprova uma única consulta à agenda sem cardápio/modelo fora do atendimento. Navegador confirmou alternância real do menu, 7 linhas/24 colunas e células roxas rgba(96,92,255).
+- Reiniciar o processo do bot para carregar o novo bloqueio; não foram feitas chamadas reais à IA/Meta nem mudanças na agenda operacional. Sem novo commit.
+
+
+## 20. Correção dos filtros de 7/30 dias — 02/10/2026
+
+- Vendas, ranking e análises já recebiam o período; pagamentos e entregas por bairro ignoravam o filtro e consultavam o histórico completo. Ambos agora enviam dias e filtram created_at pelo mesmo intervalo local usado nas análises.
+- Troca de período recarrega todos os gráficos e cancela consultas anteriores por bloco, evitando resposta antiga sobrescrever a seleção recente. Desmontagem cancela consultas e timeout inicial; atualização automática mantém o período selecionado.
+- Rótulos de pagamentos, ranking e bairros mostram o período; botões informam seleção com aria-pressed. KPIs de hoje/todos os períodos e situação operacional mantêm o escopo indicado na tela.
+- Validação: 18 testes Angular e build aprovados; 3 testes Laravel/26 assertivas aprovados. Nova regressão compara pedidos recentes/antigos em pagamentos e bairros para 7/30 dias; Angular verifica 4 consultas por seleção e cancelamento das anteriores. Navegador confirmou alternância 30→7 e período correspondente na grade semanal. Nenhum dado operacional alterado; sem novo commit.
+
+## 21. Indicadores de tempo e conversão com paleta controlada — 02/10/2026
+
+- Causa da paleta inconsistente: meter nativo conserva estilo do navegador; accent-color não controlava o preenchimento efetivamente.
+- Tempo de preparo/entrega substitui medidores nativos por barras arredondadas roxa/rosa/verde, trilha elevada, valores e amostras reais. Conversão usa anel SVG roxo com percentual central e resumo do período, acompanhado por barras/legendas dos status existentes.
+- Referência conferida novamente: Design System → Charts no Figma (node 950-3111); indicadores circulares observados são compatíveis com a conversão. Barras/labels adaptados ao domínio; não houve exportação autenticada nem garantia de igualdade pixel a pixel.
+- Outros medidores de abandono/cancelamento receberam estilos explícitos nos pseudo-elementos WebKit/Firefox para manter a marca roxa.
+- Dados/cálculos/API, ausência de dados, filtros e grade semanal preservados. Barras têm semântica meter e nomes/valores acessíveis; anel inclui rótulo textual. Sem alterações operacionais.
+- Validação: 18 testes Angular aprovados e build aprovado; conferência visual com API real mostra 22,6/20,5/43,1 minutos e conversão 41,7%, com cores corretas. Prévia indicadores-paleta.png salva. Sem novo commit.
+
+## 22. Animação destacada do botão de menu — 02/10/2026
+
+- Botão com fundo roxo, halo luminoso e onda de contorno em ciclo de 3 segundos; hover eleva/amplia e clique comprime.
+- Ícone com transição de três linhas para X quando o menu está aberto, retornando ao hambúrguer ao recolher. Nome acessível/aria-expanded e funcionamento existentes preservados.
+- prefers-reduced-motion desativa pulso, onda e transições; efeitos não bloqueiam cliques e não alteram dimensões do layout. Sem novo commit.
+
+## 23. Reversão da animação do menu — 02/10/2026
+
+- A pedido do usuário, revertida a seção 22: removidos pulso, halo, onda e transformação em X. Restaurados ícone SVG de três linhas e estilo anterior do botão. Função de esconder/reabrir menu e atributos acessíveis preservados. Demais mudanças mantidas. Sem novo commit.
+
+## 24. Hambúrguer com animação 3D — 02/10/2026
+
+- Ícone mantém três linhas com profundidade roxa, perspectiva, inclinação e flutuação de 4 segundos. Ao alternar o menu muda a rotação 3D; botão eleva no hover e comprime no clique, com sombra de relevo.
+- Mantidos nomes acessíveis e função de recolher/abrir. prefers-reduced-motion desativa animação/transições. Compilação de produção aprovada. Sem novo commit.
+
+## 25. Consolidação das melhorias em Git — 02/10/2026
+
+- Consolidado o estado final das seções 16–24: Design System, gráficos/indicadores e filtros, modal de cancelamento, bloqueio da IA fora da agenda e menu com animação 3D. As anotações anteriores de sem commit registram o estado histórico de cada etapa.
+- Validações realizadas: 19 testes Node, 18 Angular, 3 testes Laravel/26 assertivas e build de produção aprovados. Commit local; sem publicação remota.

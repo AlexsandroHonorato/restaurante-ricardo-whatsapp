@@ -12,6 +12,25 @@ class DashboardAnaliseTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_periodo_filtra_pagamentos_e_bairros(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-10-02 15:00:00', 'UTC'));
+        try {
+            $cliente = Cliente::create(['telefone' => '5512999994321', 'nome' => 'Teste']);
+            foreach ([['RECENTE', '2026-10-01 15:00:00', 40], ['ANTIGO', '2026-09-12 15:00:00', 60]] as [$codigo, $data, $valor]) {
+                $pedido = Pedido::create(['codigo_pedido' => $codigo, 'cliente_id' => $cliente->id, 'forma_pagamento' => 'pix', 'status' => 'entregue', 'valor_total' => $valor]);
+                $pedido->created_at = $data;
+                $pedido->save();
+            }
+            $this->getJson('/api/dashboard/formas-pagamento?dias=7')->assertOk()->assertJsonPath('0.quantidade', 1)->assertJsonPath('0.faturamento', 40);
+            $this->getJson('/api/dashboard/formas-pagamento?dias=30')->assertOk()->assertJsonPath('0.quantidade', 2)->assertJsonPath('0.faturamento', 100);
+            $this->getJson('/api/dashboard/mapa-bairros?dias=7')->assertOk()->assertJsonPath('0.total_pedidos', 1);
+            $this->getJson('/api/dashboard/mapa-bairros?dias=30')->assertOk()->assertJsonPath('0.total_pedidos', 2);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_ausencia_de_medicoes_e_janela_completa(): void
     {
         $this->getJson('/api/dashboard/analises?dias=7')->assertOk()->assertJsonCount(7, 'vendas')->assertJsonCount(7, 'demanda')->assertJsonPath('tempos.0.minutos', null)->assertJsonPath('atendimentos.conversao', null);

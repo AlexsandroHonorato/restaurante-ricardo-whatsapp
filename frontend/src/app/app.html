@@ -1,7 +1,7 @@
 <div class="app-container">
-  <app-sidebar></app-sidebar>
+  <app-sidebar id="menu-principal" [hidden]="!menuAberto()"></app-sidebar>
   <div class="main-wrapper">
-    <app-header></app-header>
+    <app-header [menuAberto]="menuAberto()" (alternarMenu)="menuAberto.set(!menuAberto())"></app-header>
     <main class="content-area">
       <router-outlet></router-outlet>
     </main>

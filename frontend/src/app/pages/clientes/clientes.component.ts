@@ -182,7 +182,7 @@ import { Cliente } from '../../core/models/dashboard.model';
     }
 
     .ltv-value {
-      color: #F59E0B;
+      color: var(--primary-text);
       font-size: 0.95rem;
     }
 

@@ -10,6 +10,7 @@ const pasta = mkdtempSync(join(tmpdir(), 'ricardo-test-'));
 process.env.ARQ_MEMORIA = join(pasta, 'memoria.json');
 process.env.ARQ_LOG = join(pasta, 'conversas.log');
 process.env.ARQ_PEDIDOS = join(pasta, 'pedidos.json');
+const agendaAberta = { fuso: 'America/Sao_Paulo', horarios: Array.from({ length: 7 }, (_, i) => ({ dia_semana: i + 1, ativo: true, hora_inicio: '00:00:00', hora_fim: '23:59:59' })) };
 const requisicoes = [];
 globalThis.fetch = async (url, options) => {
   requisicoes.push({ url, options });
@@ -88,19 +89,22 @@ test('persistência inválida causa erro sem apagar o arquivo', () => {
 });
 
 
-test('consulta de status não inicia um novo pedido automaticamente', async () => {
+test('consulta de status não inicia um novo pedido automaticamente', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-02T15:00:00Z') });
   const original = globalThis.fetch;
-  globalThis.fetch = async url => ({ ok: true, json: async () => String(url).includes('openrouter') ? { choices: [{ message: { content: 'Seu pedido está em preparo.' } }] } : {} });
+  globalThis.fetch = async url => ({ ok: true, json: async () => String(url).includes('horarios-atendimento') ? agendaAberta : String(url).includes('openrouter') ? { choices: [{ message: { content: 'Seu pedido está em preparo.' } }] } : {} });
   try {
     await cerebro.responderNaFila('5512999994444', 'quero saber o status do meu pedido');
     assert.equal(cerebro.obterEstadoCliente('5512999994444').status, cerebro.STATUS_CONVERSA.INICIADA);
   } finally { globalThis.fetch = original; }
 });
 
-test('fechamento usa comprovante direto e para de chamar modelo após gravação', async () => {
+test('fechamento usa comprovante direto e para de chamar modelo após gravação', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-02T15:00:00Z') });
   const original = globalThis.fetch;
   let modelos = 0;
   globalThis.fetch = async url => ({ ok: true, json: async () => {
+    if (String(url).includes('horarios-atendimento')) return agendaAberta;
     if (!String(url).includes('openrouter')) return {};
     modelos++;
     return { choices: [{ message: { content: '', tool_calls: [{ id: 'call-1', function: {
@@ -174,4 +178,19 @@ test('pedido pendente é preservado e sincronizado após recuperação da API', 
 test('pedido abaixo do mínimo de entrega não é registrado', async () => {
   await assert.rejects(pedidos.registrarPedido({ telefone: '5512999997777', nome: 'Ana', itens: ['1x Bebida - R$ 20,00'], endereco: 'Rua A', formaPagamento: 'Pix', total: '20,00' }), /mínimo/);
   assert.equal(pedidos.obterUltimoPedidoPorTelefone('5512999997777'), null);
+});
+
+test('fora do atendimento responde sem consultar cardápio ou chamar modelo', async () => {
+  const original = globalThis.fetch;
+  const chamadas = [];
+  globalThis.fetch = async url => {
+    chamadas.push(String(url));
+    return { ok: true, json: async () => ({ ...agendaAberta, horarios: agendaAberta.horarios.map(h => ({ ...h, ativo: false })) }) };
+  };
+  try {
+    const resposta = await cerebro.responderNaFila('5512999998888', 'quero pedir');
+    assert.match(resposta, /fora do horário de atendimento/);
+    assert.equal(chamadas.length, 1);
+    assert.match(chamadas[0], /horarios-atendimento$/);
+  } finally { globalThis.fetch = original; }
 });

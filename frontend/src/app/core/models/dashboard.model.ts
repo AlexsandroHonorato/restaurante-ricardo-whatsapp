@@ -6,6 +6,7 @@ export interface DashboardKpis {
   ticket_medio: number;
   total_clientes: number;
   pedidos_por_status: {
+    confirmado?: number;
     pendente: number;
     em_preparo: number;
     saiu_para_entrega: number;

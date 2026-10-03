@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnDestroy } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 
@@ -12,6 +12,9 @@ import { ApiService } from '../../core/services/api.service';
     }
     <header class="header">
       <div class="header-left">
+        <button class="menu-toggle btn btn-secondary" [class.menu-aberto]="menuAberto" type="button" (click)="alternarMenu.emit()" [attr.aria-label]="menuAberto ? 'Esconder menu' : 'Mostrar menu'" [attr.aria-expanded]="menuAberto" aria-controls="menu-principal">
+          <span class="hamburguer-3d" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
         <div class="store-status">
           <span class="status-badge" [class.open]="aberto()" [class.closed]="!aberto()">
             <span class="live-indicator"></span>
@@ -46,6 +49,43 @@ import { ApiService } from '../../core/services/api.service';
     </header>
   `,
   styles: [`
+    .menu-toggle {
+      width: 46px; height: 44px; padding: 10px; flex-shrink: 0; margin-right: 14px;
+      perspective: 180px; overflow: visible;
+      background: linear-gradient(145deg, var(--bg-surface-elevated), var(--bg-surface));
+      border: 1px solid var(--primary-text); color: var(--primary-text);
+      box-shadow: 0 4px 0 var(--border-color), 0 7px 12px rgba(0,0,0,.22);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .hamburguer-3d {
+      display: block; position: relative; width: 24px; height: 20px;
+      transform-style: preserve-3d;
+      transform: rotateY(-22deg) rotateX(12deg);
+      transition: transform .65s cubic-bezier(.2,.8,.2,1);
+      animation: hamburguer-flutuar 4s ease-in-out infinite;
+    }
+    .hamburguer-3d span {
+      position: absolute; left: 0; width: 24px; height: 3px; border-radius: 3px;
+      background: currentColor; transform: translateZ(5px);
+      box-shadow: 1px 1px 0 var(--primary), 2px 2px 0 var(--primary), 3px 3px 0 var(--primary-hover), 4px 4px 5px rgba(0,0,0,.3);
+    }
+    .hamburguer-3d span:nth-child(1) { top: 0; }
+    .hamburguer-3d span:nth-child(2) { top: 8px; }
+    .hamburguer-3d span:nth-child(3) { top: 16px; }
+    .menu-aberto .hamburguer-3d { transform: rotateY(22deg) rotateX(-12deg); }
+    .menu-toggle:hover .hamburguer-3d, .menu-toggle:focus-visible .hamburguer-3d { animation-play-state: paused; }
+    .menu-toggle:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--border-color), 0 10px 16px rgba(0,0,0,.25); }
+    .menu-toggle:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--border-color); }
+    @keyframes hamburguer-flutuar {
+      0%, 100% { translate: 0 0; rotate: y -10deg; }
+      50% { translate: 0 -2px; rotate: y 10deg; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hamburguer-3d { animation: none; }
+      .hamburguer-3d, .menu-toggle { transition: none; }
+      .menu-toggle:hover, .menu-toggle:active { transform: none; }
+    }
+    .status-badge.closed .live-indicator {background:var(--danger);box-shadow:none;animation:none;}
     .header {
       height: 70px;
       background: var(--bg-surface);
@@ -155,6 +195,8 @@ import { ApiService } from '../../core/services/api.service';
   `]
 })
 export class HeaderComponent implements OnDestroy {
+  @Input() menuAberto = true;
+  @Output() alternarMenu = new EventEmitter<void>();
   api = inject(ApiService);
   private agora = signal(new Date());
   private relogio = setInterval(() => this.agora.set(new Date()), 60000);
