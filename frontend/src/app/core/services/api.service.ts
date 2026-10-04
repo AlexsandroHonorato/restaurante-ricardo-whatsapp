@@ -1,3 +1,4 @@
+import { API_BASE } from './session-state';
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, tap, EMPTY, finalize } from 'rxjs';
@@ -23,7 +24,7 @@ export interface PeriodoDashboard { inicio: string; fim: string; }
 })
 export class ApiService {
   private http = inject(HttpClient);
-  private baseUrl = 'http://127.0.0.1:8080/api';
+  private baseUrl = API_BASE;
 
   horariosAtendimento = signal<HorarioAtendimento[] | null>(null);
 

@@ -1,3 +1,4 @@
+import { AuthService } from '../../core/services/auth.service';
 import { Component, Input, Output, EventEmitter, inject, signal, OnDestroy } from '@angular/core';
 import { TransbordosModalComponent } from './transbordos-modal.component';
 import { TransbordoService } from '../../core/services/transbordo.service';
@@ -48,12 +49,13 @@ import { ApiService } from '../../core/services/api.service';
           <span class="meta-value">{{ api.lastUpdated() | date:'HH:mm:ss' }}</span>
         </div>
 
+        <button type="button" class="btn btn-secondary" (click)="sair()">Sair</button>
         <!-- User Profile Avatar -->
         <div class="user-pill">
           <div class="user-avatar">👨‍🍳</div>
           <div class="user-info">
-            <span class="user-name">Família Ricardo</span>
-            <span class="user-role">Administrador</span>
+            <span class="user-name">{{auth.user()?.name}}</span>
+            <span class="user-role">{{auth.user()?.role === 'admin' ? 'Administrador' : 'Operador'}}</span>
           </div>
         </div>
       </div>
@@ -194,6 +196,7 @@ export class HeaderComponent implements OnDestroy {
   @Input() menuAberto = true;
   @Output() alternarMenu = new EventEmitter<void>();
   api = inject(ApiService);
+  auth = inject(AuthService);
   transbordo = inject(TransbordoService);
   private agora = signal(new Date());
   private relogio = setInterval(() => this.agora.set(new Date()), 60000);
@@ -221,6 +224,7 @@ export class HeaderComponent implements OnDestroy {
   ngOnDestroy() { clearInterval(this.relogio); }
 
 
+  sair() { this.auth.logout().subscribe({next:()=>{window.location.assign('/login');},error:()=>{this.api.erro.set('Não foi possível sair. Tente novamente.');}}); }
   refresh() {
     this.api.getKpis().subscribe();
   }

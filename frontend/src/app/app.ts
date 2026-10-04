@@ -1,4 +1,5 @@
-import { Component, signal } from '@angular/core';
+import { AuthService } from './core/services/auth.service';
+import { Component, signal, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { SidebarComponent } from './layout/sidebar/sidebar.component';
 import { HeaderComponent } from './layout/header/header.component';
@@ -11,5 +12,6 @@ import { HeaderComponent } from './layout/header/header.component';
   styleUrl: './app.css'
 })
 export class App {
+  auth = inject(AuthService);
   menuAberto = signal(true);
 }

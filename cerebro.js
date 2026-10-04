@@ -1,3 +1,4 @@
+import { cabecalhosApiBot } from './lib/api-bot.js';
 // cerebro.js: memória + ficha do negócio + modelo (OpenRouter) + máquina de estados + ferramentas de pedidos.
 import { fileURLToPath } from 'node:url';
 import { readFileSync, appendFileSync } from 'node:fs';
@@ -50,7 +51,7 @@ export function sincronizarStatusBanco(tel, status, rascunho = {}, extras = {}) 
     try {
       const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/status-conversa/sync`, {
         signal: AbortSignal.timeout(5000), method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: corpo,
+        headers: { ...cabecalhosApiBot(), 'Content-Type': 'application/json' }, body: corpo,
       });
       if (!resposta.ok) throw new Error(`API de status retornou ${resposta.status}`);
     } catch (erro) { console.warn('Falha ao sincronizar conversa:', tel, erro.message); }
@@ -148,7 +149,7 @@ export async function obterCardapioAtivo() {
     return cardapioBancoCache;
   }
   try {
-    const res = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/cardapio/texto`, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/cardapio/texto`, { headers: cabecalhosApiBot(), signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
       if (typeof data.cardapio_texto === 'string') {

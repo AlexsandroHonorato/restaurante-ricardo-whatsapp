@@ -1,3 +1,4 @@
+import { cabecalhosApiBot } from './lib/api-bot.js';
 // pedidos.js: Gerenciamento, persistência, consulta na tabela de pedidos e formatação de comandas
 import { converterValor, validarItensTotal } from './lib/pedido.js';
 export { converterValor } from './lib/pedido.js';
@@ -157,7 +158,7 @@ export async function consultarStatusPedido(idOuTelefone, telefoneCliente) {
     try {
       const parametros = new URLSearchParams({ telefone: telefoneCliente });
       if (/^PED-/i.test(idLimpo)) parametros.set('codigo_pedido', idLimpo);
-      const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos/consulta/bot?${parametros}`, { signal: AbortSignal.timeout(5000) });
+      const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos/consulta/bot?${parametros}`, { headers: cabecalhosApiBot(), signal: AbortSignal.timeout(5000) });
       if (resposta.ok) {
         const { pedido: remoto } = await resposta.json();
         if (remoto) pedido = { id: remoto.codigo_pedido, telefone: remoto.cliente.telefone, nome: remoto.cliente.nome, status: remoto.status, dataHora: remoto.created_at, endereco: remoto.endereco?.logradouro || 'Retirada no balcão', total: `R$ ${remoto.valor_total}`, itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, qtd: i.quantidade, tamanho: i.tamanho_snapshot, preco: i.preco_unitario })) };
@@ -223,7 +224,7 @@ async function sincronizarPedido(pedido) {
   try {
     const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos`, {
       method: 'POST', signal: AbortSignal.timeout(5000),
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { ...cabecalhosApiBot(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...pedido, codigo_pedido: pedido.id }),
     });
     if (!resposta.ok) throw new Error(`API de pedidos retornou ${resposta.status}`);

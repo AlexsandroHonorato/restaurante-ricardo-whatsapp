@@ -1,3 +1,4 @@
+@if (auth.user()) {
 <div class="app-container">
   <app-sidebar id="menu-principal" [hidden]="!menuAberto()"></app-sidebar>
   <div class="main-wrapper">
@@ -7,3 +8,5 @@
     </main>
   </div>
 </div>
+
+} @else { <router-outlet/> }

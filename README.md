@@ -152,3 +152,18 @@ npm run testar
 - **Localização:** Av. Irineu Mendes de Souza, 1531, Martim de Sá — Caraguatatuba/SP
 - **Horário:** Segunda a Sábado, das 11:00 às 14:30 (Fechado aos Domingos)
 - **Contato:** (12) 99750-0045 / (12) 98146-4976
+
+## Acesso da equipe
+
+O painel exige login. Para criar o primeiro administrador, execute no diretório backend:
+
+~~~powershell
+php artisan migrate
+php artisan app:criar-admin
+~~~
+
+O comando pede nome, e-mail e senha de forma interativa; a senha não aparece no terminal. Não há usuário ou senha padrão. Depois do login, administradores cadastram a equipe em **Cadastros → Usuários do sistema**. Campos: nome, e-mail único, telefone opcional, perfil administrador/operador, ativo/inativo, senha e confirmação. Senha: mínimo de 8 caracteres, maiúscula, minúscula, número e símbolo; limite de 72 bytes para evitar truncamento pelo bcrypt.
+
+Sessão usa cookie HttpOnly e SameSite=Lax, regeneração no login e invalidação no logout, CSRF e limite de tentativas. Em produção, servir via HTTPS (cookie Secure por padrão), frontend e /api no mesmo domínio por proxy. Em desenvolvimento, o frontend utiliza o mesmo hostname da página na porta 8080, para os cookies funcionarem tanto em localhost quanto em 127.0.0.1.
+
+A integração Node usa NOTIFICACAO_TOKEN (segredo forte de pelo menos 32 caracteres, igual nos dois .env) nas rotas reservadas ao bot; não colocar esse segredo no frontend. Reiniciar Node depois de atualizar código/configuração. Agenda do bot: /api/bot/horarios-atendimento; operações administrativas exigem sessão autenticada. Cadastro/listagem de usuários exige administrador no backend.

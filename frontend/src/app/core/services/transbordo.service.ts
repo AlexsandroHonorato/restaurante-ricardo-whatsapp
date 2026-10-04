@@ -1,6 +1,6 @@
 import { DestroyRef, Injectable, inject, signal, computed } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { exhaustMap, timer } from 'rxjs';
+import { exhaustMap, timer, Subscription } from 'rxjs';
 import { ApiService } from './api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -8,6 +8,8 @@ export class TransbordoService {
   private api = inject(ApiService);
   private destroyRef = inject(DestroyRef);
   private iniciado = false;
+  private consulta?: Subscription;
+  parar() { this.consulta?.unsubscribe(); this.iniciado=false; this.recebidos=false; this.ativos.clear(); this.chegada.clear(); this.conversas.set([]); this.fechados.set(new Set()); this.eventos.set(0); }
   private recebidos = false;
   private ativos = new Set<string>();
   private chegada = new Map<string, number>();
@@ -25,7 +27,7 @@ export class TransbordoService {
   iniciar() {
     if (this.iniciado) return;
     this.iniciado = true;
-    timer(0, 5000).pipe(
+    this.consulta = timer(0, 5000).pipe(
       exhaustMap(() => this.api.getStatusConversas()),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(conversas => {
@@ -48,5 +50,3 @@ export class TransbordoService {
     });
   }
 }
-
-

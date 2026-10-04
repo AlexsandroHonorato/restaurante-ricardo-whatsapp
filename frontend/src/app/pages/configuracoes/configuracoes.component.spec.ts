@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ConfiguracoesComponent } from './configuracoes.component';
 
-const baseUrl = 'http://127.0.0.1:8080/api/horarios-atendimento';
+const baseUrl = 'http://localhost:8080/api/horarios-atendimento';
 const segunda = { id: 1, dia_semana: 1, nome_dia: 'Segunda-feira', ativo: true, hora_inicio: '11:00:00', hora_fim: '14:30:00' };
 
 describe('Configurações de atendimento', () => {

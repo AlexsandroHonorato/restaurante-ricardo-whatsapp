@@ -548,3 +548,18 @@ Alterações desta etapa ainda sem novo commit.
 - Commit 08c56e4 registra alterações do fluxo WhatsApp, saudação, transbordo e mensageiro com digitando.
 - Ajustes visuais das quatro telas, fila de alertas, notificações do sino e persistência do primeiro contato agrupados em commit separado com testes e migration.
 - Validações anteriores: build Angular, 28 testes Angular, 21 testes Node e 12 testes FluxoPedidoTest aprovados. Revisão git diff --check sem erros após limpeza de espaços. Commits locais, sem push.
+
+## 48. Login, sessão segura e cadastro de usuários — 03/10/2026
+
+- Nova página /login na paleta do sistema, validações de e-mail/senha, mostrar/ocultar, mensagens amigáveis, bloqueio de submissão duplicada e layout responsivo. Layout administrativo aparece somente com usuário autenticado; guards protegem páginas.
+- Cadastros → Usuários do sistema (/usuarios), restrito a administradores: nome completo, e-mail único normalizado, telefone opcional, perfil admin/operador, ativo/inativo, senha e confirmação. Listagem paginada da equipe. Cinco critérios aprovados pelo usuário: mínimo 8, maiúscula, minúscula, número e símbolo; indicador 0–5 e limite 72 bytes para bcrypt.
+- Backend: AuthController, UserController, StoreUserRequest e PasswordPolicy; cookie de sessão HttpOnly/SameSite=Lax, Secure por padrão em produção, CSRF, regeneração de sessão/token no login, logout com invalidação, erro genérico e limites de tentativas. Senhas hashed e ocultas nas respostas; ativos/permissões verificados na API.
+- Migration de users adiciona phone/role/active e foi aplicada. Não há usuários no banco local; criar primeiro administrador via php artisan app:criar-admin no diretório backend. Comando pede senha oculta, não há credenciais padrão. README documenta primeiro acesso, HTTPS/proxy e operação do bot.
+- Rotas administrativas agora exigem sessão. Rotas necessárias ao bot usam BotAccess com segredo compartilhado NOTIFICACAO_TOKEN, mantido nos .env locais sem exposição ao frontend. Bot passou a enviar cabeçalho autenticado; agenda própria /api/bot/horarios-atendimento. Reiniciar Node para carregar alterações.
+- Frontend usa mesmo hostname da página em desenvolvimento (porta 8080) e /api no mesmo domínio em produção; interceptor só envia credenciais/CSRF ao endpoint confiável. Sessão não usa localStorage; monitor de transbordo é encerrado no logout/expiração.
+- Validação: build, 31 testes Angular, 27 testes Laravel e 21 testes Node aprovados. Navegador confirmou layout, campos obrigatórios e retorno de credenciais inválidas. API real confirmou 401 sem sessão, 419 sem CSRF e agenda autenticada do bot. Sem commit.
+
+## 49. Commit de autenticação e usuários — 03/10/2026
+
+- Login, cadastro administrativo de usuários, sessão/CSRF, permissões, migrations, integração autenticada do bot e documentação agrupados em commit local solicitado pelo usuário.
+- Mantidas validações registradas na seção 48; limpeza de espaços sem mudança funcional. Sem push.

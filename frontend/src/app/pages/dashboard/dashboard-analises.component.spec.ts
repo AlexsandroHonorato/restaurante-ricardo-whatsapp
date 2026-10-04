@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { DashboardAnalisesComponent } from './dashboard-analises.component';
-const url='http://127.0.0.1:8080/api/dashboard/analises?dias=';
+const url='http://localhost:8080/api/dashboard/analises?dias=';
 const dados={dias:7,fuso:'America/Sao_Paulo',pedidos_fora_agenda:0,demanda:[{dia:1,horas:[{hora:11,pedidos:2,atendimento:true}]}],tempos:[],atendimentos:{total:0,conversao:null,status:[],abandonos:[]},cancelamentos:[]};
 describe('Atualização estável do mapa semanal',()=>{
  beforeEach(()=>TestBed.configureTestingModule({imports:[DashboardAnalisesComponent],providers:[provideHttpClient(),provideHttpClientTesting()]}));

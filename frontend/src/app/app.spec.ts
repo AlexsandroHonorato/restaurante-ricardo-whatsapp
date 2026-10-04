@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { SessionState } from './core/services/session-state';
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
 import { provideHttpClient } from '@angular/common/http';
@@ -22,7 +24,7 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), {provide:SessionState,useValue:{user:signal({id:1,name:'Família Ricardo',email:'admin@example.com',phone:null,role:'admin',active:true}),csrf:signal('')}}],
     }).compileComponents();
   });
 

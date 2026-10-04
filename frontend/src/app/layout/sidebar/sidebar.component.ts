@@ -1,3 +1,4 @@
+import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -55,6 +56,9 @@ import { ApiService } from '../../core/services/api.service';
           <app-icon nome="cardapio" />
           <span class="nav-label">Cardápio & Preços</span>
         </a>
+        @if(auth.user()?.role === 'admin') {
+          <a routerLink="/usuarios" routerLinkActive="active" ariaCurrentWhenActive="page" class="nav-item"><app-icon nome="clientes"/><span class="nav-label">Usuários do sistema</span></a>
+        }
         <div class="nav-section-title">ADMINISTRAÇÃO</div>
         <div class="config-menu">
           <button type="button" class="nav-item config-toggle" (click)="configuracoesAbertas = !configuracoesAbertas" [attr.aria-expanded]="configuracoesAbertas" aria-controls="submenu-configuracoes">
@@ -253,4 +257,5 @@ import { ApiService } from '../../core/services/api.service';
 export class SidebarComponent {
   configuracoesAbertas = true;
   api = inject(ApiService);
+  auth = inject(AuthService);
 }
