@@ -4,7 +4,7 @@ import { readFileSync, appendFileSync } from 'node:fs';
 import { criarFilaPorChave } from './lib/fila.js';
 import { consultarAtendimento } from './lib/horario-atendimento.js';
 import { lerJson, gravarJson } from './lib/persistencia.js';
-import { registrarPedido, consultarStatusPedido } from './pedidos.js';
+import { registrarPedido, consultarStatusPedido, obterUltimoPedidoPorTelefone } from './pedidos.js';
 
 const FUSO = process.env.FUSO || 'America/Sao_Paulo';
 const MODELO = process.env.MODELO || 'google/gemini-3.7-flash';
@@ -18,6 +18,7 @@ const INFORMACOES_NEGOCIO = FICHA.split(/(?=^## )/m)
 // ---------------------------------------------------------------- status conversacionais
 export const STATUS_CONVERSA = {
   INICIADA: 'conversa_iniciada',
+  TRANSBORDO: 'transbordo_humano',
   PRATOS: 'fazendo_pedido_pratos',
   BEBIDAS: 'fazendo_pedido_bebidas',
   ENDERECO: 'coletando_endereco',
@@ -179,6 +180,8 @@ function promptDeSistema(tel, cardapioTexto = null) {
   const rascunho = estado?.rascunho || {};
   const rascunhoStr = JSON.stringify(rascunho);
   const cardapioOficial = cardapioTexto ?? cardapioBancoCache ?? FICHA;
+  const ultimoPedido = tel ? obterUltimoPedidoPorTelefone(tel) : null;
+  const temPedidoAtivo = ultimoPedido && (Date.now() - new Date(ultimoPedido.dataHora).getTime() < 12 * 60 * 60 * 1000);
 
   return `Você é o atendente virtual do Restaurante Família Ricardo no WhatsApp.
 Seu objetivo é guiar o cliente de forma cordial, ágil e organizada para realizar pedidos de delivery ou consultar o status de um pedido.
@@ -186,12 +189,27 @@ Seu objetivo é guiar o cliente de forma cordial, ágil e organizada para realiz
 [ESTADO CONVERSACIONAL DO CLIENTE]:
 - STATUS ATUAL: "${statusAtual}"
 - ITENS REGISTRADOS NO RASCUNHO: ${rascunhoStr}
+- PEDIDO RECENTE/ATIVO IDENTIFICADO: ${temPedidoAtivo ? `${ultimoPedido.id} (Status atual: "${ultimoPedido.status}", Cliente: "${ultimoPedido.nome || 'Cliente'}")` : 'Nenhum pedido ativo recente'}
 
-REGRAS OBRIGATÓRIAS DE MÁQUINA DE ESTADOS E CONTINUIDADE:
+REGRAS OBRIGATÓRIAS DE MÁQUINA DE ESTADOS E SAUDAÇÃO:
 Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
 1. Se status for 'conversa_iniciada':
-   - Quando o cliente mandar saudação ("oi", "olá"), cumprimente educadamente e pergunte: "Você deseja fazer um pedido ou saber o status de um pedido?"
-   - Ao optar por fazer um pedido, atualize o status para 'fazendo_pedido_pratos' e apresente as opções do cardápio com preços e tamanhos consultados da tabela abaixo.
+   - Quando o cliente enviar uma saudação inicial ("oi", "olá", "boa tarde", "bom dia", etc.):
+     * SE o cliente tiver um PEDIDO RECENTE/ATIVO:
+       Cumprimente educadamente pelo nome (se disponível), informe que localizou o pedido recente em andamento e apresente o menu numerado claro:
+       "Olá${ultimoPedido?.nome ? `, ${ultimoPedido.nome}` : ''}! Tudo bem? 😊🍽️\nSeja bem-vindo(a) de volta ao *Restaurante Família Ricardo*!\nIdentifiquei seu pedido recente *${ultimoPedido?.id}* em andamento.\n\nComo posso te ajudar agora?\n1️⃣ *Fazer um novo pedido*\n2️⃣ *Acompanhar meu pedido*\n3️⃣ *Falar com a equipe*\n\nPor favor, digite o número da opção ou o que deseja!"
+
+     * SE NÃO houver pedido recente ativo:
+       Apresente a saudação calorosa com o menu numerado claro:
+       "Olá! Tudo bem? 😊🍽️\nSeja muito bem-vindo(a) ao *Restaurante Família Ricardo*!\n\nComo posso te ajudar hoje?\n1️⃣ *Fazer um pedido*\n2️⃣ *Consultar status de um pedido*\n3️⃣ *Falar com a equipe*\n\nPor favor, digite o número da opção ou o que deseja!"
+
+   - Se o cliente responder "1", "1️⃣", "fazer pedido", "quero pedir", "pedido", "cardápio", "fazer um novo pedido":
+     Atualize o status para 'fazendo_pedido_pratos' e apresente as opções do cardápio do dia com preços e tamanhos consultados da tabela abaixo.
+   - Se o cliente responder "2", "2️⃣", "status", "acompanhar", "meu pedido", "rastrear", "consultar status":
+     Execute a ferramenta 'consultar_status_pedido' imediatamente.
+   - Se o cliente responder "3", "3️⃣", "falar com a equipe", "humano", "atendente", "falar com atendente":
+     Execute a ferramenta 'chamar_atendente'.
+
 2. Se status for 'fazendo_pedido_pratos':
    - O cliente está escolhendo pratos principais/porções e tamanhos (Infantil, Médio, Grande).
    - Confirme o prato e o tamanho escolhido. Pergunte se deseja adicionar mais algum prato ou se pode avançar para as bebidas.
@@ -361,7 +379,7 @@ async function executar(tel, nome, args) {
     return consultarStatusPedido(args.idOuTelefone || tel, tel);
   }
   if (nome === 'chamar_atendente') {
-    sincronizarStatusBanco(tel, obterEstadoCliente(tel).status, obterEstadoCliente(tel).rascunho, { transbordo: true, motivo_transbordo: args.motivo });
+    atualizarStatusCliente(tel, STATUS_CONVERSA.TRANSBORDO, {}, { transbordo: true, motivo_transbordo: args.motivo });
     console.log(`🔔 [TRANSFERÊNCIA PARA ATENDENTE HUMANO] Tel: ${tel} | Motivo: ${args.motivo} | Pedido: ${args.numeroPedido || 'Nenhum'}`);
     return { ok: true, mensagem: 'Solicitação de atendimento humano registrada. Contato direto da equipe: (12) 99750-0045.' };
   }
@@ -455,7 +473,7 @@ export async function responder(tel, texto) {
   const passoFecharNestaMensagem = passos.find((p) => p.ferramenta === 'fechar_pedido');
   if (!passoFecharNestaMensagem) {
     const estado = obterEstadoCliente(tel);
-    if (estado.status === STATUS_CONVERSA.INICIADA && /(?:quero|vou|gostaria de)\s+(?:fazer\s+um\s+pedido|pedir|comprar)|fazer um pedido/i.test(texto) && !/status|andamento|situa[çc][aã]o/i.test(texto)) {
+    if (estado.status === STATUS_CONVERSA.INICIADA && /(?:quero|vou|gostaria de)\s+(?:fazer\s+um\s+pedido|pedir|comprar)|fazer um pedido|^1$|^1\b|^op[çc][aã]o 1|card[aá]pio/i.test(texto) && !/status|andamento|situa[çc][aã]o/i.test(texto)) {
       estado.status = STATUS_CONVERSA.PRATOS;
       atualizarStatusCliente(tel, STATUS_CONVERSA.PRATOS, estado.rascunho);
     }

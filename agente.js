@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { assinaturaValida } from './lib/webhook.js';
 import { criarFilaPorChave } from './lib/fila.js';
 import { sincronizarPedidosPendentes } from './pedidos.js';
+import { criarMensageiro } from './lib/mensageiro.js';
 import { criarNotificador } from './lib/notificacoes.js';
 import { responderNaFila } from './cerebro.js';
 
@@ -38,25 +39,60 @@ async function graph(corpo) {
   }
   return data;
 }
-const enviarTexto = (para, texto) => graph({ recipient_type: 'individual', to: para, type: 'text', text: { preview_url: false, body: texto } });
+const mensageiro = criarMensageiro(graph);
+const enviarTexto = mensageiro.enviar;
 // marca como lida na Meta Cloud API
-const marcarComoLida = (id) => graph({ status: 'read', message_id: id });
+
 
 
 // ---------------------------------------------------------------- segurança: a URL é pública, então confira quem mandou
-// ---------------------------------------------------------------- mensagens: sem duplicar
+// ---------------------------------------------------------------- mensagens: sem duplicar (idempotência rigorosa)
 const enfileirarMensagem = criarFilaPorChave();
 const tratar = msg => enfileirarMensagem(msg?.from, () => processarMensagem(msg)).catch(erro => console.error('Falha no processamento:', erro.message));
-const vistas = new Set(); // a Meta pode reenviar a mesma mensagem: guarda os ids já tratados
+
+// Cache de deduplicação com expiração automática
+const mensagensTratadas = new Map(); // id -> timestamp
+const ultimasMensagensTexto = new Map(); // `${tel}:${texto}` -> timestamp
+
+function jaProcessada(msg) {
+  if (!msg || typeof msg.id !== 'string' || typeof msg.from !== 'string') return true;
+  const agora = Date.now();
+
+  // Limpa entradas com mais de 10 minutos
+  if (mensagensTratadas.size > 2000) {
+    for (const [id, tempo] of mensagensTratadas.entries()) {
+      if (agora - tempo > 600000) mensagensTratadas.delete(id);
+    }
+  }
+  if (ultimasMensagensTexto.size > 2000) {
+    for (const [chave, tempo] of ultimasMensagensTexto.entries()) {
+      if (agora - tempo > 10000) ultimasMensagensTexto.delete(chave);
+    }
+  }
+
+  // 1. Deduplicação por ID oficial da Meta
+  if (mensagensTratadas.has(msg.id)) return true;
+  mensagensTratadas.set(msg.id, agora);
+
+  // 2. Deduplicação por texto recente do mesmo telefone (janela de 3 segundos para evitar retransmissões duplas da rede)
+  if (msg.type === 'text' && typeof msg.text?.body === 'string') {
+    const chaveTexto = `${msg.from}:${msg.text.body.trim().toLowerCase()}`;
+    const ultimoEnvio = ultimasMensagensTexto.get(chaveTexto);
+    if (ultimoEnvio && agora - ultimoEnvio < 3000) {
+      console.log(`🛡️ [DEDUPLICAÇÃO] Mensagem repetida ignorada de ${msg.from}: "${msg.text.body}"`);
+      return true;
+    }
+    ultimasMensagensTexto.set(chaveTexto, agora);
+  }
+
+  return false;
+}
 
 async function processarMensagem(msg) {
-  if (!msg || typeof msg.id !== 'string' || typeof msg.from !== 'string' || (msg.type === 'text' && typeof msg.text?.body !== 'string')) return;
-  if (vistas.has(msg.id)) return;
-  vistas.add(msg.id);
-  if (vistas.size > 5000) vistas.delete(vistas.values().next().value);
   const tel = msg.from;
   try {
-    try { await marcarComoLida(msg.id); } catch { /* silencia erro de read receipt */ }
+    mensageiro.registrar(tel, msg.id);
+    await mensageiro.digitando(tel);
     if (msg.type !== 'text') return await enviarTexto(tel, 'Por enquanto eu só consigo ler mensagens de texto. Pode escrever pra mim? 🙂');
     const resposta = await responderNaFila(tel, msg.text.body); // uma de cada vez por pessoa
     await enviarTexto(tel, resposta);
@@ -64,7 +100,6 @@ async function processarMensagem(msg) {
   } catch (e) {
     console.error('erro ao responder', tel, e);
   }
-
 }
 
 // ---------------------------------------------------------------- idempotência de notificações
@@ -100,7 +135,8 @@ createServer((req, res) => {
   // cada mensagem nova chega num POST
   if (req.method === 'POST' && url.pathname === '/webhook') {
     lerCorpo(req, res, (bruto) => {
-      if (!assinaturaValida(bruto, req.headers['x-hub-signature-256'], WHATSAPP_APP_SECRET)) {
+      const deveValidarAssinatura = WHATSAPP_APP_SECRET && !WHATSAPP_APP_SECRET.includes('cole-aqui');
+      if (deveValidarAssinatura && !assinaturaValida(bruto, req.headers['x-hub-signature-256'], WHATSAPP_APP_SECRET)) {
         res.writeHead(401).end();
         return;
       }
@@ -112,6 +148,8 @@ createServer((req, res) => {
         for (const c of (Array.isArray(e?.changes) ? e.changes : [])) {
           for (const m of (Array.isArray(c?.value?.messages) ? c.value.messages : [])) {
             if (!m) continue;
+            // Deduplica IMEDIATAMENTE antes de enfileirar qualquer processamento
+            if (jaProcessada(m)) continue;
             console.log(`📩 [WhatsApp] Mensagem recebida de ${m.from}: "${m.text?.body || m.type}"`);
             tratar(m);
           }

@@ -13,10 +13,8 @@ export const salvarPedidos = (dados) => gravarJson(ARQ_PEDIDOS, dados);
 export function gerarIdPedido() {
   const agora = new Date();
   const dia = String(agora.getDate()).padStart(2, '0');
-  const hora = String(agora.getHours()).padStart(2, '0');
-  const min = String(agora.getMinutes()).padStart(2, '0');
-  const rand = randomUUID().slice(0, 12);
-  return `PED-${dia}${hora}${min}-${rand}`;
+  const rand = Math.floor(100 + Math.random() * 900); // 3 dígitos
+  return `PED-${dia}-${rand}`; // ex: PED-03-742
 }
 
 /**
