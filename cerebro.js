@@ -18,7 +18,7 @@ const registrarConversa = criarLogConversas(
   process.env.ARQ_LOG || fileURLToPath(new URL('./conversas.log', import.meta.url)),
   { retencaoDias: Number(process.env.LOG_RETENCAO_DIAS) || 30 },
 );
-const FICHA = readFileSync(new URL('./negocio.md', import.meta.url), 'utf8');
+const FICHA = readFileSync(process.env.ARQ_NEGOCIO || new URL('./negocio.md', import.meta.url), 'utf8');
 const INFORMACOES_NEGOCIO = FICHA.split(/(?=^## )/m)
   .filter(secao => /^## (Quem somos|Horários|Endereço|Formas|Políticas)/m.test(secao)).join('\n');
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { criarNotificador } from '../lib/notificacoes.js';
@@ -10,6 +10,9 @@ const pasta = mkdtempSync(join(tmpdir(), 'ricardo-test-'));
 process.env.ARQ_MEMORIA = join(pasta, 'memoria.json');
 process.env.ARQ_LOG = join(pasta, 'conversas.log');
 process.env.ARQ_PEDIDOS = join(pasta, 'pedidos.json');
+// Cada empresa tem a própria ficha fora do código publicado.
+process.env.ARQ_NEGOCIO = join(pasta, 'negocio.md');
+writeFileSync(process.env.ARQ_NEGOCIO, readFileSync(new URL('../negocio.md', import.meta.url), 'utf8') + '\nMARCADOR-FICHA-DA-EMPRESA\n');
 const agendaAberta = { fuso: 'America/Sao_Paulo', horarios: Array.from({ length: 7 }, (_, i) => ({ dia_semana: i + 1, ativo: true, hora_inicio: '00:00:00', hora_fim: '23:59:59' })) };
 const requisicoes = [];
 globalThis.fetch = async (url, options) => {
@@ -110,6 +113,7 @@ test('prompt enviado ao modelo contém a regra para mensagem fora de contexto', 
   try {
     await cerebro.responderNaFila('5512999990101', 'quem ganhou o jogo ontem?');
     assert.match(prompt, /MENSAGEM FORA DO CONTEXTO/);
+    assert.match(prompt, /MARCADOR-FICHA-DA-EMPRESA/);
     assert.match(prompt, /Desculpe, não entendi\. 😅 Por favor, escolha uma das opções acima\./);
   } finally { globalThis.fetch = original; }
 });

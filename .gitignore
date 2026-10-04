@@ -33,3 +33,7 @@ Thumbs.db
 memoria.json.tmp
 pedidos.json.tmp
 conversas.log.tmp
+
+# Pacotes gerados localmente para publicar
+runtime/
+__pycache__/
