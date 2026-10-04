@@ -1,11 +1,13 @@
 import { Component, Input, Output, EventEmitter, inject, signal, OnDestroy } from '@angular/core';
+import { TransbordosModalComponent } from './transbordos-modal.component';
+import { TransbordoService } from '../../core/services/transbordo.service';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TransbordosModalComponent],
   template: `
     @if (api.erro()) {
       <div role="alert" style="padding: 10px 20px; background: #7f1d1d; color: white">{{ api.erro() }}</div>
@@ -31,6 +33,15 @@ import { ApiService } from '../../core/services/api.service';
           <span>{{ api.loading() ? 'Atualizando...' : 'Atualizar Dados' }}</span>
         </button>
 
+        <button type="button" class="transbordo-bell" (click)="transbordosModal.abrir($event.currentTarget)" aria-haspopup="dialog"
+          [class.com-pendencias]="transbordo.aguardando() > 0"
+          [attr.aria-label]="'Atendimento humano: ' + transbordo.aguardando() + ' cliente(s) aguardando'"
+          title="Ver clientes aguardando atendente">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4"/></svg>
+          @if (transbordo.aguardando()) { <span class="bell-counter">{{ transbordo.aguardando() > 99 ? '99+' : transbordo.aguardando() }}</span> }
+        </button>
+        <app-transbordos-modal #transbordosModal/>
+        <span class="bell-announcement" role="status" aria-live="polite">{{ transbordo.eventos() ? 'Novo pedido de atendimento humano. ' + transbordo.aguardando() + ' cliente(s) aguardando.' : '' }}</span>
         <!-- Quick Info -->
         <div class="header-meta">
           <span class="meta-label">Última atualização:</span>
@@ -49,6 +60,16 @@ import { ApiService } from '../../core/services/api.service';
     </header>
   `,
   styles: [`
+    .transbordo-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:42px;height:42px;border-radius:12px;color:var(--text-secondary);background:transparent;border:0;padding:0;cursor:pointer;text-decoration:none}
+    .transbordo-bell:hover,.transbordo-bell.com-pendencias{color:var(--primary-text)}
+    .transbordo-bell:focus-visible{outline:2px solid var(--primary-text);outline-offset:3px}
+    .bell-counter{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 4px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--on-primary);font-size:.65rem;font-weight:700;border:2px solid var(--bg-surface)}
+    .transbordo-bell.com-pendencias svg{transform-origin:50% 15%;animation:bell-ring 2.8s ease-in-out infinite}
+
+    @keyframes bell-ring{0%,40%,100%{transform:rotate(0)}5%,15%,25%{transform:rotate(20deg)}10%,20%,30%{transform:rotate(-20deg)}35%{transform:rotate(8deg)}}
+
+    .bell-announcement{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+    @media(prefers-reduced-motion:reduce){.transbordo-bell.com-pendencias svg{animation:none}}
     .refresh-dados { background:var(--primary);color:var(--on-primary);border:1px solid transparent;gap:8px;padding:10px 16px;border-radius:10px;box-shadow:0 4px 12px var(--primary-glow);white-space:nowrap; }
     .refresh-dados:hover:not(:disabled){background:var(--primary-hover);transform:translateY(-1px)}
     .refresh-dados:active:not(:disabled){transform:translateY(0)}
@@ -173,10 +194,12 @@ export class HeaderComponent implements OnDestroy {
   @Input() menuAberto = true;
   @Output() alternarMenu = new EventEmitter<void>();
   api = inject(ApiService);
+  transbordo = inject(TransbordoService);
   private agora = signal(new Date());
   private relogio = setInterval(() => this.agora.set(new Date()), 60000);
 
   constructor() {
+    this.transbordo.iniciar();
     this.api.getHorariosAtendimento().subscribe({ error: () => {} });
   }
 

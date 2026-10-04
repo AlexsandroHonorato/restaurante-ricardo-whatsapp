@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Atendimento;
 use App\Models\HistoricoStatusPedido;
 use App\Models\Pedido;
+use App\Models\StatusConversa;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -12,6 +13,32 @@ use Tests\TestCase;
 class FluxoPedidoTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_transbordo_atualiza_status_conversacional_e_permanece_na_sincronizacao(): void
+    {
+        $dados = ['telefone' => '5512999991111', 'status' => 'conversa_iniciada', 'transbordo' => true, 'motivo_transbordo' => 'Cliente escolheu falar com a equipe'];
+        $this->postJson('/api/status-conversa/sync', $dados)->assertOk()
+            ->assertJsonPath('status_conversa.status_atual', 'transbordo_humano');
+        $this->getJson('/api/status-conversa')->assertOk()->assertJsonPath('0.status_atual', 'transbordo_humano');
+        $this->postJson('/api/status-conversa/sync', ['telefone' => $dados['telefone'], 'status' => 'transbordo_humano'])->assertOk()
+            ->assertJsonPath('status_conversa.status_atual', 'transbordo_humano');
+    }
+
+    public function test_contato_envia_saudacao_uma_vez_e_rejeita_conversa_sem_transbordo(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $this->postJson('/api/status-conversa/sync', ['telefone' => '5512999997777', 'status' => 'transbordo_humano', 'transbordo' => true])->assertOk();
+        $id = StatusConversa::where('telefone', '5512999997777')->firstOrFail()->id;
+        $this->postJson("/api/status-conversa/{$id}/contato")->assertOk();
+        $this->postJson("/api/status-conversa/{$id}/contato")->assertOk();
+        $this->assertNotNull(StatusConversa::find($id)->contato_iniciado_em);
+        $this->postJson('/api/status-conversa/sync', ['telefone' => '5512999997777', 'status' => 'transbordo_humano'])->assertOk();
+        $this->assertNotNull(StatusConversa::find($id)->contato_iniciado_em);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($r) => str_contains($r['texto'], 'Como posso ajudar'));
+        StatusConversa::find($id)->update(['status_atual' => 'conversa_iniciada']);
+        $this->postJson("/api/status-conversa/{$id}/contato")->assertStatus(409);
+    }
 
     private function dados(): array
     {

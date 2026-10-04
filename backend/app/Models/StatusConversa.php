@@ -12,6 +12,7 @@ class StatusConversa extends Model
     protected $table = 'status_conversas';
 
     protected $fillable = [
+        'contato_iniciado_em',
         'telefone',
         'status_atual',
         'status_anterior',
@@ -21,6 +22,7 @@ class StatusConversa extends Model
     ];
 
     protected $casts = [
+        'contato_iniciado_em' => 'datetime',
         'rascunho' => 'array',
         'ultimo_contato_em' => 'datetime',
         'expira_em' => 'datetime',

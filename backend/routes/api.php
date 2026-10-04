@@ -54,6 +54,7 @@ Route::prefix('atendimentos')->group(function () {
 
 Route::prefix('status-conversa')->group(function () {
     Route::get('/', [AtendimentoController::class, 'getStatusConversas']);
+    Route::post('/{id}/contato', [AtendimentoController::class, 'iniciarContato'])->whereNumber('id');
     Route::post('/sync', [AtendimentoController::class, 'syncStatus']);
 });
 

@@ -153,6 +153,9 @@ export class ApiService {
     );
   }
 
+  iniciarContatoTransbordo(id: number): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/contato`, {});
+  }
   getStatusConversas(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/status-conversa`).pipe(
       catchError(() => { this.registrarFalha(); return EMPTY; })
@@ -171,4 +174,3 @@ export class ApiService {
   }
 
 }
-

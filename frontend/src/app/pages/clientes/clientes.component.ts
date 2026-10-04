@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/ui/icon.component';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,7 +8,7 @@ import { Cliente } from '../../core/models/dashboard.model';
 @Component({
   selector: 'app-clientes',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [IconComponent, CommonModule, FormsModule],
   template: `
     <div class="clientes-page">
       <div class="page-header">
@@ -19,7 +20,7 @@ import { Cliente } from '../../core/models/dashboard.model';
 
       <!-- Barra de Busca -->
       <div class="search-bar glass-card">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><app-icon nome="buscar"/></span>
         <input
           type="text"
           placeholder="Buscar cliente por nome ou telefone..."
@@ -47,18 +48,18 @@ import { Cliente } from '../../core/models/dashboard.model';
               <tr>
                 <td>
                   <div class="client-name-cell">
-                    <div class="client-avatar">👤</div>
+                    <div class="client-avatar"><app-icon nome="clientes"/></div>
                     <strong>{{ c.nome || 'Cliente WhatsApp' }}</strong>
                   </div>
                 </td>
                 <td>
                   <a [href]="'https://wa.me/' + c.telefone" target="_blank" class="tel-btn">
-                    💬 {{ c.telefone }}
+                    <app-icon nome="atendimentos"/> {{ c.telefone }}
                   </a>
                 </td>
                 <td>
                   <span class="addr-badge">
-                    📍 {{ c.enderecos?.[0]?.bairro || 'Martim de Sá' }}
+                    <app-icon nome="local"/> {{ c.enderecos?.[0]?.bairro || 'Martim de Sá' }}
                   </span>
                 </td>
                 <td>
@@ -72,7 +73,7 @@ import { Cliente } from '../../core/models/dashboard.model';
                 </td>
                 <td>
                   <a [href]="'https://wa.me/' + c.telefone" target="_blank" class="btn btn-secondary btn-sm">
-                    Abrir Conversa
+                    <app-icon nome="atendimentos"/> Abrir Conversa
                   </a>
                 </td>
               </tr>
@@ -86,6 +87,7 @@ import { Cliente } from '../../core/models/dashboard.model';
       </div>
     </div>
   `,
+  styleUrls: ['../../shared/ui/page-actions.css'],
   styles: [`
     .clientes-page {
       display: flex;
@@ -196,7 +198,8 @@ import { Cliente } from '../../core/models/dashboard.model';
       padding: 40px;
       color: var(--text-muted);
     }
-  `]
+
+`]
 })
 export class ClientesComponent implements OnInit {
   api = inject(ApiService);

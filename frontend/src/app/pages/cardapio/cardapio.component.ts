@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/ui/icon.component';
 import { DIAS_CARDAPIO, lerDiasCardapio, gravarDiasCardapio, nomeDiasCardapio } from '../../core/models/dias-cardapio';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -14,7 +15,7 @@ interface VariacaoForm {
 @Component({
   selector: 'app-cardapio',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [IconComponent, CommonModule, FormsModule],
   template: `
     <div class="cardapio-page">
       <!-- Toast de Notificação -->
@@ -36,10 +37,10 @@ interface VariacaoForm {
 
         <div class="header-actions">
           <button class="btn btn-primary" (click)="abrirModalNovo()">
-            ➕ Novo Prato / Item
+            <app-icon nome="adicionar"/> Novo Prato / Item
           </button>
           <button class="refresh-btn glass-card" (click)="carregarCardapio()" title="Atualizar Cardápio">
-            🔄 Atualizar
+            <app-icon nome="atualizar"/> Atualizar
           </button>
         </div>
       </div>
@@ -93,15 +94,15 @@ interface VariacaoForm {
                       (click)="toggleProduto(prod)"
                       title="Alternar disponibilidade no robô"
                     >
-                      <span>{{ prod.ativo ? '✅ Ativo' : '⏸️ Pausado' }}</span>
+                      <app-icon [nome]="prod.ativo ? 'confirmar' : 'pausar'"/><span>{{ prod.ativo ? 'Ativo' : 'Pausado' }}</span>
                     </button>
 
-                    <button class="action-icon-btn edit" (click)="abrirModalEditar(prod, cat.id)" title="Editar Prato">
-                      ✏️
+                    <button class="action-icon-btn edit" (click)="abrirModalEditar(prod, cat.id)" [attr.aria-label]="'Editar ' + prod.nome" title="Editar Prato">
+                      <app-icon nome="editar"/>
                     </button>
 
-                    <button class="action-icon-btn delete" (click)="confirmarExcluir(prod)" title="Excluir Prato">
-                      🗑️
+                    <button class="action-icon-btn delete" (click)="confirmarExcluir(prod)" [attr.aria-label]="'Excluir ' + prod.nome" title="Excluir Prato">
+                      <app-icon nome="excluir"/>
                     </button>
                   </div>
                 </div>
@@ -118,8 +119,8 @@ interface VariacaoForm {
         <div class="modal-overlay animate-fade-in" (click)="fecharModal()">
           <div class="modal-card glass-card" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2>{{ modoEdicao() ? '✏️ Editar Prato / Produto' : '➕ Novo Prato / Produto' }}</h2>
-              <button class="close-btn" (click)="fecharModal()">✕</button>
+              <h2>{{ modoEdicao() ? 'Editar Prato / Produto' : 'Novo Prato / Produto' }}</h2>
+              <button class="close-btn" (click)="fecharModal()" aria-label="Fechar edição"><app-icon nome="fechar"/></button>
             </div>
 
             <form (ngSubmit)="salvarProduto()" class="modal-form">
@@ -166,7 +167,7 @@ interface VariacaoForm {
                 <div class="variations-header">
                   <label>Tamanhos e Preços (R$) *</label>
                   <button type="button" class="btn btn-secondary btn-xs" (click)="adicionarVariacao()">
-                    ➕ Adicionar Tamanho
+                    <app-icon nome="adicionar"/> Adicionar Tamanho
                   </button>
                 </div>
 
@@ -193,7 +194,7 @@ interface VariacaoForm {
                       </div>
                       @if (formVariacoes.length > 1) {
                         <button type="button" class="remove-var-btn" (click)="removerVariacao(idx)" title="Remover tamanho">
-                          ✕
+                          <app-icon nome="fechar"/>
                         </button>
                       }
                     </div>
@@ -215,6 +216,7 @@ interface VariacaoForm {
       }
     </div>
   `,
+  styleUrls: ['../../shared/ui/page-actions.css'],
   styles: [`
     .cardapio-page {
       display: flex;
@@ -628,7 +630,8 @@ interface VariacaoForm {
       border-top: 1px solid var(--border-color);
       padding-top: 14px;
     }
-  `]
+
+`]
 })
 export class CardapioComponent implements OnInit {
   api = inject(ApiService);

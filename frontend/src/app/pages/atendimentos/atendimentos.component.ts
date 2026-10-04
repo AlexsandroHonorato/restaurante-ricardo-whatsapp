@@ -1,12 +1,15 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { IconComponent } from '../../shared/ui/icon.component';
+import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { TransbordoService } from '../../core/services/transbordo.service';
 import { Atendimento } from '../../core/models/dashboard.model';
 
 @Component({
   selector: 'app-atendimentos',
   standalone: true,
-  imports: [CommonModule],
+  imports: [IconComponent, CommonModule],
   template: `
     <div class="atendimentos-page">
       <div class="page-header">
@@ -24,7 +27,7 @@ import { Atendimento } from '../../core/models/dashboard.model';
               (click)="alternarVisao('cards')"
               title="Visualização em Cards"
             >
-              <span class="btn-icon">🗂️</span> Cards
+              <app-icon nome="dashboard"/> Cards
             </button>
             <button
               class="view-btn"
@@ -32,28 +35,65 @@ import { Atendimento } from '../../core/models/dashboard.model';
               (click)="alternarVisao('lista')"
               title="Visualização em Tabela/Lista"
             >
-              <span class="btn-icon">📋</span> Lista
+              <app-icon nome="lista"/> Lista
             </button>
           </div>
 
           <button class="refresh-btn glass-card" (click)="carregar()" title="Recarregar Dados">
-            🔄 Atualizar Status
+            <app-icon nome="atualizar"/> Atualizar Status
           </button>
           <div class="status-filters">
             <button class="filter-pill" [class.active]="filtroTransbordo() === undefined" (click)="filtrar(undefined)">Todas as Conversas</button>
-            <button class="filter-pill alert" [class.active]="filtroTransbordo() === true" (click)="filtrar(true)">🔔 Transbordo Humano</button>
+            <button class="filter-pill alert" [class.active]="filtroTransbordo() === true" (click)="filtrar(true)"><app-icon nome="alerta"/> Transbordo Humano</button>
           </div>
         </div>
       </div>
 
+      <p class="handoff-announcement" role="status" aria-live="polite">
+        {{ transbordos().length ? transbordos().length + ' cliente(s) aguardando atendimento humano.' : '' }}
+      </p>
+      @if (transbordos().length) {
+        <div class="handoff-summary">
+          <strong>{{ transbordos().length }} cliente(s) aguardando · Mais antigos primeiro</strong>
+          @if (transbordo.fechados().size) {
+            <button class="btn btn-secondary btn-sm" (click)="transbordo.mostrarAlertas()">Mostrar alertas fechados</button>
+          }
+        </div>
+      }
+      @if (transbordo.alertas().length) {
+        <section class="handoff-queue" aria-label="Clientes aguardando atendente">
+          @for (s of transbordo.alertas(); track s.id) {
+            <article class="handoff-card" role="alert">
+              <button type="button" class="handoff-close" (click)="transbordo.fechar(s.id)" [attr.aria-label]="'Fechar alerta de ' + s.telefone"><app-icon nome="fechar"/></button>
+              <div class="handoff-symbol"><app-icon nome="alerta"/></div>
+              <div class="handoff-content">
+                <span class="handoff-label">{{ transbordos().indexOf(s) + 1 }}º NA FILA · ATENDIMENTO HUMANO SOLICITADO</span>
+                <h2>Cliente quer falar com um atendente</h2>
+                <p>WhatsApp {{ s.telefone }} · Aguardando a equipe</p>
+              </div>
+              <div class="handoff-actions">
+                <button class="btn btn-primary" [disabled]="enviandoContato().has(s.id)" (click)="falarComCliente(s)">
+                  <app-icon nome="atendimentos"/> {{ enviandoContato().has(s.id) ? 'Enviando…' : 'Falar com o cliente' }}
+                </button>
+                @if (contatosEnviados().has(s.id)) {
+                  <small>Mensagem inicial enviada.</small>
+                  <a [href]="'https://wa.me/' + s.telefone" target="_blank" rel="noopener noreferrer">Abrir conversa no WhatsApp</a>
+                }
+                @if (errosContato()[s.id]) { <small role="alert">{{ errosContato()[s.id] }}</small> }
+              </div>
+            </article>
+          }
+        </section>
+      }
+
       <!-- 1. VISÃO EM CARDS (FEED DE CONVERSAS) -->
       @if (modoVisao() === 'cards') {
         <div class="chat-feed-grid">
-          @for (s of statusConversas(); track s.id) {
+          @for (s of conversasVisiveis(); track s.id) {
             <div class="glass-card chat-card" [class.alert-border]="s.status_atual === 'transbordo_humano'">
               <div class="chat-header">
                 <div class="chat-user">
-                  <div class="avatar">💬</div>
+                  <div class="avatar" aria-hidden="true"><app-icon nome="atendimentos"/></div>
                   <div>
                     <strong>WhatsApp {{ s.telefone }}</strong>
                     <span class="chat-tel">Último contato: {{ s.ultimo_contato_em | date:'dd/MM • HH:mm:ss' }}</span>
@@ -99,7 +139,7 @@ import { Atendimento } from '../../core/models/dashboard.model';
               <!-- Botões de Ação -->
               <div class="chat-footer">
                 <a [href]="'https://wa.me/' + s.telefone" target="_blank" class="btn btn-primary btn-sm full">
-                  📱 Abrir Conversa no WhatsApp
+                  <app-icon nome="atendimentos"/> Abrir Conversa no WhatsApp
                 </a>
               </div>
             </div>
@@ -128,11 +168,11 @@ import { Atendimento } from '../../core/models/dashboard.model';
               </tr>
             </thead>
             <tbody>
-              @for (s of statusConversas(); track s.id) {
+              @for (s of conversasVisiveis(); track s.id) {
                 <tr [class.alert-row]="s.status_atual === 'transbordo_humano'">
                   <td class="client-cell">
                     <div class="tel-wrapper">
-                      <span class="avatar-mini">💬</span>
+                      <span class="avatar-mini" aria-hidden="true"><app-icon nome="atendimentos"/></span>
                       <div>
                         <strong class="tel-number">{{ s.telefone }}</strong>
                       </div>
@@ -156,7 +196,7 @@ import { Atendimento } from '../../core/models/dashboard.model';
                           <span class="tag-chip bebidas" title="Bebidas">🥤 {{ s.rascunho.bebidas.join(', ') }}</span>
                         }
                         @if (s.rascunho.endereco) {
-                          <span class="tag-chip endereco" title="Endereço">📍 {{ s.rascunho.endereco }}</span>
+                          <span class="tag-chip endereco" title="Endereço"><app-icon nome="local"/> {{ s.rascunho.endereco }}</span>
                         }
                         @if (s.rascunho.formaPagamento) {
                           <span class="tag-chip pagamento" title="Pagamento">💳 {{ s.rascunho.formaPagamento }}</span>
@@ -171,7 +211,7 @@ import { Atendimento } from '../../core/models/dashboard.model';
                   </td>
                   <td>
                     <a [href]="'https://wa.me/' + s.telefone" target="_blank" class="btn btn-primary btn-xs flex-btn">
-                      📱 Abrir WhatsApp
+                      <app-icon nome="atendimentos"/> Abrir WhatsApp
                     </a>
                   </td>
                 </tr>
@@ -191,7 +231,20 @@ import { Atendimento } from '../../core/models/dashboard.model';
       }
     </div>
   `,
+  styleUrls: ['../../shared/ui/page-actions.css'],
   styles: [`
+    .handoff-announcement { position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%); }
+    .handoff-queue { max-height:480px;overflow-y:auto;padding:4px;display:grid;gap:14px;perspective:1100px; }
+    .handoff-card { position:relative;display:flex;align-items:center;gap:18px;padding:32px 22px 22px;border-radius:16px;border:1px solid var(--primary);background:linear-gradient(120deg,var(--bg-surface-elevated),var(--bg-surface));box-shadow:0 12px 30px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.08);animation:handoff-enter .75s cubic-bezier(.2,.8,.2,1) both;transform-origin:center top; }
+    .handoff-summary{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:.85rem;color:var(--text-secondary)}
+    .handoff-close{position:absolute;top:7px;right:7px;width:28px;height:28px;border:0;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);background:transparent;cursor:pointer}
+    .handoff-close:hover{color:var(--primary-text);background:var(--primary-glow)}
+    .handoff-actions{display:flex;flex-direction:column;gap:6px;font-size:.75rem}.handoff-actions a{color:var(--primary-text)}
+    .handoff-symbol { display:flex;align-items:center;justify-content:center;flex-shrink:0;width:48px;height:48px;border-radius:14px;background:var(--primary-glow);color:var(--primary-text); }
+    .handoff-content { flex:1;min-width:0; }.handoff-label { font-size:.7rem;letter-spacing:.08em;color:var(--primary-text);font-weight:700; }.handoff-content h2 { font-size:1.05rem;margin:6px 0; }.handoff-content p { margin:0;color:var(--text-secondary);font-size:.85rem;overflow-wrap:anywhere; }
+    @keyframes handoff-enter { from { opacity:0;transform:translateY(-20px) rotateX(-35deg) scale(.94); } to { opacity:1;transform:translateY(0) rotateX(0) scale(1); } }
+    @media(max-width:700px) { .handoff-card { flex-wrap:wrap;padding:18px; }.handoff-card .btn { width:100%; }.handoff-content { flex-basis:calc(100% - 66px); } }
+    @media(prefers-reduced-motion:reduce) { .handoff-card { animation:none; } }
     .atendimentos-page {
       display: flex;
       flex-direction: column;
@@ -328,7 +381,32 @@ import { Atendimento } from '../../core/models/dashboard.model';
       background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(17, 24, 39, 0.8));
     }
 
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 0;
+      font-size: .75rem;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .chat-user { min-width: 0; }
+    .chat-user > div { min-width: 0; }
+    .chat-user strong { overflow-wrap: anywhere; }
     .chat-header {
+      flex-wrap: wrap;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -341,11 +419,12 @@ import { Atendimento } from '../../core/models/dashboard.model';
       gap: 10px;
     }
 
+    .avatar, .avatar-mini { flex-shrink: 0; color: var(--primary-text); }
     .avatar {
       width: 38px;
       height: 38px;
-      border-radius: 50%;
-      background: var(--bg-surface-elevated);
+      border-radius: 10px;
+      background: var(--primary-glow);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -470,8 +549,8 @@ import { Atendimento } from '../../core/models/dashboard.model';
     .avatar-mini {
       width: 28px;
       height: 28px;
-      border-radius: 50%;
-      background: var(--bg-surface-elevated);
+      border-radius: 10px;
+      background: var(--primary-glow);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -584,21 +663,46 @@ import { Atendimento } from '../../core/models/dashboard.model';
       margin-bottom: 12px;
       display: block;
     }
-  `]
+
+`]
 })
 export class AtendimentosComponent implements OnInit {
   api = inject(ApiService);
+  private destroyRef = inject(DestroyRef);
   atendimentos = signal<Atendimento[]>([]);
-  statusConversas = signal<any[]>([]);
+  transbordo = inject(TransbordoService);
+  statusConversas = this.transbordo.conversas;
   filtroTransbordo = signal<boolean | undefined>(undefined);
   modoVisao = signal<'cards' | 'lista'>('cards');
 
+  enviandoContato = signal(new Set<number>());
+  contatosEnviados = signal(new Set<number>());
+  errosContato = signal<Record<number, string>>({});
+  falarComCliente(s: { id: number }) {
+    if (this.enviandoContato().has(s.id)) return;
+    this.enviandoContato.update(ids => new Set([...ids, s.id]));
+    this.api.iniciarContatoTransbordo(s.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.transbordo.assumir(s.id);
+        this.contatosEnviados.update(ids => new Set([...ids, s.id]));
+        this.enviandoContato.update(ids => new Set([...ids].filter(id => id !== s.id)));
+      },
+      error: () => {
+        this.errosContato.update(erros => ({ ...erros, [s.id]: 'Não foi possível enviar. Tente novamente.' }));
+        this.enviandoContato.update(ids => new Set([...ids].filter(id => id !== s.id)));
+      }
+    });
+  }
+  transbordos = this.transbordo.fila;
+  conversasVisiveis = computed(() => this.filtroTransbordo() === true ? this.statusConversas().filter(s => s.status_atual === 'transbordo_humano') : this.statusConversas());
+
   ngOnInit() {
     this.carregar();
+    this.transbordo.iniciar();
   }
 
   carregar() {
-    this.api.getStatusConversas().subscribe((res) => {
+    this.api.getStatusConversas().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((res) => {
       this.statusConversas.set(res);
     });
     this.api.getAtendimentos(this.filtroTransbordo()).subscribe((res) => {

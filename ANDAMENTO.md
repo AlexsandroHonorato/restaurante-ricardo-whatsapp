@@ -101,12 +101,13 @@ graph TD
   - Chamada à API OpenRouter com `google/gemini-3.7-flash` e `max_tokens: 450`.
   - Tratamento resiliente e amigável para erros de API (402/429/limite de créditos com direcionamento para telefone da loja).
   - Serialização de concorrência por telefone (`responderNaFila`).
-  - Máquina de estados conversacional (`STATUS_CONVERSA`) com ferramentas: `atualizar_status_conversa`, `fechar_pedido`, `consultar_status_pedido`, `chamar_atendente`.
+  - Máquina de estados conversacional (`STATUS_CONVERSA`) com ferramentas: `atualizar_status_conversa`, `fechar_pedido`, `consultar_status_pedido`, `chamar_atendente` e estado explícito `STATUS_CONVERSA.TRANSBORDO` (`transbordo_humano`).
+  - **Saudação Contextual & Menu Numerado:** Identificação automática de pedido ativo recente (últimas 12h) e opções numeradas intuitivas (1️⃣ Fazer pedido, 2️⃣ Acompanhar pedido, 3️⃣ Falar com a equipe).
   - **Envio Direto da Tabela de Pedidos:** Ao fechar o pedido ou consultar o status, a resposta enviada ao cliente é consultada diretamente da tabela e formatada de forma determinística, sem deixar a geração do comprovante para a IA.
 * [pedidos.js](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.js):
   - Banco de pedidos persistido ([pedidos.json](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.json)) e sincronização REST com API Laravel/MySQL.
   - Funções de busca direta na tabela: `obterPedidoPorId` e `obterUltimoPedidoPorTelefone`.
-  - Geração de IDs (`PED-DDHHMM-XXX`).
+  - Geração de IDs curtos e amigáveis (`PED-DD-XXX`, ex: `PED-03-742`).
   - Formatação e impressão térmica da comanda da cozinha (`formatarComanda`, `imprimirComanda`).
   - Geração de mensagem oficial formatada para o cliente (`formatarMensagemConfirmacaoCliente` e `formatarMensagemStatusCliente`).
 * [agente.js](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/agente.js):
@@ -199,6 +200,10 @@ graph TD
   - Migration executada e populada com os 6 status oficiais: `pendente` (⏳ #F59E0B), `confirmado` (📋 #3B82F6), `em_preparo` (👨‍🍳 #8B5CF6), `saiu_para_entrega` (🛵 #06B6D4), `entregue` (✅ #10B981) e `cancelado` (❌ #EF4444).
   - Model Eloquent `StatusPedido.php`, relacionamento `statusCatalogo()` no Model `Pedido.php` e endpoint `GET /api/status-pedidos`.
   - DDL e seeds atualizados em `database/schema.sql` e `database/seeds.sql`.
+
+- [x] **9. Resposta Imediata de Horário de Atendimento (Sem Gastar IA) & Validação de Webhook:**
+  - **Atendimento Fora do Expediente:** Integração de verificação determinística de horário comercial (`lib/horario-atendimento.js` e `lib/horario.js`). Mensagens recebidas fora do horário de atendimento (Segunda a Sábado das 11:00 às 14:30 e Domingos) recebem resposta automática instantânea informando o próximo horário de atendimento sem chamar a IA e sem gastar créditos.
+  - **Túnel & Assinatura de Webhook:** Ajuste no `lib/webhook.js` para permitir bypass de assinatura HMAC em desenvolvimento quando o App Secret for opcional, túnel Cloudflare operacional e WABA subscrita com sucesso.
 
 
 
@@ -473,3 +478,73 @@ Alterações desta etapa ainda sem novo commit.
 ## 36. Ícones nos tipos do cardápio semanal — 03/10/2026
 
 - Categorias dos cartões exibem ícones SVG: talheres para pratos diários, calendário para pratos do dia, porção, adicionais, bebidas e cervejas. Mantidos nomes textuais e ícones decorativos aria-hidden, com paleta roxa do sistema. Sem novo commit.
+
+## 37. Botões e ícones das telas operacionais — 03/10/2026
+
+- Padronizados controles de Pedidos, Atendimentos, Clientes e Cardápio: atualizar, Cards/Lista, filtros, busca, criação, edição, exclusão, preparo, entrega e abertura do WhatsApp.
+- Ícones SVG reutilizam IconComponent; estilos comuns centralizados em shared/ui/page-actions.css, com paleta do sistema, foco por teclado e respeito a movimento reduzido. Edição/exclusão e fechamento possuem identificação acessível; cores semânticas preservadas.
+- Mantidos handlers, APIs e regras de negócio. Corrigida a sombra de hover dos botões primários para a cor roxa do sistema.
+- Validação: build Angular aprovado e 22 testes aprovados em 9 arquivos. Sem novo commit.
+
+## 38. Ícone de conversa no monitor — 03/10/2026
+
+- Substituído emoji dos avatares de Atendimentos por SVG de conversa nos modos Cards e Lista. Contêiner com cantos arredondados, cor roxa e flex-shrink: 0 para evitar formato comprimido na tabela.
+- Ajuste visual; ações e dados preservados.
+
+## 39. Indicadores de status do monitor — 03/10/2026
+
+- Badges de Atendimentos com cantos de 8px, ponto de status, espaçamento uniforme e texto em linha única. Cabeçalho dos cartões permite mover o indicador para outra linha quando necessário, sem comprimir o texto ou o avatar.
+- Mantidos rótulos, cores semânticas e estágios da conversa nos modos Cards e Lista.
+
+## 40. Solicitação de atendente com destaque 3D — 03/10/2026
+
+- Monitor mostra fila de cards no topo para status transbordo_humano: entrada 3D uma vez por inclusão, mensagem “Cliente quer falar com um atendente”, telefone e botão Falar com o cliente. Funciona também no modo Lista; anúncio acessível, responsividade e reduced-motion.
+- Consulta de status a cada 5 segundos, sem consultas automáticas sobrepostas; encerra ao destruir a tela. Filtro Transbordo agora filtra as conversas exibidas. Card conserva identidade nas atualizações e desaparece quando deixa o transbordo.
+- Corrigida ferramenta chamar_atendente: persiste TRANSBORDO na memória do bot. API aceita esse estágio e normaliza pedidos com transbordo=true, evitando exibir Iniciada/Menu após transferência.
+- Validação: build Angular aprovado; 23 testes Angular, 19 testes Node e 11 testes FluxoPedidoTest aprovados. Regressões cobrem chegada automática, identidade do card, saída do status, limpeza do timer e sincronização na API. Sem commit.
+
+## 41. Sininho global de transbordo — 03/10/2026
+
+- Sininho SVG à direita de Atualizar Dados, contador de clientes em transbordo, destaque roxo e animação de recebimento a cada nova entrada. Clique abre /atendimentos; rótulo acessível, anúncio discreto e respeito a reduced-motion.
+- TransbordoService centraliza consulta a cada 5 segundos para cabeçalho e monitor, evitando dois timers. Snapshot inicial conta pendências sem avisar histórico; atualizações iguais não repetem alerta, retorno de cliente ao transbordo gera novo aviso, falha de rede mantém último estado.
+- Testes cobrem contagem, novas entradas, ausência de avisos duplicados, retorno e falha de rede. Build e 24 testes Angular aprovados (11 arquivos). Sem commit.
+
+## 42. Alertas fecháveis, fila e saudação humana — 03/10/2026
+
+- Cards de transbordo são alertas com botão Fechar. Fechar oculta aviso, conserva cliente na fila/contador, e Mostrar alertas fechados restaura. Nova entrada após saída volta a alertar. Fila ordenada pela primeira detecção/último contato no snapshot inicial, posição exibida e rolagem limitada a 480px.
+- Falar com o cliente chama POST /api/status-conversa/{id}/contato e envia saudação da equipe perguntando como pode ajudar. Confirmação aparece após sucesso com link Abrir conversa; erro permite tentar novamente, botão bloqueia cliques durante envio.
+- Backend valida transbordo ativo, usa canal interno protegido do bot, lock/cache por sessão e chave de idempotência. Fechar ou enviar saudação não encerra atendimento nem altera status.
+- lib/mensageiro.js centraliza digitando/read antes dos envios do bot e notificações com pequena pausa. Guarda ID recebido por telefone por até 24h com limite de cache; sem ID ou falha no indicador, envio continua. Processamento do bot também indica digitando antes da geração.
+- Validação: build e 24 testes Angular, 21 testes Node e 12 testes FluxoPedidoTest aprovados. Mocks verificam indicador antes do texto, fallback, fechamento sem perder pendência e saudação idempotente. Nenhuma mensagem real enviada na validação. Reiniciar processo Node para carregar mudanças do mensageiro. Sem commit.
+
+## 43. Sino conta somente transbordos sem primeiro contato — 03/10/2026
+
+- Após Falar com o cliente confirmar envio, TransbordoService marca contato iniciado e reduz imediatamente contador/fila de alertas. Ex.: 5 pendências passam a 4. Falha de envio conserva pendência; Fechar alerta continua somente ocultando aviso.
+- Persistência contato_iniciado_em em status_conversas: endpoint registra após sucesso; sincronizações do mesmo transbordo preservam marcação; mudança de estágio/nova entrada limpa para novo atendimento. Migration aplicada no banco local.
+- Contatos iniciados permanecem no monitor e filtro Transbordo, mas não no sino nem em Mostrar alertas fechados. Atualizar/navegar não restaura pendências já atendidas.
+- Validação: build, 25 testes Angular e 12 testes FluxoPedidoTest aprovados. Regressões verificam 5 para 4, atualização, restauração de alertas e persistência durante sincronização. Sem commit.
+
+## 44. Modal da fila no sininho — 03/10/2026
+
+- Clique no sino abre dialog modal com transbordos pendentes, posições, telefones e último contato, ordenados pela fila existente. Rolagem para listas grandes e estado vazio; atualização automática compartilhada.
+- Cada item permite Falar com o cliente: mantém saudação/idempotência, bloqueio durante envio, erro com tentativa e retirada após sucesso. Confirmação contém link para conversa. Footer permite abrir monitor completo.
+- Fechar por botão, Escape nativo ou clique fora; foco nativo do dialog, título/descrição acessíveis e layout responsivo. Fechar não remove pendências.
+- Novo componente separado TransbordosModalComponent. Build aprovado; regressões verificam abertura/fechamento, estado vazio, envio sem duplicação, remoção após sucesso e conservação em erro. Sem commit.
+
+## 45. Notificações ancoradas ao sino — 03/10/2026
+
+- Painel compacto de 390px abaixo do sino, alinhado à direita e limitado à viewport. Reposiciona em resize/scroll, fundo transparente, rolagem e layout adaptado ao celular.
+- Cabeçalho Notificações com contador; cartões na paleta roxa mostram solicitação, telefone, posição, último contato e pratos/bebidas/endereço/pagamento quando disponíveis. Mantidos envio da saudação, remoção após confirmação e link para monitor.
+- Build e 28 testes aprovados. Navegador confirmou painel junto ao sino com pendência real e fechamento devolvendo foco ao botão, sem enviar mensagem. CLI agent-browser indisponível; verificação feita pelo navegador integrado. Sem commit.
+
+## 46. Sino sem moldura e toque durante pendências — 03/10/2026
+
+- Removidos fundo, borda e sombra do sino, mantendo área clicável e foco de teclado. Contador e abertura do painel preservados.
+- Ícone balança com intervalo enquanto aguardando > 0 e para ao zerar; removidas animações alternadas por evento. prefers-reduced-motion mantém indicador estático.
+- Build Angular aprovado. Sem commit.
+
+## 47. Commits das alterações pendentes — 03/10/2026
+
+- Commit 08c56e4 registra alterações do fluxo WhatsApp, saudação, transbordo e mensageiro com digitando.
+- Ajustes visuais das quatro telas, fila de alertas, notificações do sino e persistência do primeiro contato agrupados em commit separado com testes e migration.
+- Validações anteriores: build Angular, 28 testes Angular, 21 testes Node e 12 testes FluxoPedidoTest aprovados. Revisão git diff --check sem erros após limpeza de espaços. Commits locais, sem push.

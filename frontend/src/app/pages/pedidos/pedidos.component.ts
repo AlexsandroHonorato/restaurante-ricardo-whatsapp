@@ -1,3 +1,4 @@
+import { IconComponent } from '../../shared/ui/icon.component';
 import { PedidoStatusComponent } from '../../shared/ui/pedido-status.component';
 import { Component, OnInit, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -8,7 +9,7 @@ import { Pedido } from '../../core/models/dashboard.model';
 @Component({
   selector: 'app-pedidos',
   standalone: true,
-  imports: [CommonModule, FormsModule, PedidoStatusComponent],
+  imports: [IconComponent, CommonModule, FormsModule, PedidoStatusComponent],
   template: `
     <div class="pedidos-page">
       <dialog #cancelamentoDialog class="cancelamento-dialog" aria-labelledby="cancelamento-titulo" aria-describedby="cancelamento-descricao" (cancel)="aoCancelarDialog($event)" (close)="cancelando.set(null)">
@@ -49,7 +50,7 @@ import { Pedido } from '../../core/models/dashboard.model';
               (click)="alternarVisao('cards')"
               title="Visualização em Cards Kanban"
             >
-              <span class="btn-icon">🗂️</span> Cards
+              <app-icon nome="dashboard"/> Cards
             </button>
             <button
               class="view-btn"
@@ -57,7 +58,7 @@ import { Pedido } from '../../core/models/dashboard.model';
               (click)="alternarVisao('lista')"
               title="Visualização em Tabela Detalhada"
             >
-              <span class="btn-icon">📋</span> Lista
+              <app-icon nome="lista"/> Lista
             </button>
           </div>
 
@@ -74,7 +75,7 @@ import { Pedido } from '../../core/models/dashboard.model';
 
       <!-- Barra de Busca -->
       <div class="search-bar glass-card">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"><app-icon nome="buscar"/></span>
         <input
           type="text"
           placeholder="Buscar por código (PED-...), nome do cliente, bairro ou telefone..."
@@ -82,7 +83,7 @@ import { Pedido } from '../../core/models/dashboard.model';
           (ngModelChange)="buscar()"
         />
         <button class="refresh-btn" (click)="carregarPedidos()" title="Atualizar Pedidos">
-          🔄 Atualizar
+          <app-icon nome="atualizar"/> Atualizar
         </button>
       </div>
 
@@ -104,11 +105,11 @@ import { Pedido } from '../../core/models/dashboard.model';
                 <div class="cust-row">
                   <strong>👤 {{ pedido.cliente?.nome || 'Cliente WhatsApp' }}</strong>
                   <a [href]="'https://wa.me/' + pedido.cliente?.telefone" target="_blank" class="tel-link">
-                    📱 {{ pedido.cliente?.telefone }}
+                    <app-icon nome="atendimentos"/> {{ pedido.cliente?.telefone }}
                   </a>
                 </div>
                 <div class="addr-text">
-                  📍 {{ pedido.endereco?.logradouro }}, {{ pedido.endereco?.numero }} — <strong>{{ pedido.endereco?.bairro }}</strong>
+                  <app-icon nome="local"/> {{ pedido.endereco?.logradouro }}, {{ pedido.endereco?.numero }} — <strong>{{ pedido.endereco?.bairro }}</strong>
                 </div>
               </div>
 
@@ -144,7 +145,7 @@ import { Pedido } from '../../core/models/dashboard.model';
                 @if (pedido.status !== 'entregue' && pedido.status !== 'cancelado') {<button class="btn btn-secondary btn-sm" (click)="abrirCancelamento(pedido)">Cancelar</button>}
                 @if (pedido.status === 'pendente') {
                   <button class="btn btn-primary btn-sm full" (click)="alterarStatus(pedido, 'em_preparo')">
-                    👨‍🍳 Iniciar Preparo na Cozinha
+                    <app-icon nome="preparo"/> Iniciar Preparo na Cozinha
                   </button>
                 }
                 @if (pedido.status === 'em_preparo') {
@@ -154,9 +155,9 @@ import { Pedido } from '../../core/models/dashboard.model';
                     (click)="despacharParaEntrega(pedido)"
                   >
                     @if (despachandoIds()[pedido.id]) {
-                      ⏳ Despachando & Notificando...
+                      <app-icon nome="atualizar"/> Despachando & Notificando...
                     } @else {
-                      🛵 Despachar (Notificar Cliente)
+                      <app-icon nome="entrega"/> Despachar (Notificar Cliente)
                     }
                   </button>
                 }
@@ -164,7 +165,7 @@ import { Pedido } from '../../core/models/dashboard.model';
 
                 @if (pedido.status === 'saiu_para_entrega') {
                   <button class="btn btn-success btn-sm full" (click)="alterarStatus(pedido, 'entregue')">
-                    ✅ Confirmar Entrega
+                    <app-icon nome="confirmar"/> Confirmar Entrega
                   </button>
                 }
                 @if (pedido.status === 'entregue') {
@@ -248,7 +249,7 @@ import { Pedido } from '../../core/models/dashboard.model';
                       @if (pedido.status !== 'entregue' && pedido.status !== 'cancelado') {<button class="btn btn-secondary btn-sm" (click)="abrirCancelamento(pedido)">Cancelar</button>}
                 @if (pedido.status === 'pendente') {
                         <button class="btn btn-primary btn-xs" (click)="alterarStatus(pedido, 'em_preparo')">
-                          👨‍🍳 Preparar
+                          <app-icon nome="preparo"/> Preparar
                         </button>
                       }
                       @if (pedido.status === 'em_preparo') {
@@ -258,9 +259,9 @@ import { Pedido } from '../../core/models/dashboard.model';
                           (click)="despacharParaEntrega(pedido)"
                         >
                           @if (despachandoIds()[pedido.id]) {
-                            ⏳ Despachando...
+                            <app-icon nome="atualizar"/> Despachando...
                           } @else {
-                            🛵 Despachar
+                            <app-icon nome="entrega"/> Despachar
                           }
                         </button>
                       }
@@ -268,7 +269,7 @@ import { Pedido } from '../../core/models/dashboard.model';
 
                       @if (pedido.status === 'saiu_para_entrega') {
                         <button class="btn btn-success btn-xs" (click)="alterarStatus(pedido, 'entregue')">
-                          ✅ Entregue
+                          <app-icon nome="confirmar"/> Entregue
                         </button>
                       }
                       @if (pedido.status === 'entregue') {
@@ -290,6 +291,7 @@ import { Pedido } from '../../core/models/dashboard.model';
       }
     </div>
   `,
+  styleUrls: ['../../shared/ui/page-actions.css'],
   styles: [`
     .cancelamento-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--border-highlight);border-radius:var(--radius-lg);background:var(--bg-surface);color:var(--text-primary);box-shadow:0 24px 80px rgba(0,0,0,.45);overflow-y:auto}
     .cancelamento-dialog::backdrop{background:rgba(9,13,24,.75);backdrop-filter:blur(4px)}
@@ -772,7 +774,8 @@ import { Pedido } from '../../core/models/dashboard.model';
       margin-bottom: 12px;
       display: block;
     }
-  `]
+
+`]
 })
 export class PedidosComponent implements OnInit {
   cancelando = signal<Pedido | null>(null);

@@ -7,6 +7,9 @@ use App\Models\Cliente;
 use App\Models\StatusConversa;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AtendimentoController extends Controller
 {
@@ -37,7 +40,7 @@ class AtendimentoController extends Controller
     {
         $request->validate([
             'telefone' => ['required', 'regex:/^\d{10,15}$/'],
-            'status' => 'required|in:conversa_iniciada,fazendo_pedido_pratos,fazendo_pedido_bebidas,coletando_endereco,coletando_pagamento,preparando_na_cozinha,saiu_para_entrega,cancelado_apos_30_minutos',
+            'status' => 'required|in:conversa_iniciada,fazendo_pedido_pratos,fazendo_pedido_bebidas,coletando_endereco,coletando_pagamento,preparando_na_cozinha,saiu_para_entrega,cancelado_apos_30_minutos,transbordo_humano',
             'rascunho' => 'nullable|array',
             'nome' => 'nullable|string|max:150',
             'motivo_transbordo' => 'nullable|string|max:255',
@@ -47,7 +50,7 @@ class AtendimentoController extends Controller
         ]);
 
         $tel = preg_replace('/\D/', '', $request->input('telefone'));
-        $statusAtual = $request->input('status');
+        $statusAtual = $request->boolean('transbordo') ? 'transbordo_humano' : $request->input('status');
         $rascunho = $request->input('rascunho', []);
         $transbordo = $request->boolean('transbordo', false);
         $motivoTransbordo = $request->input('motivo_transbordo');
@@ -73,6 +76,7 @@ class AtendimentoController extends Controller
         $statusConversa = StatusConversa::updateOrCreate(
             ['telefone' => $tel],
             [
+                'contato_iniciado_em' => ($statusAtual === 'transbordo_humano' && $statusAnterior === $statusAtual) ? $statusConversa?->contato_iniciado_em : null,
                 'status_atual' => $statusAtual,
                 'status_anterior' => $statusAnterior,
                 'rascunho' => $rascunho,
@@ -130,6 +134,40 @@ class AtendimentoController extends Controller
     /**
      * Lista os status conversacionais ativos
      */
+    public function iniciarContato(int $id)
+    {
+        $conversa = StatusConversa::findOrFail($id);
+        abort_unless($conversa->status_atual === 'transbordo_humano', 409, 'Este cliente não está aguardando atendimento humano.');
+        $atendimento = Atendimento::whereHas('cliente', fn ($q) => $q->where('telefone', $conversa->telefone))
+            ->where('transbordo_humano', true)->latest('id')->first();
+        $chave = 'contato_transbordo_'.$id.'_'.($atendimento?->id ?? $conversa->ultimo_contato_em->timestamp);
+        try {
+            return Cache::lock($chave.'_lock', 30)->block(5, function () use ($chave, $conversa) {
+                if (! Cache::has($chave)) {
+                    $resposta = Http::timeout(20)
+                        ->withToken(config('services.bot.token') ?? '')
+                        ->post(config('services.bot.url').'/api/notificar', [
+                            'para' => $conversa->telefone,
+                            'texto' => 'Olá! Sou da equipe do Restaurante Família Ricardo. Como posso ajudar você?',
+                            'idempotency_key' => $chave,
+                        ])->throw();
+                    if ($resposta->json('ok') !== true) {
+                        throw new \RuntimeException('Envio não confirmado');
+                    }
+                    Cache::put($chave, true, now()->addDay());
+                }
+
+                $conversa->update(['contato_iniciado_em' => $conversa->contato_iniciado_em ?? now()]);
+
+                return response()->json(['ok' => true]);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Falha no contato de transbordo', ['status_id' => $id, 'erro' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Não foi possível enviar a saudação. Tente novamente.'], 502);
+        }
+    }
+
     public function getStatusConversas()
     {
         $status = StatusConversa::orderBy('ultimo_contato_em', 'DESC')->get();
