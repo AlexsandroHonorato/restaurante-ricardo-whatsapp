@@ -3,7 +3,8 @@ import { cabecalhosApiBot } from './lib/api-bot.js';
 import { converterValor, validarItensTotal } from './lib/pedido.js';
 export { converterValor } from './lib/pedido.js';
 import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
+import { EMPRESA } from './lib/empresa.js';
 import { lerJson, gravarJson } from './lib/persistencia.js';
 
 const ARQ_PEDIDOS = process.env.ARQ_PEDIDOS || fileURLToPath(new URL('./pedidos.json', import.meta.url));
@@ -11,11 +12,16 @@ const ARQ_PEDIDOS = process.env.ARQ_PEDIDOS || fileURLToPath(new URL('./pedidos.
 export const carregarPedidos = () => lerJson(ARQ_PEDIDOS);
 export const salvarPedidos = (dados) => gravarJson(ARQ_PEDIDOS, dados);
 
-export function gerarIdPedido() {
-  const agora = new Date();
-  const dia = String(agora.getDate()).padStart(2, '0');
-  const rand = Math.floor(100 + Math.random() * 900); // 3 dígitos
-  return `PED-${dia}-${rand}`; // ex: PED-03-742
+// A data completa evita reaproveitar o código de outro mês (a API trata código repetido como o mesmo pedido).
+export function gerarIdPedido(agora = new Date(), usados = new Set(Object.keys(carregarPedidos()))) {
+  const data = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.FUSO || 'America/Sao_Paulo', year: '2-digit', month: '2-digit', day: '2-digit' })
+    .format(agora).replaceAll('-', '');
+  const inicio = randomInt(900);
+  for (let passo = 0; passo < 900; passo++) {
+    const id = `PED-${data}-${100 + (inicio + passo) % 900}`; // ex: PED-261004-742
+    if (!usados.has(id)) return id;
+  }
+  throw new Error('Números de pedido do dia esgotados');
 }
 
 /**
@@ -96,7 +102,7 @@ export async function registrarPedido({ id, telefone, nome, itens, endereco, for
   if (valor <= 0) throw new Error('Total do pedido inválido');
   if (trocoPara && converterValor(trocoPara) < valor) throw new Error('O valor para troco não cobre o pedido');
   const pedidos = carregarPedidos();
-  const novoId = id || gerarIdPedido();
+  const novoId = id || gerarIdPedido(new Date(), new Set(Object.keys(pedidos)));
 
   if (pedidos[novoId]) throw new Error('Número do pedido já registrado');
   const pedido = {
@@ -182,7 +188,7 @@ export async function consultarStatusPedido(idOuTelefone, telefoneCliente) {
 
   return {
     aviso: 'Pedido não localizado automaticamente na nossa tabela de pedidos. Encaminhando para um atendente humano.',
-    mensagemStatus: 'Não encontrei nenhum pedido em andamento com os dados informados. 🔍\nPara falar com nossa equipe, ligue para (12) 99750-0045.',
+    mensagemStatus: `Não encontrei nenhum pedido em andamento com os dados informados. 🔍\nPara falar com nossa equipe, ligue para ${EMPRESA.telefone}.`,
   };
 }
 
@@ -194,7 +200,7 @@ export function formatarComanda(pedido) {
 
   return `
 ${linha}
-   RESTAURANTE FAMÍLIA RICARDO
+   ${EMPRESA.nome.toUpperCase()}
         COMANDA DE PEDIDO
 ${linha}
 Nº PEDIDO: ${pedido.id}

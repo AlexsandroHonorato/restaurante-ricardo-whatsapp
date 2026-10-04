@@ -3,14 +3,19 @@
     <div>
       <span class="eyebrow">CONFIGURAÇÕES DO RESTAURANTE</span>
       <h1 class="page-title">Horários de atendimento</h1>
-      <p class="page-subtitle">Defina os dias de funcionamento e o período de atendimento de cada dia.</p>
+      <p class="page-subtitle">
+        Defina os dias de funcionamento e o período de atendimento de cada dia.
+      </p>
     </div>
     <span class="timezone">Horário de São Paulo</span>
   </div>
 
   <div class="schedule-panel glass-card">
     <div class="panel-heading">
-      <div><h2>Agenda semanal</h2><p>Ative os dias de atendimento e salve as alterações de cada dia.</p></div>
+      <div>
+        <h2>Agenda semanal</h2>
+        <p>Ative os dias de atendimento e salve as alterações de cada dia.</p>
+      </div>
       <span class="week-badge">Segunda a domingo</span>
     </div>
     @if (carregando()) {
@@ -18,7 +23,9 @@
     } @else if (erro()) {
       <div class="feedback error" role="alert">
         <p>{{ erro() }}</p>
-        <button type="button" class="btn btn-secondary" (click)="carregar()">Tentar novamente</button>
+        <button type="button" class="btn btn-secondary" (click)="carregar()">
+          Tentar novamente
+        </button>
       </div>
     } @else {
       <div class="days-list">
@@ -26,22 +33,58 @@
           <form class="day-row" [class.closed]="!dia.ativo" (ngSubmit)="salvar(dia)">
             <div class="day-description">
               <h3>{{ dia.nome_dia }}</h3>
-              <span class="day-status" [class.is-open]="dia.ativo">{{ dia.ativo ? 'Atendimento ativo' : 'Fechado' }}</span>
+              <span class="day-status" [class.is-open]="dia.ativo">{{
+                dia.ativo ? 'Atendimento ativo' : 'Fechado'
+              }}</span>
             </div>
             <label class="toggle-label" [for]="'ativo-' + dia.dia_semana">
-              <input type="checkbox" [id]="'ativo-' + dia.dia_semana" [name]="'ativo-' + dia.dia_semana" [ngModel]="dia.ativo" (ngModelChange)="alterarAtivo(dia, $event)" [disabled]="dia.salvando">
+              <input
+                type="checkbox"
+                [id]="'ativo-' + dia.dia_semana"
+                [name]="'ativo-' + dia.dia_semana"
+                [ngModel]="dia.ativo"
+                (ngModelChange)="alterarAtivo(dia, $event)"
+                [disabled]="dia.salvando"
+              />
               <span>{{ dia.ativo ? 'Aberto' : 'Fechado' }}</span>
             </label>
             <div class="time-fields">
-              <label [for]="'inicio-' + dia.dia_semana">Hora de início
-                <input type="time" [id]="'inicio-' + dia.dia_semana" name="hora_inicio" [ngModel]="dia.hora_inicio" (ngModelChange)="alterarHora(dia, 'hora_inicio', $event)" [disabled]="!dia.ativo || dia.salvando" [required]="dia.ativo">
+              <label [for]="'inicio-' + dia.dia_semana"
+                >Hora de início
+                <input
+                  type="time"
+                  [id]="'inicio-' + dia.dia_semana"
+                  name="hora_inicio"
+                  [ngModel]="dia.hora_inicio"
+                  (ngModelChange)="alterarHora(dia, 'hora_inicio', $event)"
+                  [disabled]="!dia.ativo || dia.salvando"
+                  [required]="dia.ativo"
+                />
               </label>
               <span class="time-separator" aria-hidden="true">—</span>
-              <label [for]="'fim-' + dia.dia_semana">Hora de fim
-                <input type="time" [id]="'fim-' + dia.dia_semana" name="hora_fim" [ngModel]="dia.hora_fim" (ngModelChange)="alterarHora(dia, 'hora_fim', $event)" [disabled]="!dia.ativo || dia.salvando" [required]="dia.ativo">
+              <label [for]="'fim-' + dia.dia_semana"
+                >Hora de fim
+                <input
+                  type="time"
+                  [id]="'fim-' + dia.dia_semana"
+                  name="hora_fim"
+                  [ngModel]="dia.hora_fim"
+                  (ngModelChange)="alterarHora(dia, 'hora_fim', $event)"
+                  [disabled]="!dia.ativo || dia.salvando"
+                  [required]="dia.ativo"
+                />
               </label>
             </div>
-            <button type="submit" class="btn" [class.btn-primary]="alterado(dia)" [class.btn-secondary]="!alterado(dia)" [disabled]="dia.salvando || !alterado(dia) || !!validacao(dia)" [attr.aria-label]="'Salvar horário de ' + dia.nome_dia">{{ dia.salvando ? 'Salvando...' : 'Salvar' }}</button>
+            <button
+              type="submit"
+              class="btn"
+              [class.btn-primary]="alterado(dia)"
+              [class.btn-secondary]="!alterado(dia)"
+              [disabled]="dia.salvando || !alterado(dia) || !!validacao(dia)"
+              [attr.aria-label]="'Salvar horário de ' + dia.nome_dia"
+            >
+              {{ dia.salvando ? 'Salvando...' : 'Salvar' }}
+            </button>
             @if (dia.erro || (alterado(dia) && validacao(dia))) {
               <p class="row-message error" role="alert">{{ dia.erro || validacao(dia) }}</p>
             } @else if (dia.sucesso) {
@@ -53,6 +96,8 @@
         }
       </div>
     }
-    <div class="panel-note">Os horários de início e fim devem estar no mesmo dia. Fuso: {{ fuso() }}.</div>
+    <div class="panel-note">
+      Os horários de início e fim devem estar no mesmo dia. Fuso: {{ fuso() }}.
+    </div>
   </div>
 </section>

@@ -148,7 +148,7 @@ class AtendimentoController extends Controller
                         ->withToken(config('services.bot.token') ?? '')
                         ->post(config('services.bot.url').'/api/notificar', [
                             'para' => $conversa->telefone,
-                            'texto' => 'Olá! Sou da equipe do Restaurante Família Ricardo. Como posso ajudar você?',
+                            'texto' => 'Olá! Sou da equipe do '.config('services.empresa.nome').'. Como posso ajudar você?',
                             'idempotency_key' => $chave,
                         ])->throw();
                     if ($resposta->json('ok') !== true) {

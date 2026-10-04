@@ -1,0 +1,137 @@
+@if (api.erro()) {
+  <div role="alert" style="padding: 10px 20px; background: #7f1d1d; color: white">
+    {{ api.erro() }}
+  </div>
+}
+<header class="header">
+  <div class="header-left">
+    <button
+      class="menu-toggle btn btn-secondary"
+      [class.menu-girado]="!menuAberto"
+      type="button"
+      (click)="alternarMenu.emit()"
+      [attr.aria-label]="menuAberto ? 'Esconder menu' : 'Mostrar menu'"
+      [attr.aria-expanded]="menuAberto"
+      aria-controls="menu-principal"
+    >
+      <svg
+        class="hamburguer-icon"
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <path d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+    <div class="store-status">
+      <span class="status-badge" [class.open]="aberto()" [class.closed]="!aberto()">
+        <span class="live-indicator"></span>
+        {{
+          api.horariosAtendimento()
+            ? aberto()
+              ? 'Restaurante Aberto'
+              : 'Restaurante Fechado'
+            : 'Consultando agenda'
+        }}
+        • Caraguatatuba/SP
+      </span>
+      <span class="hours">{{
+        horarioHoje()?.ativo
+          ? 'Hoje: ' +
+            horarioHoje()?.hora_inicio?.slice(0, 5) +
+            ' às ' +
+            horarioHoje()?.hora_fim?.slice(0, 5)
+          : api.horariosAtendimento()
+            ? 'Hoje sem atendimento'
+            : 'Horários em Configurações'
+      }}</span>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Atualizar Dados -->
+    <button
+      class="btn refresh-dados"
+      (click)="refresh()"
+      [disabled]="api.loading()"
+      [class.carregando]="api.loading()"
+      [attr.aria-busy]="api.loading()"
+    >
+      <svg
+        class="refresh-icon"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 2M4 16l2 2a7 7 0 0 0 12-1" />
+      </svg>
+      <span>{{ api.loading() ? 'Atualizando...' : 'Atualizar Dados' }}</span>
+    </button>
+
+    <button
+      type="button"
+      class="transbordo-bell"
+      (click)="transbordosModal.abrir($event.currentTarget)"
+      aria-haspopup="dialog"
+      [class.com-pendencias]="transbordo.aguardando() > 0"
+      [attr.aria-label]="
+        'Atendimento humano: ' + transbordo.aguardando() + ' cliente(s) aguardando'
+      "
+      title="Ver clientes aguardando atendente"
+    >
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4" />
+      </svg>
+      @if (transbordo.aguardando()) {
+        <span class="bell-counter">{{
+          transbordo.aguardando() > 99 ? '99+' : transbordo.aguardando()
+        }}</span>
+      }
+    </button>
+    <app-transbordos-modal #transbordosModal />
+    <span class="bell-announcement" role="status" aria-live="polite">{{
+      transbordo.eventos()
+        ? 'Novo pedido de atendimento humano. ' +
+          transbordo.aguardando() +
+          ' cliente(s) aguardando.'
+        : ''
+    }}</span>
+    <!-- Quick Info -->
+    <div class="header-meta">
+      <span class="meta-label">Última atualização:</span>
+      <span class="meta-value">{{ api.lastUpdated() | date: 'HH:mm:ss' }}</span>
+    </div>
+
+    <button type="button" class="btn btn-secondary" (click)="sair()">Sair</button>
+    <!-- User Profile Avatar -->
+    <div class="user-pill">
+      <div class="user-avatar">👨‍🍳</div>
+      <div class="user-info">
+        <span class="user-name">{{ auth.user()?.name }}</span>
+        <span class="user-role">{{
+          auth.user()?.role === 'admin' ? 'Administrador' : 'Operador'
+        }}</span>
+      </div>
+    </div>
+  </div>
+</header>

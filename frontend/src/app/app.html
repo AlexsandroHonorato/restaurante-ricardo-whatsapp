@@ -1,12 +1,16 @@
 @if (auth.user()) {
-<div class="app-container">
-  <app-sidebar id="menu-principal" [hidden]="!menuAberto()"></app-sidebar>
-  <div class="main-wrapper">
-    <app-header [menuAberto]="menuAberto()" (alternarMenu)="menuAberto.set(!menuAberto())"></app-header>
-    <main class="content-area">
-      <router-outlet></router-outlet>
-    </main>
+  <div class="app-container">
+    <app-sidebar id="menu-principal" [hidden]="!menuAberto()"></app-sidebar>
+    <div class="main-wrapper">
+      <app-header
+        [menuAberto]="menuAberto()"
+        (alternarMenu)="menuAberto.set(!menuAberto())"
+      ></app-header>
+      <main class="content-area">
+        <router-outlet></router-outlet>
+      </main>
+    </div>
   </div>
-</div>
-
-} @else { <router-outlet/> }
+} @else {
+  <router-outlet />
+}

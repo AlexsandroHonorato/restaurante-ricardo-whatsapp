@@ -32,3 +32,4 @@ Thumbs.db
 # Escritas atômicas de dados locais
 memoria.json.tmp
 pedidos.json.tmp
+conversas.log.tmp

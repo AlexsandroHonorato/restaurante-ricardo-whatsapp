@@ -6,6 +6,10 @@ return [
         'token' => env('NOTIFICACAO_TOKEN'),
     ],
 
+    'empresa' => [
+        'nome' => env('EMPRESA_NOME', 'Restaurante Família Ricardo'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

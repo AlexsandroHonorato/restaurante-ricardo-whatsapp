@@ -18,8 +18,14 @@
 }
 
 @media (max-width: 768px) {
-  .app-container { flex-direction: column; }
-  .content-area { padding: 20px 16px; }
+  .app-container {
+    flex-direction: column;
+  }
+  .content-area {
+    padding: 20px 16px;
+  }
 }
 
-app-sidebar[hidden] { display: none; }
+app-sidebar[hidden] {
+  display: none;
+}

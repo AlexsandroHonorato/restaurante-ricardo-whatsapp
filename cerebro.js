@@ -1,8 +1,10 @@
 import { cabecalhosApiBot } from './lib/api-bot.js';
 // cerebro.js: memória + ficha do negócio + modelo (OpenRouter) + máquina de estados + ferramentas de pedidos.
 import { fileURLToPath } from 'node:url';
-import { readFileSync, appendFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { criarLogConversas } from './lib/log-conversas.js';
 import { criarFilaPorChave } from './lib/fila.js';
+import { EMPRESA } from './lib/empresa.js';
 import { consultarAtendimento } from './lib/horario-atendimento.js';
 import { lerJson, gravarJson } from './lib/persistencia.js';
 import { registrarPedido, consultarStatusPedido, obterUltimoPedidoPorTelefone } from './pedidos.js';
@@ -12,6 +14,10 @@ const MODELO = process.env.MODELO || 'google/gemini-3.7-flash';
 const MAX_MENSAGENS = 20;              // quantas mensagens da conversa voltam para o modelo
 const EXPIRA_MINUTOS_INATIVIDADE = 30;   // inatividade de 30 min antes de fechar o pedido expira e volta ao início
 const ARQ_MEMORIA = process.env.ARQ_MEMORIA || fileURLToPath(new URL('./memoria.json', import.meta.url));
+const registrarConversa = criarLogConversas(
+  process.env.ARQ_LOG || fileURLToPath(new URL('./conversas.log', import.meta.url)),
+  { retencaoDias: Number(process.env.LOG_RETENCAO_DIAS) || 30 },
+);
 const FICHA = readFileSync(new URL('./negocio.md', import.meta.url), 'utf8');
 const INFORMACOES_NEGOCIO = FICHA.split(/(?=^## )/m)
   .filter(secao => /^## (Quem somos|Horários|Endereço|Formas|Políticas)/m.test(secao)).join('\n');
@@ -184,7 +190,7 @@ function promptDeSistema(tel, cardapioTexto = null) {
   const ultimoPedido = tel ? obterUltimoPedidoPorTelefone(tel) : null;
   const temPedidoAtivo = ultimoPedido && (Date.now() - new Date(ultimoPedido.dataHora).getTime() < 12 * 60 * 60 * 1000);
 
-  return `Você é o atendente virtual do Restaurante Família Ricardo no WhatsApp.
+  return `Você é o atendente virtual do ${EMPRESA.nome} no WhatsApp.
 Seu objetivo é guiar o cliente de forma cordial, ágil e organizada para realizar pedidos de delivery ou consultar o status de um pedido.
 
 [ESTADO CONVERSACIONAL DO CLIENTE]:
@@ -198,11 +204,11 @@ Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
    - Quando o cliente enviar uma saudação inicial ("oi", "olá", "boa tarde", "bom dia", etc.):
      * SE o cliente tiver um PEDIDO RECENTE/ATIVO:
        Cumprimente educadamente pelo nome (se disponível), informe que localizou o pedido recente em andamento e apresente o menu numerado claro:
-       "Olá${ultimoPedido?.nome ? `, ${ultimoPedido.nome}` : ''}! Tudo bem? 😊🍽️\nSeja bem-vindo(a) de volta ao *Restaurante Família Ricardo*!\nIdentifiquei seu pedido recente *${ultimoPedido?.id}* em andamento.\n\nComo posso te ajudar agora?\n1️⃣ *Fazer um novo pedido*\n2️⃣ *Acompanhar meu pedido*\n3️⃣ *Falar com a equipe*\n\nPor favor, digite o número da opção ou o que deseja!"
+       "Olá${ultimoPedido?.nome ? `, ${ultimoPedido.nome}` : ''}! Tudo bem? 😊🍽️\nSeja bem-vindo(a) de volta ao *${EMPRESA.nome}*!\nIdentifiquei seu pedido recente *${ultimoPedido?.id}* em andamento.\n\nComo posso te ajudar agora?\n1️⃣ *Fazer um novo pedido*\n2️⃣ *Acompanhar meu pedido*\n3️⃣ *Falar com a equipe*\n\nPor favor, digite o número da opção ou o que deseja!"
 
      * SE NÃO houver pedido recente ativo:
        Apresente a saudação calorosa com o menu numerado claro:
-       "Olá! Tudo bem? 😊🍽️\nSeja muito bem-vindo(a) ao *Restaurante Família Ricardo*!\n\nComo posso te ajudar hoje?\n1️⃣ *Fazer um pedido*\n2️⃣ *Consultar status de um pedido*\n3️⃣ *Falar com a equipe*\n\nPor favor, digite o número da opção ou o que deseja!"
+       "Olá! Tudo bem? 😊🍽️\nSeja muito bem-vindo(a) ao *${EMPRESA.nome}*!\n\nComo posso te ajudar hoje?\n1️⃣ *Fazer um pedido*\n2️⃣ *Consultar status de um pedido*\n3️⃣ *Falar com a equipe*\n\nPor favor, digite o número da opção ou o que deseja!"
 
    - Se o cliente responder "1", "1️⃣", "fazer pedido", "quero pedir", "pedido", "cardápio", "fazer um novo pedido":
      Atualize o status para 'fazendo_pedido_pratos' e apresente as opções do cardápio do dia com preços e tamanhos consultados da tabela abaixo.
@@ -232,6 +238,12 @@ Sempre verifique o STATUS ATUAL do cliente e dê continuidade exata:
 7. REGRA DE TEMPO LIMITE (30 MINUTOS):
    - Se o cliente responder DENTRO de 30 minutos, você CONTINUA DE ONDE ELE PAROU de acordo com o status atual.
    - Se passar de 30 minutos sem fechar o pedido, a sessão expira e retorna ao status inicial ('conversa_iniciada').
+
+REGRA DE MENSAGEM FORA DO CONTEXTO:
+- Se o cliente escrever algo que não tem relação com o restaurante nem com a etapa atual do atendimento (assuntos aleatórios, piadas, política, futebol, pedidos de tarefas, texto sem sentido), NÃO responda ao assunto, NÃO chame ferramentas e NÃO mude o status. Responda exatamente:
+  "Desculpe, não entendi. 😅 Por favor, escolha uma das opções acima."
+- Se ainda não houver opções apresentadas nesta conversa, responda "Desculpe, não entendi. 😅" e apresente o menu numerado inicial.
+- NÃO trate como fora do contexto: saudações, respostas que a etapa atual pediu (nome, endereço, ponto de referência, forma de pagamento, troco, "sim", "não", quantidades, números de opção) e dúvidas sobre o restaurante (cardápio, preços, horários, endereço, entrega, pagamento).
 
 REGRAS RÍGIDAS:
 - NUNCA dê desconto, não altere os preços da tabela e não invente pratos fora do cardápio oficial.
@@ -382,7 +394,7 @@ async function executar(tel, nome, args) {
   if (nome === 'chamar_atendente') {
     atualizarStatusCliente(tel, STATUS_CONVERSA.TRANSBORDO, {}, { transbordo: true, motivo_transbordo: args.motivo });
     console.log(`🔔 [TRANSFERÊNCIA PARA ATENDENTE HUMANO] Tel: ${tel} | Motivo: ${args.motivo} | Pedido: ${args.numeroPedido || 'Nenhum'}`);
-    return { ok: true, mensagem: 'Solicitação de atendimento humano registrada. Contato direto da equipe: (12) 99750-0045.' };
+    return { ok: true, mensagem: `Solicitação de atendimento humano registrada. Contato direto da equipe: ${EMPRESA.telefone}.` };
   }
   return { erro: `Ferramenta desconhecida: ${nome}` };
 }
@@ -396,7 +408,7 @@ async function chamarModelo(messages) {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://familia-ricardo-whatsapp.local',
-      'X-OpenRouter-Title': 'Agente Restaurante Familia Ricardo',
+      'X-OpenRouter-Title': `Agente ${EMPRESA.nome}`.normalize('NFD').replace(/[̀-ͯ]/g, ''), // cabeçalho HTTP só aceita ASCII com segurança
     },
     signal: AbortSignal.timeout(45000),
     body: JSON.stringify({ model: MODELO, messages, tools: FERRAMENTAS, temperature: 0.3, max_tokens: 1500 }),
@@ -415,7 +427,7 @@ export async function responder(tel, texto) {
   const cardapioTexto = await obterCardapioAtivo();
   const messages = [{ role: 'system', content: promptDeSistema(tel, cardapioTexto) }, ...historico(tel), { role: 'user', content: texto }];
   const passos = [];
-  let resposta = 'Olá! Tive uma breve instabilidade para consultar as opções. Se precisar de ajuda, ligue para (12) 99750-0045. 🍽️';
+  let resposta = `Olá! Tive uma breve instabilidade para consultar as opções. Se precisar de ajuda, ligue para ${EMPRESA.telefone}. 🍽️`;
 
   try {
     let pedidoFechado = null;
@@ -462,11 +474,11 @@ export async function responder(tel, texto) {
     console.error(`⚠ [AVISO DE SERVIÇO - Tel: ${tel}]:`, errStr);
 
     if (/402|budget_exhausted|credits|payment/i.test(errStr)) {
-      resposta = 'Olá! No momento nosso canal de atendimento automático está com alta demanda. ⏳\n\nVocê pode falar com nossa equipe pelo telefone. Se preferir fazer seu pedido agora por ligação, ligue para (12) 99750-0045 ou (12) 98146-4976. 🍽️😊';
+      resposta = `Olá! No momento nosso canal de atendimento automático está com alta demanda. ⏳\n\nVocê pode falar com nossa equipe pelo telefone. Se preferir fazer seu pedido agora por ligação, ligue para ${EMPRESA.telefone} ou ${EMPRESA.telefoneAlternativo}. 🍽️😊`;
     } else if (/429|rate_limit|too many requests/i.test(errStr)) {
-      resposta = 'Estou recebendo muitas mensagens simultâneas neste momento! ⏳ Já estou processando seu atendimento. Pode aguardar um instante ou falar conosco pelo telefone (12) 99750-0045.';
+      resposta = `Estou recebendo muitas mensagens simultâneas neste momento! ⏳ Já estou processando seu atendimento. Pode aguardar um instante ou falar conosco pelo telefone ${EMPRESA.telefone}.`;
     } else {
-      resposta = 'Desculpe, tive uma instabilidade momentânea na conexão. Você pode falar diretamente com nossa equipe. Contato direto: (12) 99750-0045.';
+      resposta = `Desculpe, tive uma instabilidade momentânea na conexão. Você pode falar diretamente com nossa equipe. Contato direto: ${EMPRESA.telefone}.`;
     }
   }
 
@@ -483,7 +495,7 @@ export async function responder(tel, texto) {
   lembrar(tel, 'user', texto);
   lembrar(tel, 'assistant', resposta);
   sincronizarStatusBanco(tel, memoria[tel]?.status, memoria[tel]?.rascunho, { registrar_mensagem: true });
-  appendFileSync(process.env.ARQ_LOG || fileURLToPath(new URL('./conversas.log', import.meta.url)), JSON.stringify({ quando: new Date().toISOString(), tel, status: memoria[tel]?.status, texto, passos, resposta }) + '\n');
+  registrarConversa({ quando: new Date().toISOString(), tel, status: memoria[tel]?.status, texto, passos, resposta });
   return resposta;
 }
 

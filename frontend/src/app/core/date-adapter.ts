@@ -5,10 +5,17 @@ import { MatDatepickerIntl } from '@angular/material/datepicker';
 export function calendarioPortugues() {
   const textos = new MatDatepickerIntl();
   Object.assign(textos, {
-    calendarLabel: 'Calendário', openCalendarLabel: 'Abrir calendário', closeCalendarLabel: 'Fechar calendário',
-    prevMonthLabel: 'Mês anterior', nextMonthLabel: 'Próximo mês', prevYearLabel: 'Ano anterior', nextYearLabel: 'Próximo ano',
-    prevMultiYearLabel: 'Anos anteriores', nextMultiYearLabel: 'Próximos anos',
-    switchToMonthViewLabel: 'Escolher dia', switchToMultiYearViewLabel: 'Escolher mês e ano',
+    calendarLabel: 'Calendário',
+    openCalendarLabel: 'Abrir calendário',
+    closeCalendarLabel: 'Fechar calendário',
+    prevMonthLabel: 'Mês anterior',
+    nextMonthLabel: 'Próximo mês',
+    prevYearLabel: 'Ano anterior',
+    nextYearLabel: 'Próximo ano',
+    prevMultiYearLabel: 'Anos anteriores',
+    nextMultiYearLabel: 'Próximos anos',
+    switchToMonthViewLabel: 'Escolher dia',
+    switchToMultiYearViewLabel: 'Escolher mês e ano',
   });
   return textos;
 }
@@ -22,6 +29,8 @@ export class DataBrasileiraAdapter extends NativeDateAdapter {
     if (!partes) return new Date(NaN);
     const [, dia, mes, ano] = partes.map(Number);
     const data = new Date(ano, mes - 1, dia);
-    return data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia ? data : new Date(NaN);
+    return data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia
+      ? data
+      : new Date(NaN);
   }
 }

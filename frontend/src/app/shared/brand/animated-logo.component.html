@@ -1,0 +1,46 @@
+<div
+  class="logo"
+  [class.animar]="animar()"
+  [class.pausado]="pausado()"
+  role="img"
+  aria-label="BotClient. Atendimento inteligente no WhatsApp. Pedidos, atendimento e métricas."
+  (pointermove)="aoMoverPonteiro($event)"
+  (pointerleave)="aoSairPonteiro()"
+>
+  <div class="geometria" aria-hidden="true">
+    <span class="geo-anel"></span><span class="geo-orbita"></span><span class="geo-ponto"></span>
+  </div>
+  <div class="flutuar" aria-hidden="true">
+    <div class="palco">
+      <div class="simbolo">
+        <app-brand-symbol class="camada camada-anel" parte="anel" />
+        <app-brand-symbol class="camada camada-robo" parte="robo" />
+        <svg class="reflexo" viewBox="0 0 320 300">
+          <path class="reflexo-brilho" pathLength="100" d="M230.7 65.7A110 110 0 1 0 263.4 187.6" />
+          <path class="reflexo-nucleo" pathLength="100" d="M230.7 65.7A110 110 0 1 0 263.4 187.6" />
+        </svg>
+      </div>
+      <p class="marca">
+        @for (letra of letrasBot; track $index) {
+          <span class="letra letra-bot" [style.--i]="$index">{{ letra }}</span>
+        }
+        @for (letra of letrasClient; track $index) {
+          <span class="letra letra-client" [style.--i]="$index + letrasBot.length">{{
+            letra
+          }}</span>
+        }
+      </p>
+      @if (!compacto()) {
+        <p class="slogan">Atendimento inteligente no WhatsApp</p>
+        <span class="barra"></span>
+        <p class="pilares">
+          <span class="pilar" style="--i: 0">Pedidos</span
+          ><span class="ponto ponto-1" style="--i: 1"></span>
+          <span class="pilar" style="--i: 2">Atendimento</span
+          ><span class="ponto ponto-2" style="--i: 3"></span>
+          <span class="pilar" style="--i: 4">Métricas</span>
+        </p>
+      }
+    </div>
+  </div>
+</div>

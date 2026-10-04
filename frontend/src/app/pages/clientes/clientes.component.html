@@ -1,0 +1,84 @@
+<div class="clientes-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Clientes & Fidelidade (LTV)</h1>
+      <p class="page-subtitle">
+        Base de contatos, histórico de consumo e recorrência de clientes do WhatsApp
+      </p>
+    </div>
+  </div>
+
+  <!-- Barra de Busca -->
+  <div class="search-bar glass-card">
+    <span class="search-icon"><app-icon nome="buscar" /></span>
+    <input
+      type="text"
+      placeholder="Buscar cliente por nome ou telefone..."
+      [(ngModel)]="termoBusca"
+      (ngModelChange)="buscar()"
+    />
+  </div>
+
+  <!-- Tabela de Clientes -->
+  <div class="table-container glass-card">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>CLIENTE</th>
+          <th>TELEFONE WHATSAPP</th>
+          <th>BAIRRO / ENDEREÇO</th>
+          <th>TOTAL PEDIDOS</th>
+          <th>LTV (TOTAL GASTO)</th>
+          <th>PRIMEIRO CONTATO</th>
+          <th>AÇÕES</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of clientes(); track c.id) {
+          <tr>
+            <td>
+              <div class="client-name-cell">
+                <div class="client-avatar"><app-icon nome="clientes" /></div>
+                <strong>{{ c.nome || 'Cliente WhatsApp' }}</strong>
+              </div>
+            </td>
+            <td>
+              <a [href]="'https://wa.me/' + c.telefone" target="_blank" class="tel-btn">
+                <app-icon nome="atendimentos" /> {{ c.telefone }}
+              </a>
+            </td>
+            <td>
+              <span class="addr-badge">
+                <app-icon nome="local" /> {{ c.enderecos?.[0]?.bairro || 'Martim de Sá' }}
+              </span>
+            </td>
+            <td>
+              <span class="orders-count">{{ c.total_pedidos }} pedidos</span>
+            </td>
+            <td>
+              <strong class="ltv-value">{{
+                c.total_gasto | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR'
+              }}</strong>
+            </td>
+            <td>
+              <span class="date-text">{{ c.primeiro_contato_em | date: 'dd/MM/yyyy' }}</span>
+            </td>
+            <td>
+              <a
+                [href]="'https://wa.me/' + c.telefone"
+                target="_blank"
+                class="btn btn-secondary btn-sm"
+              >
+                <app-icon nome="atendimentos" /> Abrir Conversa
+              </a>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="7" class="empty-cell">Nenhum cliente cadastrado no momento.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

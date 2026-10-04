@@ -9,7 +9,7 @@ import { HeaderComponent } from './layout/header/header.component';
   standalone: true,
   imports: [RouterOutlet, SidebarComponent, HeaderComponent],
   templateUrl: './app.html',
-  styleUrl: './app.css'
+  styleUrl: './app.css',
 })
 export class App {
   auth = inject(AuthService);

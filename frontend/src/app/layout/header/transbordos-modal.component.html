@@ -1,0 +1,84 @@
+<dialog
+  #dialog
+  class="transbordos-dialog"
+  aria-labelledby="transbordos-titulo"
+  aria-describedby="transbordos-descricao"
+  (click)="fecharFundo($event)"
+>
+  <div class="modal-heading">
+    <div>
+      <h2 id="transbordos-titulo">
+        <app-icon nome="alerta" /> Notificações
+        <span class="notification-total">{{ transbordo.aguardando() }} pendentes</span>
+      </h2>
+      <p id="transbordos-descricao">
+        {{ transbordo.aguardando() }} cliente(s) aguardando · Mais antigos primeiro
+      </p>
+    </div>
+    <button
+      type="button"
+      class="close"
+      autofocus
+      aria-label="Fechar lista de transbordos"
+      (click)="fechar()"
+    >
+      <app-icon nome="fechar" />
+    </button>
+  </div>
+  <div class="modal-list">
+    @for (s of transbordo.fila(); track s.id; let i = $index) {
+      <article class="pending-item">
+        <span class="queue-number">{{ i + 1 }}</span>
+        <div class="pending-info">
+          <strong>Cliente solicita atendimento</strong>
+          <span class="customer-phone"><app-icon nome="clientes" /> WhatsApp {{ s.telefone }}</span>
+          <span class="notification-type">TRANSBORDO HUMANO · {{ i + 1 }}º na fila</span>
+          @if (s.rascunho?.pratos?.length) {
+            <small>Pratos: {{ s.rascunho.pratos.join(', ') }}</small>
+          }
+          @if (s.rascunho?.bebidas?.length) {
+            <small>Bebidas: {{ s.rascunho.bebidas.join(', ') }}</small>
+          }
+          @if (s.rascunho?.endereco) {
+            <small>Endereço: {{ s.rascunho.endereco }}</small>
+          }
+          @if (s.rascunho?.formaPagamento) {
+            <small>Pagamento: {{ s.rascunho.formaPagamento }}</small>
+          }
+          <small>Último contato: {{ s.ultimo_contato_em | date: 'dd/MM HH:mm' }}</small>
+        </div>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm"
+          [disabled]="enviando().has(s.id)"
+          (click)="falar(s.id)"
+        >
+          <app-icon nome="atendimentos" />
+          {{ enviando().has(s.id) ? 'Enviando…' : 'Falar com o cliente' }}
+        </button>
+        @if (erros()[s.id]) {
+          <p class="send-error" role="alert">{{ erros()[s.id] }}</p>
+        }
+      </article>
+    } @empty {
+      <div class="empty">
+        <app-icon nome="confirmar" /><strong>Nenhum transbordo pendente</strong>
+        <p>Novas solicitações aparecerão aqui automaticamente.</p>
+      </div>
+    }
+  </div>
+  @if (ultimoContato()) {
+    <p class="success" role="status">
+      Mensagem inicial enviada.
+      <a [href]="'https://wa.me/' + ultimoContato()" target="_blank" rel="noopener noreferrer"
+        >Abrir conversa no WhatsApp</a
+      >
+    </p>
+  }
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="fechar()">Fechar</button>
+    <a class="btn btn-primary" routerLink="/atendimentos" (click)="fechar()"
+      >Ver monitor de atendimentos</a
+    >
+  </div>
+</dialog>

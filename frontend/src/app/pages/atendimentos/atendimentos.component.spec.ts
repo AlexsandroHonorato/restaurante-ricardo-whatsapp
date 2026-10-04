@@ -5,7 +5,10 @@ import { AtendimentosComponent } from './atendimentos.component';
 import { ApiService } from '../../core/services/api.service';
 
 describe('Solicitação de atendimento humano', () => {
-  afterEach(() => { TestBed.resetTestingModule(); vi.useRealTimers(); });
+  afterEach(() => {
+    TestBed.resetTestingModule();
+    vi.useRealTimers();
+  });
 
   it('detecta o transbordo automaticamente, mantém o card e remove quando o status muda', async () => {
     vi.useFakeTimers();
@@ -13,9 +16,15 @@ describe('Solicitação de atendimento humano', () => {
     const consultar = vi.fn(() => of(conversas));
     TestBed.configureTestingModule({
       imports: [AtendimentosComponent],
-      providers: [{ provide: ApiService, useValue: {
-        getStatusConversas: consultar, getAtendimentos: () => of({ data: [] })
-      } }]
+      providers: [
+        {
+          provide: ApiService,
+          useValue: {
+            getStatusConversas: consultar,
+            getAtendimentos: () => of({ data: [] }),
+          },
+        },
+      ],
     });
     const fixture = TestBed.createComponent(AtendimentosComponent);
     fixture.detectChanges();
@@ -25,7 +34,9 @@ describe('Solicitação de atendimento humano', () => {
     fixture.detectChanges();
     const card = fixture.nativeElement.querySelector('.handoff-card');
     expect(card.textContent).toContain('Cliente quer falar com um atendente');
-    expect(card.querySelector('.handoff-actions button').textContent).toContain('Falar com o cliente');
+    expect(card.querySelector('.handoff-actions button').textContent).toContain(
+      'Falar com o cliente',
+    );
     await vi.advanceTimersByTimeAsync(5000);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.handoff-card')).toBe(card);
@@ -50,5 +61,3 @@ describe('Solicitação de atendimento humano', () => {
     expect(consultar).toHaveBeenCalledTimes(chamadas);
   });
 });
-
-

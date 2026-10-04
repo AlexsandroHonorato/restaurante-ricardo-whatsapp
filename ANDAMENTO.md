@@ -107,7 +107,7 @@ graph TD
 * [pedidos.js](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.js):
   - Banco de pedidos persistido ([pedidos.json](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/pedidos.json)) e sincronização REST com API Laravel/MySQL.
   - Funções de busca direta na tabela: `obterPedidoPorId` e `obterUltimoPedidoPorTelefone`.
-  - Geração de IDs curtos e amigáveis (`PED-DD-XXX`, ex: `PED-03-742`).
+  - Geração de IDs com data completa (`PED-AAMMDD-XXX`, ex: `PED-261004-742`), sorteio criptográfico e sem repetir códigos já usados.
   - Formatação e impressão térmica da comanda da cozinha (`formatarComanda`, `imprimirComanda`).
   - Geração de mensagem oficial formatada para o cliente (`formatarMensagemConfirmacaoCliente` e `formatarMensagemStatusCliente`).
 * [agente.js](file:///c:/@PROJETOS/APP/restaurante-ricardo-whatsapp/agente.js):
@@ -563,3 +563,20 @@ Alterações desta etapa ainda sem novo commit.
 
 - Login, cadastro administrativo de usuários, sessão/CSRF, permissões, migrations, integração autenticada do bot e documentação agrupados em commit local solicitado pelo usuário.
 - Mantidas validações registradas na seção 48; limpeza de espaços sem mudança funcional. Sem push.
+
+## 50. Marca BotClient, auditoria de segurança e refatoração — 04/10/2026
+
+- **Produto:** o painel passa a se chamar **BotClient** (marca do usuário; um bot personalizado por empresa). Painel mostra só a marca BotClient; paleta roxa mantida.
+- **Logo:** `shared/brand/brand-symbol.component.ts` (SVG com volume: anel com seta + balão-robô) e `animated-logo.component.*` (camadas com entrada 3D, onda nas letras, inclinação no mouse, versão compacta). Usado no login, sidebar e `favicon.svg`; título da aba "BotClient". Arte 3D renderizada definitiva pode substituir o SVG depois.
+- **Login:** layout do PropoClient (painel com cenário 3D em canvas `login-backdrop`, cartão com ícones, mostrar/ocultar senha, lembrar e-mail em localStorage, pausar animações). Validações e mensagens anteriores preservadas; 8 testes novos.
+- **Segurança (bot):** webhook sempre valida HMAC (antes pulava sem segredo); `/api/notificar` exige `NOTIFICACAO_TOKEN` sempre, comparação em tempo constante (antes aceitava chamadas "locais", que um túnel pode forjar); número do pedido não colide mais (antes `Math.random` com 900 opções e reaproveitado entre meses — a API trataria código repetido como o mesmo pedido).
+- **Segurança (API):** `alterado_por` do histórico vem do usuário autenticado (antes o cliente HTTP escolhia).
+- **Multiempresa:** `lib/empresa.js` (`EMPRESA_NOME`, `EMPRESA_TELEFONE`, `EMPRESA_TELEFONE_2`) e `services.empresa.nome` no backend; padrões mantêm os textos atuais. `.env.exemplo` e `backend/.env.example` documentados.
+- **Layout:** cabeçalho sem quebra/transbordo de 1024px a 1500px; cartões de situação com mesma altura; KPIs mostram "—" sem resposta da API (antes R$ 0,00 falso); submenu não estica a barra no celular. Varredura de 8 telas × 4 larguras sem rolagem horizontal.
+- **Código limpo (painel):** templates/estilos inline de 8 componentes movidos para `.html/.css`; Prettier aplicado em `src/app` (havia linhas minificadas de até 2.362 caracteres). Comparação pixel a pixel antes/depois sem diferença.
+- **Validação:** 24 testes Node, 29 Laravel (169 asserções), 40 Angular e build aprovados.
+- **Ajustes posteriores (04/10):** `lib/horario.js` removido pelo usuário; barra do hambúrguer fixa no topo (sticky no host `app-header`, conferido rolando as telas em 1440px e 390px); `conversas.log` com retenção de 30 dias (`LOG_RETENCAO_DIAS`, poda no máximo 1×/hora em `lib/log-conversas.js`) e falha de gravação não derruba mais a resposta ao cliente. 27 testes Node aprovados.
+- **Mensagem fora do contexto (04/10):** regra no prompt (`cerebro.js`): assunto sem relação com o restaurante ou com a etapa atual → "Desculpe, não entendi. 😅 Por favor, escolha uma das opções acima.", sem ferramentas nem mudança de status; sem opções anteriores, mostra o menu. Saudações, respostas da etapa e dúvidas do restaurante ficam de fora. Teste unitário confere a regra no prompt (28 Node); casos 12 e 13 do `npm run testar` (IA real) ainda não executados.
+- **Pratos por dia da semana refeito (04/10):** grade pratos × dias (SEG–DOM) com células roxas preenchidas/apagadas; seções "Prato do dia" (com linha de contagem e ⚠ em dia aberto sem prato do dia), "Variam durante a semana" e grupo recolhido "Servidos em todos os dias de atendimento" (pela situação salva; abre ao buscar). Dias fechados na agenda ficam bloqueados e preservam o valor salvo; sem agenda nada é bloqueado. Quadro "Hoje" mostra o que está salvo para o dia (pausados fora). Salvamento único em barra fixa (até 3 requisições em paralelo; falha mantém só o prato com erro pendente; bloqueia prato sem dias), "Desfazer tudo", aviso ao sair por rota (`core/alteracoes-pendentes.guard.ts`) ou ao fechar a aba. Contrato da API inalterado (`dias_disponiveis`). 9 testes novos; 46 Angular e build aprovados; conferido em 1440px e 390px com dados simulados.
+- **Código morto removido:** `agenda.js` e `lib/horario.js` apagados pelo usuário (04/10).
+- **Pendências:** listas sem estado de erro próprio (só aviso global) e `alterarStatus` sem tratamento de falha; perfil operador pode editar cardápio/horários (confirmar regra); `GET /status-conversa` sem paginação, consultado a cada 5 s; reiniciar bot e API para carregar as mudanças. Sem commit.

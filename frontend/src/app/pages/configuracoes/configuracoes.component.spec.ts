@@ -4,12 +4,22 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ConfiguracoesComponent } from './configuracoes.component';
 
 const baseUrl = 'http://localhost:8080/api/horarios-atendimento';
-const segunda = { id: 1, dia_semana: 1, nome_dia: 'Segunda-feira', ativo: true, hora_inicio: '11:00:00', hora_fim: '14:30:00' };
+const segunda = {
+  id: 1,
+  dia_semana: 1,
+  nome_dia: 'Segunda-feira',
+  ativo: true,
+  hora_inicio: '11:00:00',
+  hora_fim: '14:30:00',
+};
 
 describe('Configurações de atendimento', () => {
   let http: HttpTestingController;
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [ConfiguracoesComponent], providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      imports: [ConfiguracoesComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());

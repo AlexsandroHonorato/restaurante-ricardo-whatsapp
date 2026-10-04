@@ -1,0 +1,181 @@
+.transbordos-dialog {
+  position: fixed;
+  margin: 0;
+  width: min(390px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+}
+.transbordos-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.transbordos-dialog::backdrop {
+  background: transparent;
+}
+.modal-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.95rem;
+}
+h2 app-icon {
+  color: var(--primary-text);
+}
+.modal-heading p {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.close {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.modal-list {
+  padding: 12px 14px;
+  min-height: 0;
+  max-height: 58dvh;
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+}
+.pending-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(var(--primary-rgb), 0.5);
+  border-radius: 12px;
+  background: var(--primary-glow);
+}
+.notification-total {
+  font-size: 0.65rem;
+  padding: 3px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  background: var(--primary-glow);
+  color: var(--primary-text);
+}
+.pending-item .btn {
+  width: 100%;
+  justify-content: center;
+}
+.customer-phone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pending-info .notification-type {
+  color: var(--primary-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.pending-info small:last-child {
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border-color);
+}
+.queue-number {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--primary-glow);
+  color: var(--primary-text);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pending-info {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+.pending-info strong {
+  font-size: 0.9rem;
+}
+.pending-info span,
+.pending-info small {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.send-error {
+  width: 100%;
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 10px;
+  gap: 12px;
+  text-align: center;
+}
+.empty app-icon {
+  color: var(--success);
+}
+.empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.success {
+  margin: 0;
+  padding: 12px 24px;
+  color: var(--success);
+  font-size: 0.85rem;
+}
+.success a {
+  color: var(--primary-text);
+  margin-left: 6px;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--border-color);
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 3px;
+}
+@media (max-width: 560px) {
+  .modal-heading,
+  .modal-list,
+  .modal-footer {
+    padding: 16px;
+  }
+  .pending-item .btn {
+    width: 100%;
+  }
+}

@@ -167,11 +167,22 @@ export interface HorariosAtendimentoResponse {
 }
 
 export interface AnalisesDashboard {
- data_inicio?: string | null; data_fim?: string | null;
- dias: number; fuso: string; pedidos_fora_agenda: number;
- demanda: {dia: number; horas: {hora: number; pedidos: number; atendimento: boolean}[]}[];
- tempos: {tipo: string; minutos: number | null; amostras: number}[];
- atendimentos: {total: number; conversao: number | null; status: ContagemAnalise[]; abandonos: ContagemAnalise[]};
- cancelamentos: ContagemAnalise[];
+  data_inicio?: string | null;
+  data_fim?: string | null;
+  dias: number;
+  fuso: string;
+  pedidos_fora_agenda: number;
+  demanda: { dia: number; horas: { hora: number; pedidos: number; atendimento: boolean }[] }[];
+  tempos: { tipo: string; minutos: number | null; amostras: number }[];
+  atendimentos: {
+    total: number;
+    conversao: number | null;
+    status: ContagemAnalise[];
+    abandonos: ContagemAnalise[];
+  };
+  cancelamentos: ContagemAnalise[];
 }
-export interface ContagemAnalise {nome: string; total: number;}
+export interface ContagemAnalise {
+  nome: string;
+  total: number;
+}

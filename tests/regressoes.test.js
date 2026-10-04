@@ -99,6 +99,21 @@ test('consulta de status não inicia um novo pedido automaticamente', async t =>
   } finally { globalThis.fetch = original; }
 });
 
+test('prompt enviado ao modelo contém a regra para mensagem fora de contexto', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-02T15:00:00Z') });
+  const original = globalThis.fetch;
+  let prompt = '';
+  globalThis.fetch = async (url, opcoes) => {
+    if (String(url).includes('openrouter')) prompt = JSON.parse(opcoes.body).messages[0].content;
+    return { ok: true, json: async () => String(url).includes('horarios-atendimento') ? agendaAberta : String(url).includes('openrouter') ? { choices: [{ message: { content: 'ok' } }] } : {} };
+  };
+  try {
+    await cerebro.responderNaFila('5512999990101', 'quem ganhou o jogo ontem?');
+    assert.match(prompt, /MENSAGEM FORA DO CONTEXTO/);
+    assert.match(prompt, /Desculpe, não entendi\. 😅 Por favor, escolha uma das opções acima\./);
+  } finally { globalThis.fetch = original; }
+});
+
 test('fechamento usa comprovante direto e para de chamar modelo após gravação', async t => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-02T15:00:00Z') });
   const original = globalThis.fetch;
@@ -143,6 +158,34 @@ test('assinatura HMAC exige segredo válido e rejeita alterações no corpo', as
   assert.equal(assinaturaValida(Buffer.from('{}'), assinatura, 'segredo-teste'), false);
   assert.equal(assinaturaValida(bruto, assinatura, undefined), false);
   assert.equal(assinaturaValida(bruto, undefined, 'segredo-teste'), false);
+});
+
+test('rota de notificação exige token configurado, mesmo para chamadas locais', async () => {
+  const { notificacaoAutorizada } = await import('../lib/webhook.js');
+  assert.equal(notificacaoAutorizada(undefined, undefined), false);
+  assert.equal(notificacaoAutorizada('Bearer ', ''), false);
+  assert.equal(notificacaoAutorizada('Bearer errado', 'token-certo'), false);
+  assert.equal(notificacaoAutorizada('token-certo', 'token-certo'), false);
+  assert.equal(notificacaoAutorizada('Bearer token-certo', 'token-certo'), true);
+});
+
+test('número do pedido inclui a data e não repete um código já usado', () => {
+  const dia = new Date('2026-10-04T15:00:00Z');
+  const usados = new Set(Array.from({ length: 899 }, (_, i) => `PED-261004-${String(100 + i).padStart(3, '0')}`));
+  assert.equal(pedidos.gerarIdPedido(dia, usados), 'PED-261004-999');
+  assert.match(pedidos.gerarIdPedido(dia, new Set()), /^PED-261004-\d{3}$/);
+  usados.add('PED-261004-999');
+  assert.throws(() => pedidos.gerarIdPedido(dia, usados), /esgotados/);
+});
+
+test('dados da empresa vêm da configuração e mantêm os textos atuais por padrão', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: false, status: 404 });
+  try {
+    const resposta = await pedidos.consultarStatusPedido('PED-INEXISTENTE', '5512999990000');
+    assert.equal(resposta.mensagemStatus, 'Não encontrei nenhum pedido em andamento com os dados informados. 🔍\nPara falar com nossa equipe, ligue para (12) 99750-0045.');
+    assert.match(pedidos.formatarComanda({ id: 'PED-1', dataHora: new Date().toISOString(), itens: [] }), /RESTAURANTE FAMÍLIA RICARDO/);
+  } finally { globalThis.fetch = original; }
 });
 
 test('fila preserva ordem e continua após uma tarefa falhar', async () => {

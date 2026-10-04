@@ -1,0 +1,244 @@
+<div class="cardapio-page">
+  <!-- Toast de Notificação -->
+  @if (toastMensagem()) {
+    <div class="toast-notification glass-card animate-fade-in">
+      <span class="toast-icon">✨</span>
+      <div class="toast-content">
+        <strong>Cardápio Atualizado</strong>
+        <p>{{ toastMensagem() }}</p>
+      </div>
+    </div>
+  }
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Gestão do Cardápio & Preços</h1>
+      <p class="page-subtitle">
+        Cadastre, edite e pause pratos e bebidas em tempo real no atendimento do WhatsApp
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="abrirModalNovo()">
+        <app-icon nome="adicionar" /> Novo Prato / Item
+      </button>
+      <button
+        class="refresh-btn glass-card"
+        (click)="carregarCardapio()"
+        title="Atualizar Cardápio"
+      >
+        <app-icon nome="atualizar" /> Atualizar
+      </button>
+    </div>
+  </div>
+
+  <!-- Lista de Categorias e Produtos -->
+  <div class="categories-list">
+    @for (cat of cardapio(); track cat.id) {
+      <div class="glass-card category-card">
+        <div class="category-header">
+          <div class="cat-title-group">
+            <h2>{{ cat.nome }}</h2>
+            <p>{{ cat.descricao }}</p>
+          </div>
+          <span class="badge badge-prep">{{ cat.produtos.length }} itens cadastrados</span>
+        </div>
+
+        <div class="products-table">
+          @for (prod of cat.produtos; track prod.id) {
+            <div class="product-row" [class.inactive]="!prod.ativo">
+              <div class="prod-main">
+                <div class="prod-info">
+                  <div class="prod-name-row">
+                    <strong>{{ prod.nome }}</strong>
+                    <span
+                      class="status-indicator"
+                      [class.active]="prod.ativo"
+                      [class.paused]="!prod.ativo"
+                    >
+                      {{ prod.ativo ? '● Ativo no WhatsApp' : '○ Pausado' }}
+                    </span>
+                  </div>
+                  @if (prod.descricao) {
+                    <span class="prod-desc">{{ prod.descricao }}</span>
+                  }
+                </div>
+              </div>
+
+              <span class="prod-desc">{{ nomeDias(prod.dias_disponiveis) }}</span>
+              <!-- Variações e Preços -->
+              <div class="prod-variations">
+                @for (v of prod.variacoes; track v.id) {
+                  <span class="var-badge">
+                    <span class="var-size">{{ v.tamanho }}:</span>
+                    <span class="var-price">{{
+                      v.preco | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR'
+                    }}</span>
+                  </span>
+                }
+              </div>
+
+              <!-- Ações do Prato -->
+              <div class="prod-actions">
+                <button
+                  class="btn btn-sm toggle-btn"
+                  [class.btn-success]="prod.ativo"
+                  [class.btn-secondary]="!prod.ativo"
+                  (click)="toggleProduto(prod)"
+                  title="Alternar disponibilidade no robô"
+                >
+                  <app-icon [nome]="prod.ativo ? 'confirmar' : 'pausar'" /><span>{{
+                    prod.ativo ? 'Ativo' : 'Pausado'
+                  }}</span>
+                </button>
+
+                <button
+                  class="action-icon-btn edit"
+                  (click)="abrirModalEditar(prod, cat.id)"
+                  [attr.aria-label]="'Editar ' + prod.nome"
+                  title="Editar Prato"
+                >
+                  <app-icon nome="editar" />
+                </button>
+
+                <button
+                  class="action-icon-btn delete"
+                  (click)="confirmarExcluir(prod)"
+                  [attr.aria-label]="'Excluir ' + prod.nome"
+                  title="Excluir Prato"
+                >
+                  <app-icon nome="excluir" />
+                </button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-cat">Nenhum item cadastrado nesta categoria.</div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- Modal de Cadastro / Edição -->
+  @if (modalAberto()) {
+    <div class="modal-overlay animate-fade-in" (click)="fecharModal()">
+      <div class="modal-card glass-card" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>{{ modoEdicao() ? 'Editar Prato / Produto' : 'Novo Prato / Produto' }}</h2>
+          <button class="close-btn" (click)="fecharModal()" aria-label="Fechar edição">
+            <app-icon nome="fechar" />
+          </button>
+        </div>
+
+        <form (ngSubmit)="salvarProduto()" class="modal-form">
+          <div class="form-group">
+            <label>Categoria *</label>
+            <select [(ngModel)]="formCategoriaId" name="categoria_id" required>
+              <option [ngValue]="null" disabled>Selecione a categoria...</option>
+              @for (c of categorias(); track c.id) {
+                <option [ngValue]="c.id">{{ c.nome }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Nome do Prato / Item *</label>
+            <input
+              type="text"
+              [(ngModel)]="formNome"
+              name="nome"
+              placeholder="Ex: Filé de Frango à Parmegiana"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label>Descrição / Acompanhamentos</label>
+            <input
+              type="text"
+              [(ngModel)]="formDescricao"
+              name="descricao"
+              placeholder="Ex: Acompanha arroz, feijão, farofa e salada"
+            />
+          </div>
+
+          <fieldset
+            class="form-group"
+            style="border: 1px solid var(--border-color); padding: 12px; border-radius: 8px"
+          >
+            <legend>Dias disponíveis *</legend>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px">
+              @for (dia of diasSemana; track dia.valor) {
+                <label style="display: flex; align-items: center; gap: 6px"
+                  ><input
+                    type="checkbox"
+                    style="width: auto"
+                    [checked]="formDias.includes(dia.valor)"
+                    (change)="alternarDia(dia.valor)"
+                    [disabled]="salvando()"
+                  />{{ dia.nome }}</label
+                >
+              }
+            </div>
+            @if (!formDias.length) {
+              <p role="alert">Selecione pelo menos um dia.</p>
+            }
+          </fieldset>
+          <!-- Variações de Tamanhos e Preços -->
+          <div class="form-group">
+            <div class="variations-header">
+              <label>Tamanhos e Preços (R$) *</label>
+              <button type="button" class="btn btn-secondary btn-xs" (click)="adicionarVariacao()">
+                <app-icon nome="adicionar" /> Adicionar Tamanho
+              </button>
+            </div>
+
+            <div class="variations-list">
+              @for (v of formVariacoes; track $index; let idx = $index) {
+                <div class="var-input-row">
+                  <input
+                    type="text"
+                    [(ngModel)]="v.tamanho"
+                    [name]="'tamanho_' + idx"
+                    placeholder="Tamanho (ex: Grande, Infantil, 2L, Lata)"
+                    required
+                  />
+                  <div class="price-input-wrap">
+                    <span class="currency-prefix">R$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      [(ngModel)]="v.preco"
+                      [name]="'preco_' + idx"
+                      placeholder="0,00"
+                      required
+                    />
+                  </div>
+                  @if (formVariacoes.length > 1) {
+                    <button
+                      type="button"
+                      class="remove-var-btn"
+                      (click)="removerVariacao(idx)"
+                      title="Remover tamanho"
+                    >
+                      <app-icon nome="fechar" />
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="fecharModal()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" [disabled]="!formValido() || salvando()">
+              {{ modoEdicao() ? 'Salvar Alterações' : 'Cadastrar Prato' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</div>

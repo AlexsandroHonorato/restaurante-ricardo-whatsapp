@@ -1,0 +1,109 @@
+/* Cenário 3D do painel da marca: aurora, holofote e dois canvas (trás e frente do logo). */
+:host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(32px, 5vw, 80px);
+  overflow: hidden;
+  background: radial-gradient(ellipse 120% 80% at 50% 40%, #29265a 0%, #1a202c 55%, #11141c 100%);
+}
+
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.camada-tras {
+  z-index: 0;
+}
+.camada-frente {
+  z-index: 2;
+}
+
+/* Aurora: três massas de luz que se movem devagar e se misturam */
+.aurora {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.8;
+}
+.aurora i {
+  position: absolute;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  animation: aurora-deriva 18s ease-in-out infinite alternate;
+}
+.aurora i:nth-child(1) {
+  width: 55%;
+  height: 45%;
+  left: 18%;
+  top: 12%;
+  background: radial-gradient(circle, #605cff66 0%, #605cff26 40%, transparent 70%);
+}
+.aurora i:nth-child(2) {
+  width: 45%;
+  height: 40%;
+  right: 12%;
+  top: 30%;
+  background: radial-gradient(circle, #ff69b44d 0%, #ff69b41c 40%, transparent 70%);
+  animation-duration: 23s;
+  animation-delay: -6s;
+}
+.aurora i:nth-child(3) {
+  width: 50%;
+  height: 38%;
+  left: 28%;
+  bottom: 8%;
+  background: radial-gradient(circle, #2fe5a733 0%, #2fe5a714 40%, transparent 70%);
+  animation-duration: 27s;
+  animation-delay: -12s;
+}
+@keyframes aurora-deriva {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate(8%, -6%) scale(1.15) rotate(20deg);
+  }
+  100% {
+    transform: translate(-6%, 5%) scale(0.95) rotate(-12deg);
+  }
+}
+
+/* Holofote atrás do logo, respirando */
+.holofote {
+  position: absolute;
+  width: min(80%, 620px);
+  aspect-ratio: 1;
+  left: 50%;
+  top: 42%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #605cff38 0%, #ff69b41a 38%, transparent 68%);
+  animation: holofote-respira 7s ease-in-out infinite;
+}
+@keyframes holofote-respira {
+  0%,
+  100% {
+    opacity: 0.75;
+    scale: 1;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.08;
+  }
+}
+
+:host(.pausado) .aurora i,
+:host(.pausado) .holofote {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurora i,
+  .holofote {
+    animation: none;
+  }
+}

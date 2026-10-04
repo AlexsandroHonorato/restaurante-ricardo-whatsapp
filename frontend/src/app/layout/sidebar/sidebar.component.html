@@ -1,0 +1,124 @@
+<aside class="sidebar">
+  <!-- Logo & Brand -->
+  <div class="brand">
+    <app-brand-symbol class="brand-icon" />
+    <div class="brand-text">
+      <h2>Bot<span class="brand-client">Client</span></h2>
+      <span class="brand-badge">WhatsApp AI</span>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="nav-list">
+    <div class="nav-section-title">PRINCIPAL</div>
+
+    <a
+      routerLink="/dashboard"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      class="nav-item"
+    >
+      <app-icon nome="dashboard" />
+      <span class="nav-label">Dashboard Geral</span>
+    </a>
+
+    <a
+      routerLink="/pedidos"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      class="nav-item"
+    >
+      <app-icon nome="pedidos" />
+      <span class="nav-label">Pedidos & Cozinha</span>
+      @if (api.kpis()?.pedidos_por_status?.em_preparo) {
+        <span class="nav-pill prep">{{ api.kpis()?.pedidos_por_status?.em_preparo }}</span>
+      }
+    </a>
+
+    <a
+      routerLink="/atendimentos"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      class="nav-item"
+    >
+      <app-icon nome="atendimentos" />
+      <span class="nav-label">Atendimentos IA</span>
+      @if (api.kpis()?.total_transbordo_humano) {
+        <span class="nav-pill alert">{{ api.kpis()?.total_transbordo_humano }}</span>
+      }
+    </a>
+
+    <div class="nav-section-title">CADASTROS</div>
+
+    <a
+      routerLink="/clientes"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      class="nav-item"
+    >
+      <app-icon nome="clientes" />
+      <span class="nav-label">Clientes & LTV</span>
+    </a>
+
+    <a
+      routerLink="/cardapio"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      class="nav-item"
+    >
+      <app-icon nome="cardapio" />
+      <span class="nav-label">Cardápio & Preços</span>
+    </a>
+    @if (auth.user()?.role === 'admin') {
+      <a
+        routerLink="/usuarios"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        class="nav-item"
+        ><app-icon nome="clientes" /><span class="nav-label">Usuários do sistema</span></a
+      >
+    }
+    <div class="nav-section-title">ADMINISTRAÇÃO</div>
+    <div class="config-menu">
+      <button
+        type="button"
+        class="nav-item config-toggle"
+        (click)="configuracoesAbertas = !configuracoesAbertas"
+        [attr.aria-expanded]="configuracoesAbertas"
+        aria-controls="submenu-configuracoes"
+      >
+        <app-icon nome="configuracoes" /><span class="nav-label">Configurações</span
+        ><span class="chevron" aria-hidden="true">{{ configuracoesAbertas ? '⌄' : '›' }}</span>
+      </button>
+      <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
+        <a
+          routerLink="/configuracoes/horarios"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+          class="nav-item"
+          >Horário de atendimento</a
+        >
+        <a
+          routerLink="/configuracoes/pratos-semana"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+          class="nav-item"
+          >Pratos por dia da semana</a
+        >
+      </div>
+    </div>
+  </nav>
+
+  <!-- Bot Status Card -->
+  <div class="bot-card">
+    <div class="bot-header">
+      <span aria-hidden="true">◉</span>
+      <span class="bot-title">Atendimento WhatsApp</span>
+    </div>
+    <p class="bot-desc">Integração Meta Cloud API</p>
+    <div class="bot-stat">
+      <span>Taxa de Conversão:</span>
+      <strong>{{ api.kpis() ? api.kpis()?.taxa_conversao_ia + '%' : 'Sem dados' }}</strong>
+    </div>
+  </div>
+</aside>

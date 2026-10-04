@@ -1,0 +1,283 @@
+<div class="atendimentos-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Monitor de Atendimentos & Status da IA</h1>
+      <p class="page-subtitle">
+        Acompanhe as conversas em tempo real, estágios da máquina de estados e transbordo humano
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <!-- Toggle de Visão (Cards vs Lista) -->
+      <div class="view-toggle glass-card">
+        <button
+          class="view-btn"
+          [class.active]="modoVisao() === 'cards'"
+          (click)="alternarVisao('cards')"
+          title="Visualização em Cards"
+        >
+          <app-icon nome="dashboard" /> Cards
+        </button>
+        <button
+          class="view-btn"
+          [class.active]="modoVisao() === 'lista'"
+          (click)="alternarVisao('lista')"
+          title="Visualização em Tabela/Lista"
+        >
+          <app-icon nome="lista" /> Lista
+        </button>
+      </div>
+
+      <button class="refresh-btn glass-card" (click)="carregar()" title="Recarregar Dados">
+        <app-icon nome="atualizar" /> Atualizar Status
+      </button>
+      <div class="status-filters">
+        <button
+          class="filter-pill"
+          [class.active]="filtroTransbordo() === undefined"
+          (click)="filtrar(undefined)"
+        >
+          Todas as Conversas
+        </button>
+        <button
+          class="filter-pill alert"
+          [class.active]="filtroTransbordo() === true"
+          (click)="filtrar(true)"
+        >
+          <app-icon nome="alerta" /> Transbordo Humano
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <p class="handoff-announcement" role="status" aria-live="polite">
+    {{
+      transbordos().length
+        ? transbordos().length + ' cliente(s) aguardando atendimento humano.'
+        : ''
+    }}
+  </p>
+  @if (transbordos().length) {
+    <div class="handoff-summary">
+      <strong>{{ transbordos().length }} cliente(s) aguardando · Mais antigos primeiro</strong>
+      @if (transbordo.fechados().size) {
+        <button class="btn btn-secondary btn-sm" (click)="transbordo.mostrarAlertas()">
+          Mostrar alertas fechados
+        </button>
+      }
+    </div>
+  }
+  @if (transbordo.alertas().length) {
+    <section class="handoff-queue" aria-label="Clientes aguardando atendente">
+      @for (s of transbordo.alertas(); track s.id) {
+        <article class="handoff-card" role="alert">
+          <button
+            type="button"
+            class="handoff-close"
+            (click)="transbordo.fechar(s.id)"
+            [attr.aria-label]="'Fechar alerta de ' + s.telefone"
+          >
+            <app-icon nome="fechar" />
+          </button>
+          <div class="handoff-symbol"><app-icon nome="alerta" /></div>
+          <div class="handoff-content">
+            <span class="handoff-label"
+              >{{ transbordos().indexOf(s) + 1 }}º NA FILA · ATENDIMENTO HUMANO SOLICITADO</span
+            >
+            <h2>Cliente quer falar com um atendente</h2>
+            <p>WhatsApp {{ s.telefone }} · Aguardando a equipe</p>
+          </div>
+          <div class="handoff-actions">
+            <button
+              class="btn btn-primary"
+              [disabled]="enviandoContato().has(s.id)"
+              (click)="falarComCliente(s)"
+            >
+              <app-icon nome="atendimentos" />
+              {{ enviandoContato().has(s.id) ? 'Enviando…' : 'Falar com o cliente' }}
+            </button>
+            @if (contatosEnviados().has(s.id)) {
+              <small>Mensagem inicial enviada.</small>
+              <a [href]="'https://wa.me/' + s.telefone" target="_blank" rel="noopener noreferrer"
+                >Abrir conversa no WhatsApp</a
+              >
+            }
+            @if (errosContato()[s.id]) {
+              <small role="alert">{{ errosContato()[s.id] }}</small>
+            }
+          </div>
+        </article>
+      }
+    </section>
+  }
+
+  <!-- 1. VISÃO EM CARDS (FEED DE CONVERSAS) -->
+  @if (modoVisao() === 'cards') {
+    <div class="chat-feed-grid">
+      @for (s of conversasVisiveis(); track s.id) {
+        <div
+          class="glass-card chat-card"
+          [class.alert-border]="s.status_atual === 'transbordo_humano'"
+        >
+          <div class="chat-header">
+            <div class="chat-user">
+              <div class="avatar" aria-hidden="true"><app-icon nome="atendimentos" /></div>
+              <div>
+                <strong>WhatsApp {{ s.telefone }}</strong>
+                <span class="chat-tel"
+                  >Último contato: {{ s.ultimo_contato_em | date: 'dd/MM • HH:mm:ss' }}</span
+                >
+              </div>
+            </div>
+
+            <span class="badge" [ngClass]="getBadgeClass(s.status_atual)">
+              {{ formatStatusConversa(s.status_atual) }}
+            </span>
+          </div>
+
+          <!-- Dados da Conversa -->
+          <div class="chat-body">
+            <div class="chat-metric">
+              <span class="metric-lbl">Estágio Atual do Robô:</span>
+              <strong class="stage-tag">{{ formatStatusConversa(s.status_atual) }}</strong>
+            </div>
+
+            @if (s.rascunho && temItensRascunho(s.rascunho)) {
+              <div class="rascunho-box">
+                <span class="rascunho-title">🛒 Rascunho em Andamento:</span>
+                @if (s.rascunho.pratos?.length) {
+                  <div class="rascunho-item">🍛 Pratos: {{ s.rascunho.pratos.join(', ') }}</div>
+                }
+                @if (s.rascunho.bebidas?.length) {
+                  <div class="rascunho-item">🥤 Bebidas: {{ s.rascunho.bebidas.join(', ') }}</div>
+                }
+                @if (s.rascunho.endereco) {
+                  <div class="rascunho-item">📍 Endereço: {{ s.rascunho.endereco }}</div>
+                }
+                @if (s.rascunho.formaPagamento) {
+                  <div class="rascunho-item">💳 Pagamento: {{ s.rascunho.formaPagamento }}</div>
+                }
+              </div>
+            }
+
+            <div class="chat-metric">
+              <span class="metric-lbl">Expiração (30 min):</span>
+              <span class="expire-time">{{ s.expira_em | date: 'HH:mm:ss' }}</span>
+            </div>
+          </div>
+
+          <!-- Botões de Ação -->
+          <div class="chat-footer">
+            <a
+              [href]="'https://wa.me/' + s.telefone"
+              target="_blank"
+              class="btn btn-primary btn-sm full"
+            >
+              <app-icon nome="atendimentos" /> Abrir Conversa no WhatsApp
+            </a>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state glass-card">
+          <span class="empty-icon">🤖</span>
+          <h3>Nenhuma conversa ativa no momento</h3>
+          <p>
+            Assim que um cliente enviar uma mensagem no WhatsApp ou simulador, o status aparecerá
+            aqui.
+          </p>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- 2. VISÃO EM LISTA (TABELA DETALHADA) -->
+  @if (modoVisao() === 'lista') {
+    <div class="table-container glass-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Telefone / WhatsApp</th>
+            <th>Último Contato</th>
+            <th>Estágio da IA</th>
+            <th>Rascunho / Conteúdo em Aberto</th>
+            <th>Expira em (30m)</th>
+            <th>Ação Rápida</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of conversasVisiveis(); track s.id) {
+            <tr [class.alert-row]="s.status_atual === 'transbordo_humano'">
+              <td class="client-cell">
+                <div class="tel-wrapper">
+                  <span class="avatar-mini" aria-hidden="true"
+                    ><app-icon nome="atendimentos"
+                  /></span>
+                  <div>
+                    <strong class="tel-number">{{ s.telefone }}</strong>
+                  </div>
+                </div>
+              </td>
+              <td class="time-cell">
+                {{ s.ultimo_contato_em | date: 'HH:mm:ss • dd/MM' }}
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getBadgeClass(s.status_atual)">
+                  {{ formatStatusConversa(s.status_atual) }}
+                </span>
+              </td>
+              <td>
+                @if (s.rascunho && temItensRascunho(s.rascunho)) {
+                  <div class="rascunho-inline-list">
+                    @if (s.rascunho.pratos?.length) {
+                      <span class="tag-chip pratos" title="Pratos"
+                        >🍛 {{ s.rascunho.pratos.join(', ') }}</span
+                      >
+                    }
+                    @if (s.rascunho.bebidas?.length) {
+                      <span class="tag-chip bebidas" title="Bebidas"
+                        >🥤 {{ s.rascunho.bebidas.join(', ') }}</span
+                      >
+                    }
+                    @if (s.rascunho.endereco) {
+                      <span class="tag-chip endereco" title="Endereço"
+                        ><app-icon nome="local" /> {{ s.rascunho.endereco }}</span
+                      >
+                    }
+                    @if (s.rascunho.formaPagamento) {
+                      <span class="tag-chip pagamento" title="Pagamento"
+                        >💳 {{ s.rascunho.formaPagamento }}</span
+                      >
+                    }
+                  </div>
+                } @else {
+                  <span class="text-muted-sm">Sem rascunho ativo</span>
+                }
+              </td>
+              <td class="time-cell">
+                <span class="expire-badge">{{ s.expira_em | date: 'HH:mm:ss' }}</span>
+              </td>
+              <td>
+                <a
+                  [href]="'https://wa.me/' + s.telefone"
+                  target="_blank"
+                  class="btn btn-primary btn-xs flex-btn"
+                >
+                  <app-icon nome="atendimentos" /> Abrir WhatsApp
+                </a>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="6" class="empty-table-cell">
+                <div class="empty-state-mini">
+                  <span>🤖</span>
+                  <p>Nenhuma conversa ativa no momento.</p>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

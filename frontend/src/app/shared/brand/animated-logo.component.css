@@ -1,0 +1,376 @@
+/* Logo 3D BotClient: só transform/opacity são animados; o volume vem de gradientes e sombras estáticas. */
+:host {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.logo {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  perspective: 1100px;
+  perspective-origin: 50% 40%;
+  text-align: center;
+}
+.flutuar,
+.palco,
+.simbolo {
+  transform-style: preserve-3d;
+}
+.palco {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+}
+
+.simbolo {
+  position: relative;
+  width: 72%;
+  margin: 0 auto;
+  aspect-ratio: 320 / 300;
+  filter: drop-shadow(0 18px 36px rgba(96, 92, 255, 0.38));
+}
+.camada {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  transform-origin: 50% 50%;
+}
+/* Profundidade real só no hover (--pop 0→1); em repouso as camadas ficam coplanares. */
+.camada-anel {
+  translate: 0 0 0;
+}
+.camada-robo {
+  translate: 0 0 calc(45px * var(--pop, 0));
+}
+
+.reflexo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+}
+.reflexo path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 14 100;
+  stroke-dashoffset: 114;
+}
+.reflexo-brilho {
+  stroke: #b5b2ff;
+  stroke-width: 30;
+  opacity: 0.35;
+}
+.reflexo-nucleo {
+  stroke: #fff;
+  stroke-width: 9;
+}
+
+.marca {
+  margin: 14px 0 0;
+  font-size: 16cqi;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  user-select: none;
+  translate: 0 0 calc(60px * var(--pop, 0));
+}
+.letra {
+  display: inline-block;
+  transform-origin: 50% 90%;
+  -webkit-text-stroke: 1.5px currentColor;
+  filter: drop-shadow(0 2px 0 #4a44d6) drop-shadow(0 2px 0 #2b2477)
+    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
+}
+.letra-bot {
+  color: #fff;
+}
+.letra-client {
+  color: #8f8cff;
+  background: linear-gradient(120deg, #8f8cff 0%, #605cff 45%, #ff69b4 100%);
+  background-size: 6ch 100%;
+  background-position: calc((var(--i) - 3) * -1ch) 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 0;
+}
+
+.slogan {
+  margin: 14px 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #d6d4ff;
+  translate: 0 0 calc(35px * var(--pop, 0));
+}
+.barra {
+  display: block;
+  width: 56px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #605cff, #ff69b4);
+  box-shadow: 0 0 12px rgba(96, 92, 255, 0.6);
+}
+.pilares {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #aab6cc;
+  translate: 0 0 calc(30px * var(--pop, 0));
+}
+.pilar,
+.ponto {
+  display: inline-block;
+}
+.ponto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.ponto-1 {
+  background: #605cff;
+  box-shadow: 0 0 10px #605cff;
+}
+.ponto-2 {
+  background: #2fe5a7;
+  box-shadow: 0 0 10px #2fe5a7;
+}
+
+/* ── Entrada: anel gira da profundidade, robô salta, letras tombam em sequência ── */
+.animar .camada-anel {
+  animation: anel-entra 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s backwards;
+}
+.animar .reflexo {
+  animation: reflexo-mostra 0.4s ease 1.7s forwards;
+}
+.animar .reflexo path {
+  animation: reflexo-corre 3.6s ease-in-out 1.7s infinite;
+}
+.animar .camada-robo {
+  animation:
+    robo-entra 1.1s cubic-bezier(0.2, 0.9, 0.25, 1.05) 0.75s backwards,
+    robo-respira 6s ease-in-out 3.2s infinite;
+}
+.animar .letra {
+  animation:
+    letra-entra 0.95s cubic-bezier(0.16, 1, 0.3, 1) calc(1s + var(--i) * 70ms) backwards,
+    letra-onda 7s ease-in-out calc(3.6s + var(--i) * 90ms) infinite;
+}
+.animar .slogan {
+  animation: slogan-entra 0.85s cubic-bezier(0.16, 1, 0.3, 1) 1.85s backwards;
+}
+.animar .barra {
+  animation: barra-entra 0.7s cubic-bezier(0.16, 1, 0.3, 1) 2.3s backwards;
+}
+.animar .pilar,
+.animar .ponto {
+  animation: pilar-entra 0.8s cubic-bezier(0.16, 1, 0.3, 1) calc(2.45s + var(--i) * 80ms) backwards;
+}
+.animar .flutuar {
+  animation: flutua 11s ease-in-out 3.2s infinite;
+}
+.animar .geometria {
+  animation: geometria-surge 1.8s ease both;
+}
+
+@keyframes anel-entra {
+  0% {
+    opacity: 0;
+    transform: translateZ(-520px) rotateY(-110deg) rotateX(18deg) scale(0.7);
+  }
+  55% {
+    opacity: 1;
+    transform: translateZ(30px) rotateY(14deg) rotateX(-4deg) scale(1.02);
+  }
+  78% {
+    transform: translateZ(0) rotateY(-4deg) rotateX(1deg) scale(1);
+  }
+}
+@keyframes robo-entra {
+  0% {
+    opacity: 0;
+    transform: translateZ(-320px) scale(0.2);
+  }
+  60% {
+    opacity: 1;
+    transform: translateZ(60px) scale(1.12);
+  }
+  80% {
+    transform: translateZ(0) scale(0.97);
+  }
+}
+@keyframes robo-respira {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-2.5%) translateZ(26px);
+  }
+}
+@keyframes letra-entra {
+  0% {
+    opacity: 0;
+    transform: translateY(60%) translateZ(-220px) rotateX(-100deg);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-6%) translateZ(30px) rotateX(14deg);
+  }
+  80% {
+    transform: translateY(0) translateZ(0) rotateX(-5deg);
+  }
+}
+@keyframes letra-onda {
+  0%,
+  11%,
+  100% {
+    transform: none;
+  }
+  4% {
+    transform: translateY(-7%) translateZ(40px) rotateX(-12deg);
+  }
+  7% {
+    transform: translateY(1%) translateZ(0) rotateX(4deg);
+  }
+}
+@keyframes slogan-entra {
+  0% {
+    opacity: 0;
+    transform: translateZ(-40px) rotateX(95deg);
+  }
+  70% {
+    opacity: 1;
+    transform: rotateX(-12deg);
+  }
+}
+@keyframes barra-entra {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+}
+@keyframes pilar-entra {
+  0% {
+    opacity: 0;
+    transform: translateY(40%) rotateY(-80deg);
+  }
+  70% {
+    opacity: 1;
+    transform: rotateY(10deg);
+  }
+}
+@keyframes flutua {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateY(-5px) rotateY(7deg) rotateX(3deg);
+  }
+  75% {
+    transform: translateY(3px) rotateY(-7deg) rotateX(-2deg);
+  }
+}
+@keyframes reflexo-mostra {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes reflexo-corre {
+  0% {
+    stroke-dashoffset: 114;
+    opacity: 0;
+  }
+  12%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+/* ── Geometria decorativa atrás do símbolo ── */
+.geometria {
+  position: absolute;
+  inset: 0 0 40% 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.25;
+}
+.geo-anel {
+  position: absolute;
+  width: 70%;
+  aspect-ratio: 1;
+  top: -2%;
+  left: 15%;
+  border: 1px solid #605cff88;
+  border-radius: 50%;
+}
+.geo-orbita {
+  position: absolute;
+  width: 82%;
+  aspect-ratio: 1;
+  top: -8%;
+  left: 9%;
+  border: 1px dashed #ff69b466;
+  border-radius: 50%;
+}
+.geo-ponto {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2fe5a7;
+  top: 18%;
+  right: 12%;
+}
+@keyframes geometria-surge {
+  0% {
+    opacity: 0;
+    transform: rotate(-6deg) scale(0.97);
+  }
+  30% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0.25;
+    transform: rotate(4deg) scale(1);
+  }
+}
+
+/* ── Pausado / movimento reduzido: logo estático e completo ── */
+.pausado *,
+.pausado {
+  animation: none !important;
+}
+.pausado .palco {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo {
+    perspective: none;
+  }
+  .logo,
+  .logo * {
+    animation: none !important;
+  }
+  .palco {
+    transform: none;
+  }
+}

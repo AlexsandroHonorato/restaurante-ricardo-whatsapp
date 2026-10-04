@@ -59,8 +59,7 @@ class PedidoController extends Controller
     {
         $request->validate([
             'status' => 'required|in:pendente,confirmado,em_preparo,saiu_para_entrega,entregue,cancelado',
-            'alterado_por' => 'nullable|string',
-            'observacao' => 'nullable|string',
+            'observacao' => 'nullable|string|max:1000',
             'motivo_cancelamento' => 'nullable|string|max:255',
         ]);
 
@@ -92,7 +91,8 @@ class PedidoController extends Controller
             $pedido->save();
             HistoricoStatusPedido::create([
                 'pedido_id' => $pedido->id, 'status_anterior' => $anterior, 'status_novo' => $novo,
-                'alterado_por' => $request->input('alterado_por', 'painel_admin'), 'observacao' => $request->input('observacao'),
+                // Autor vem da sessão: o cliente HTTP não pode atribuir a mudança a outra pessoa.
+                'alterado_por' => $request->user()->email, 'observacao' => $request->input('observacao'),
             ]);
 
             return [$pedido, true];

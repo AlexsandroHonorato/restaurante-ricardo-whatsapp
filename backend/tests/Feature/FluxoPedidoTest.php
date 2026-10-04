@@ -143,6 +143,25 @@ class FluxoPedidoTest extends TestCase
         $this->assertSame(1, Atendimento::firstOrFail()->total_mensagens_bot);
     }
 
+    public function test_historico_registra_usuario_autenticado_e_ignora_autor_enviado(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $this->postJson('/api/pedidos', $this->dados())->assertCreated();
+        $id = Pedido::firstOrFail()->id;
+        $this->patchJson("/api/pedidos/{$id}/status", ['status' => 'saiu_para_entrega', 'alterado_por' => 'outra pessoa'])->assertOk();
+        $this->assertSame(auth()->user()->email, HistoricoStatusPedido::latest('id')->firstOrFail()->alterado_por);
+    }
+
+    public function test_saudacao_do_transbordo_usa_nome_da_empresa_configurado(): void
+    {
+        config(['services.empresa.nome' => 'Pizzaria Exemplo']);
+        Http::fake(['*' => Http::response(['ok' => true])]);
+        $this->postJson('/api/status-conversa/sync', ['telefone' => '5512999996666', 'status' => 'transbordo_humano', 'transbordo' => true])->assertOk();
+        $id = StatusConversa::where('telefone', '5512999996666')->firstOrFail()->id;
+        $this->postJson("/api/status-conversa/{$id}/contato")->assertOk();
+        Http::assertSent(fn ($r) => $r['texto'] === 'Olá! Sou da equipe do Pizzaria Exemplo. Como posso ajudar você?');
+    }
+
     public function test_pedido_minimo_aplica_se_a_entrega_e_preserva_retirada(): void
     {
         $dados = $this->dados();

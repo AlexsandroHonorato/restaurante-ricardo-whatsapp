@@ -24,7 +24,25 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), {provide:SessionState,useValue:{user:signal({id:1,name:'Família Ricardo',email:'admin@example.com',phone:null,role:'admin',active:true}),csrf:signal('')}}],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        {
+          provide: SessionState,
+          useValue: {
+            user: signal({
+              id: 1,
+              name: 'Família Ricardo',
+              email: 'admin@example.com',
+              phone: null,
+              role: 'admin',
+              active: true,
+            }),
+            csrf: signal(''),
+          },
+        },
+      ],
     }).compileComponents();
   });
 

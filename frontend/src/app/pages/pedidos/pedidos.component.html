@@ -1,0 +1,402 @@
+<div class="pedidos-page">
+  <dialog
+    #cancelamentoDialog
+    class="cancelamento-dialog"
+    aria-labelledby="cancelamento-titulo"
+    aria-describedby="cancelamento-descricao"
+    (cancel)="aoCancelarDialog($event)"
+    (close)="cancelando.set(null)"
+  >
+    <form (ngSubmit)="confirmarCancelamento()" class="cancelamento-form">
+      <div class="cancelamento-heading">
+        <span class="cancelamento-icon" aria-hidden="true">×</span
+        ><button
+          type="button"
+          class="cancelamento-fechar"
+          aria-label="Fechar cancelamento"
+          [disabled]="salvandoCancelamento()"
+          (click)="fecharCancelamento()"
+        >
+          ×
+        </button>
+      </div>
+      <h2 id="cancelamento-titulo">Cancelar pedido</h2>
+      <p id="cancelamento-descricao">
+        {{ cancelando()?.codigo_pedido }} · Informe o motivo para registrar o cancelamento deste
+        pedido.
+      </p>
+      <label for="motivo-cancelamento"
+        >Motivo do cancelamento <span aria-hidden="true">*</span></label
+      >
+      <textarea
+        id="motivo-cancelamento"
+        name="motivoCancelamento"
+        [(ngModel)]="motivoCancelamento"
+        maxlength="255"
+        required
+        rows="4"
+        autofocus
+        placeholder="Ex.: cliente desistiu do pedido"
+        [disabled]="salvandoCancelamento()"
+      ></textarea>
+      <small class="cancelamento-contador">{{ motivoCancelamento.length }} / 255 caracteres</small>
+      @if (erroCancelamento()) {
+        <p role="alert" class="cancelamento-erro">{{ erroCancelamento() }}</p>
+      }
+      <div class="cancelamento-footer">
+        <button
+          type="button"
+          class="btn btn-secondary"
+          [disabled]="salvandoCancelamento()"
+          (click)="fecharCancelamento()"
+        >
+          Voltar</button
+        ><button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="!motivoCancelamento.trim() || salvandoCancelamento()"
+        >
+          {{ salvandoCancelamento() ? 'Cancelando…' : 'Confirmar cancelamento' }}
+        </button>
+      </div>
+    </form>
+  </dialog>
+  <!-- Toast de Notificação -->
+  @if (toastMensagem()) {
+    <div class="toast-notification glass-card animate-fade-in">
+      <span class="toast-icon">🛵💨</span>
+      <div class="toast-content">
+        <strong>Notificação Automática WhatsApp</strong>
+        <p>{{ toastMensagem() }}</p>
+      </div>
+    </div>
+  }
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Gestão Operacional de Pedidos</h1>
+      <p class="page-subtitle">
+        Acompanhe a cozinha, despache entregas e notifique clientes em tempo real
+      </p>
+    </div>
+
+    <div class="header-actions">
+      <!-- Toggle de Visão (Cards vs Lista) -->
+      <div class="view-toggle glass-card">
+        <button
+          class="view-btn"
+          [class.active]="modoVisao() === 'cards'"
+          (click)="alternarVisao('cards')"
+          title="Visualização em Cards Kanban"
+        >
+          <app-icon nome="dashboard" /> Cards
+        </button>
+        <button
+          class="view-btn"
+          [class.active]="modoVisao() === 'lista'"
+          (click)="alternarVisao('lista')"
+          title="Visualização em Tabela Detalhada"
+        >
+          <app-icon nome="lista" /> Lista
+        </button>
+      </div>
+
+      <!-- Filtros de Status -->
+      <div class="status-filters">
+        <button
+          class="filter-pill"
+          [class.active]="filtroStatus() === ''"
+          (click)="filtrarStatus('')"
+        >
+          Todos
+        </button>
+        <button
+          class="filter-pill pending"
+          [class.active]="filtroStatus() === 'pendente'"
+          (click)="filtrarStatus('pendente')"
+        >
+          Pendentes
+        </button>
+        <button
+          class="filter-pill prep"
+          [class.active]="filtroStatus() === 'em_preparo'"
+          (click)="filtrarStatus('em_preparo')"
+        >
+          Na Cozinha
+        </button>
+        <button
+          class="filter-pill delivery"
+          [class.active]="filtroStatus() === 'saiu_para_entrega'"
+          (click)="filtrarStatus('saiu_para_entrega')"
+        >
+          Em Rota
+        </button>
+        <button
+          class="filter-pill delivered"
+          [class.active]="filtroStatus() === 'entregue'"
+          (click)="filtrarStatus('entregue')"
+        >
+          Entregues
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de Busca -->
+  <div class="search-bar glass-card">
+    <span class="search-icon"><app-icon nome="buscar" /></span>
+    <input
+      type="text"
+      placeholder="Buscar por código (PED-...), nome do cliente, bairro ou telefone..."
+      [(ngModel)]="termoBusca"
+      (ngModelChange)="buscar()"
+    />
+    <button class="refresh-btn" (click)="carregarPedidos()" title="Atualizar Pedidos">
+      <app-icon nome="atualizar" /> Atualizar
+    </button>
+  </div>
+
+  <!-- 1. VISÃO EM CARDS (GRID KANBAN) -->
+  @if (modoVisao() === 'cards') {
+    <div class="orders-grid">
+      @for (pedido of pedidos(); track pedido.id) {
+        <div
+          class="glass-card order-card"
+          [class.highlight]="pedido.status === 'em_preparo'"
+          [class.in-delivery]="pedido.status === 'saiu_para_entrega'"
+        >
+          <div class="order-card-header">
+            <div class="order-id-group">
+              <span class="order-code">{{ pedido.codigo_pedido }}</span>
+              <span class="order-time">{{ pedido.created_at | date: 'HH:mm • dd/MM' }}</span>
+            </div>
+            <app-pedido-status [status]="pedido.status" />
+          </div>
+
+          <!-- Cliente & Endereço -->
+          <div class="order-customer-box">
+            <div class="cust-row">
+              <strong>👤 {{ pedido.cliente?.nome || 'Cliente WhatsApp' }}</strong>
+              <a
+                [href]="'https://wa.me/' + pedido.cliente?.telefone"
+                target="_blank"
+                class="tel-link"
+              >
+                <app-icon nome="atendimentos" /> {{ pedido.cliente?.telefone }}
+              </a>
+            </div>
+            <div class="addr-text">
+              <app-icon nome="local" /> {{ pedido.endereco?.logradouro }},
+              {{ pedido.endereco?.numero }} — <strong>{{ pedido.endereco?.bairro }}</strong>
+            </div>
+          </div>
+
+          <!-- Itens do Pedido -->
+          <div class="order-items-list">
+            @for (item of pedido.itens; track item.id) {
+              <div class="order-item-row">
+                <div class="item-desc">
+                  <span class="item-qty">{{ item.quantidade }}x</span>
+                  <span class="item-name"
+                    >{{ item.nome_snapshot }} ({{ item.tamanho_snapshot }})</span
+                  >
+                </div>
+                <span class="item-price">{{
+                  item.subtotal | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR'
+                }}</span>
+              </div>
+            }
+          </div>
+
+          <!-- Pagamento e Total -->
+          <div class="order-footer">
+            <div class="pay-info">
+              <span class="pay-method">💳 {{ pedido.forma_pagamento | uppercase }}</span>
+              @if (pedido.troco_para) {
+                <span class="troco-info">Troco para: R$ {{ pedido.troco_para }}</span>
+              }
+            </div>
+            <div class="total-info">
+              <span class="total-label">Total</span>
+              <span class="total-val">{{
+                pedido.valor_total | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR'
+              }}</span>
+            </div>
+          </div>
+
+          <!-- Ações de Status da Cozinha e Despacho -->
+          <div class="order-actions">
+            @if (pedido.status !== 'entregue' && pedido.status !== 'cancelado') {
+              <button class="btn btn-secondary btn-sm" (click)="abrirCancelamento(pedido)">
+                Cancelar
+              </button>
+            }
+            @if (pedido.status === 'pendente') {
+              <button
+                class="btn btn-primary btn-sm full"
+                (click)="alterarStatus(pedido, 'em_preparo')"
+              >
+                <app-icon nome="preparo" /> Iniciar Preparo na Cozinha
+              </button>
+            }
+            @if (pedido.status === 'em_preparo') {
+              <button
+                class="btn btn-warning btn-sm full dispatch-btn"
+                [disabled]="despachandoIds()[pedido.id]"
+                (click)="despacharParaEntrega(pedido)"
+              >
+                @if (despachandoIds()[pedido.id]) {
+                  <app-icon nome="atualizar" /> Despachando & Notificando...
+                } @else {
+                  <app-icon nome="entrega" /> Despachar (Notificar Cliente)
+                }
+              </button>
+            }
+
+            @if (pedido.status === 'saiu_para_entrega') {
+              <button
+                class="btn btn-success btn-sm full"
+                (click)="alterarStatus(pedido, 'entregue')"
+              >
+                <app-icon nome="confirmar" /> Confirmar Entrega
+              </button>
+            }
+            @if (pedido.status === 'entregue') {
+              <span class="delivered-msg">🎉 Pedido Concluído e Entregue</span>
+            }
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state glass-card">
+          <span class="empty-icon">📭</span>
+          <h3>Nenhum pedido encontrado</h3>
+          <p>Os novos pedidos recebidos no WhatsApp aparecerão aqui em tempo real.</p>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- 2. VISÃO EM LISTA (TABELA DETALHADA) -->
+  @if (modoVisao() === 'lista') {
+    <div class="table-container glass-card">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Horário</th>
+            <th>Cliente</th>
+            <th>Endereço / Bairro</th>
+            <th>Itens do Pedido</th>
+            <th>Pagamento</th>
+            <th>Valor Total</th>
+            <th>Status</th>
+            <th>Ação Rápida</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (pedido of pedidos(); track pedido.id) {
+            <tr [class.highlight-row]="pedido.status === 'em_preparo'">
+              <td class="code-cell">
+                <strong>{{ pedido.codigo_pedido }}</strong>
+              </td>
+              <td class="time-cell">
+                {{ pedido.created_at | date: 'HH:mm • dd/MM' }}
+              </td>
+              <td>
+                <div class="client-cell">
+                  <span class="client-name">{{ pedido.cliente?.nome || 'Cliente' }}</span>
+                  <a
+                    [href]="'https://wa.me/' + pedido.cliente?.telefone"
+                    target="_blank"
+                    class="tel-link"
+                  >
+                    {{ pedido.cliente?.telefone }}
+                  </a>
+                </div>
+              </td>
+              <td>
+                <div class="addr-cell">
+                  <span>{{ pedido.endereco?.logradouro }}, {{ pedido.endereco?.numero }}</span>
+                  <small class="bairro-tag">{{ pedido.endereco?.bairro }}</small>
+                </div>
+              </td>
+              <td>
+                <div class="items-cell">
+                  @for (item of pedido.itens; track item.id) {
+                    <div class="item-bullet">
+                      • {{ item.quantidade }}x {{ item.nome_snapshot }} ({{
+                        item.tamanho_snapshot
+                      }})
+                    </div>
+                  }
+                </div>
+              </td>
+              <td>
+                <span class="pay-badge">{{ pedido.forma_pagamento }}</span>
+                @if (pedido.troco_para) {
+                  <div class="troco-tag">Tr. R$ {{ pedido.troco_para }}</div>
+                }
+              </td>
+              <td class="price-cell">
+                <strong>{{
+                  pedido.valor_total | currency: 'BRL' : 'symbol' : '1.2-2' : 'pt-BR'
+                }}</strong>
+              </td>
+              <td>
+                <app-pedido-status [status]="pedido.status" />
+              </td>
+              <td>
+                <div class="action-cell">
+                  @if (pedido.status !== 'entregue' && pedido.status !== 'cancelado') {
+                    <button class="btn btn-secondary btn-sm" (click)="abrirCancelamento(pedido)">
+                      Cancelar
+                    </button>
+                  }
+                  @if (pedido.status === 'pendente') {
+                    <button
+                      class="btn btn-primary btn-xs"
+                      (click)="alterarStatus(pedido, 'em_preparo')"
+                    >
+                      <app-icon nome="preparo" /> Preparar
+                    </button>
+                  }
+                  @if (pedido.status === 'em_preparo') {
+                    <button
+                      class="btn btn-warning btn-xs"
+                      [disabled]="despachandoIds()[pedido.id]"
+                      (click)="despacharParaEntrega(pedido)"
+                    >
+                      @if (despachandoIds()[pedido.id]) {
+                        <app-icon nome="atualizar" /> Despachando...
+                      } @else {
+                        <app-icon nome="entrega" /> Despachar
+                      }
+                    </button>
+                  }
+
+                  @if (pedido.status === 'saiu_para_entrega') {
+                    <button
+                      class="btn btn-success btn-xs"
+                      (click)="alterarStatus(pedido, 'entregue')"
+                    >
+                      <app-icon nome="confirmar" /> Entregue
+                    </button>
+                  }
+                  @if (pedido.status === 'entregue') {
+                    <span class="delivered-mini">Concluído</span>
+                  }
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="9" class="empty-table-cell">
+                Nenhum pedido localizado no filtro selecionado.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

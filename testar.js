@@ -100,6 +100,16 @@ const TESTES = [
     ],
     ok: (r) => /coca|bebida|endereço|entrega/i.test(r),
   },
+  {
+    nome: '12. Mensagem fora do contexto pede para escolher as opções',
+    msgs: ['oi', 'quem ganhou o jogo do Flamengo ontem?'],
+    ok: (r) => /não entendi/i.test(r) && /op[çc][õo]es acima/i.test(r) && !/flamengo|placar|gol/i.test(r),
+  },
+  {
+    nome: '13. Endereço durante o pedido não é tratado como fora do contexto',
+    msgs: ['quero 1 Filé de frango à parmegiana grande', 'sem bebida', 'Rua das Flores, 25, Centro. Nome Paula'],
+    ok: (r) => !/não entendi/i.test(r),
+  },
 ];
 
 let aprovados = 0;

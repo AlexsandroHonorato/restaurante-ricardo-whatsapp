@@ -8,7 +8,9 @@ describe('ApiService', () => {
   let http: HttpTestingController;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
     api = TestBed.inject(ApiService);
     http = TestBed.inject(HttpTestingController);
   });
@@ -16,9 +18,11 @@ describe('ApiService', () => {
 
   it('keeps the last KPI values and reports failure without fabricated sales', () => {
     let emitted = false;
-    api.getKpis().subscribe(() => emitted = true);
+    api.getKpis().subscribe(() => (emitted = true));
     expect(api.loading()).toBe(true);
-    http.expectOne('http://localhost:8080/api/dashboard/kpis').flush({}, { status: 503, statusText: 'Unavailable' });
+    http
+      .expectOne('http://localhost:8080/api/dashboard/kpis')
+      .flush({}, { status: 503, statusText: 'Unavailable' });
     expect(api.loading()).toBe(false);
     expect(api.kpis()).toBeNull();
     expect(api.erro()).toBeTruthy();
@@ -27,8 +31,10 @@ describe('ApiService', () => {
 
   it('does not replace operational orders with an empty success on failure', () => {
     let emitted = false;
-    api.getPedidos().subscribe(() => emitted = true);
-    http.expectOne('http://localhost:8080/api/pedidos').flush({}, { status: 500, statusText: 'Error' });
+    api.getPedidos().subscribe(() => (emitted = true));
+    http
+      .expectOne('http://localhost:8080/api/pedidos')
+      .flush({}, { status: 500, statusText: 'Error' });
     expect(emitted).toBe(false);
     expect(api.erro()).toBeTruthy();
   });
