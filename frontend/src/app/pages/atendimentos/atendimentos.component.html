@@ -1,9 +1,14 @@
-<div class="atendimentos-page">
+<div
+  class="atendimentos-page"
+  [class.sem-editar]="!podeEditar()"
+  [class.sem-excluir]="!podeExcluir()"
+>
   <div class="page-header">
     <div>
       <h1 class="page-title">Monitor de Atendimentos & Status da IA</h1>
       <p class="page-subtitle">
-        Acompanhe as conversas em tempo real, estágios da máquina de estados e transbordo humano
+        Conversas das últimas 24 horas em tempo real, estágios da máquina de estados e transbordo
+        humano
       </p>
     </div>
 
@@ -28,6 +33,16 @@
         </button>
       </div>
 
+      <select
+        class="periodo-select glass-card"
+        aria-label="Período das conversas"
+        [value]="periodoHoras()"
+        (change)="mudarPeriodo(+$any($event.target).value)"
+      >
+        @for (p of periodos; track p.horas) {
+          <option [value]="p.horas">{{ p.rotulo }}</option>
+        }
+      </select>
       <button class="refresh-btn glass-card" (click)="carregar()" title="Recarregar Dados">
         <app-icon nome="atualizar" /> Atualizar Status
       </button>
@@ -111,6 +126,49 @@
     </section>
   }
 
+  @if (semResposta().length) {
+    <section class="sem-resposta glass-card" aria-labelledby="sem-resposta-titulo">
+      <h2 id="sem-resposta-titulo">
+        <app-icon nome="alerta" /> {{ semResposta().length }} cliente(s) sem resposta
+      </h2>
+      <p>
+        Escreveram com o bot fora do ar e a mensagem chegou tarde demais para ele responder. Decida
+        se a equipe chama o cliente.
+      </p>
+      <ul>
+        @for (c of semResposta(); track c.telefone) {
+          <li>
+            <div class="sem-resposta-info">
+              <strong>WhatsApp {{ c.telefone }}</strong>
+              <span
+                >{{ c.ultima_em | date: 'dd/MM HH:mm' }} · {{ c.quantidade }} mensagem(ns) · “{{
+                  c.ultima_mensagem || 'mensagem sem texto'
+                }}”</span
+              >
+            </div>
+            <div class="sem-resposta-acoes">
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                (click)="abrirConversa(c.telefone)"
+              >
+                <app-icon nome="atendimentos" /> Conversar pelo painel
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm dispensar"
+                [disabled]="dispensando().has(c.telefone)"
+                (click)="dispensarSemResposta(c.telefone)"
+              >
+                Dispensar
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
   <!-- 1. VISÃO EM CARDS (FEED DE CONVERSAS) -->
   @if (modoVisao() === 'cards') {
     <div class="chat-feed-grid">
@@ -119,6 +177,15 @@
           class="glass-card chat-card"
           [class.alert-border]="s.status_atual === 'transbordo_humano'"
         >
+          <button
+            type="button"
+            class="handoff-close excluir-conversa"
+            (click)="pedirExclusao(s)"
+            title="Excluir conversa"
+            [attr.aria-label]="'Excluir conversa de ' + s.telefone"
+          >
+            <app-icon nome="excluir" />
+          </button>
           <div class="chat-header">
             <div class="chat-user">
               <div class="avatar" aria-hidden="true"><app-icon nome="atendimentos" /></div>
@@ -168,22 +235,32 @@
 
           <!-- Botões de Ação -->
           <div class="chat-footer">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm full"
+              (click)="abrirConversa(s.telefone)"
+            >
+              <app-icon nome="atendimentos" /> Conversar pelo painel
+            </button>
             <a
               [href]="'https://wa.me/' + s.telefone"
               target="_blank"
-              class="btn btn-primary btn-sm full"
+              rel="noopener noreferrer"
+              class="btn btn-secondary btn-sm full"
             >
-              <app-icon nome="atendimentos" /> Abrir Conversa no WhatsApp
+              Abrir no WhatsApp
             </a>
           </div>
         </div>
       } @empty {
         <div class="empty-state glass-card">
           <span class="empty-icon">🤖</span>
-          <h3>Nenhuma conversa ativa no momento</h3>
+          <h3>Nenhuma conversa {{ textoPeriodo() }}</h3>
           <p>
-            Assim que um cliente enviar uma mensagem no WhatsApp ou simulador, o status aparecerá
-            aqui.
+            Assim que um cliente enviar uma mensagem no WhatsApp, o status aparecerá aqui.
+            @if (periodoHoras() < 720) {
+              Para ver conversas mais antigas, escolha um período maior acima.
+            }
           </p>
         </div>
       }
@@ -257,12 +334,20 @@
                 <span class="expire-badge">{{ s.expira_em | date: 'HH:mm:ss' }}</span>
               </td>
               <td>
+                <button
+                  type="button"
+                  class="btn btn-primary btn-xs flex-btn"
+                  (click)="abrirConversa(s.telefone)"
+                >
+                  <app-icon nome="atendimentos" /> Conversar
+                </button>
                 <a
                   [href]="'https://wa.me/' + s.telefone"
                   target="_blank"
-                  class="btn btn-primary btn-xs flex-btn"
+                  rel="noopener noreferrer"
+                  class="btn btn-secondary btn-xs flex-btn"
                 >
-                  <app-icon nome="atendimentos" /> Abrir WhatsApp
+                  WhatsApp
                 </a>
               </td>
             </tr>
@@ -271,13 +356,90 @@
               <td colspan="6" class="empty-table-cell">
                 <div class="empty-state-mini">
                   <span>🤖</span>
-                  <p>Nenhuma conversa ativa no momento.</p>
+                  <p>Nenhuma conversa {{ textoPeriodo() }}.</p>
                 </div>
               </td>
             </tr>
           }
         </tbody>
       </table>
+    </div>
+  }
+
+  @if (conversaParaExcluir(); as s) {
+    <div class="conversa-overlay" (click)="cancelarExclusao()">
+      <section
+        class="excluir-modal glass-card"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="excluir-titulo"
+        aria-describedby="excluir-descricao"
+        (click)="$event.stopPropagation()"
+        (keydown.escape)="cancelarExclusao()"
+      >
+        <h2 id="excluir-titulo"><app-icon nome="alerta" /> Excluir esta conversa?</h2>
+        <div id="excluir-descricao">
+          <p>
+            A conversa de <strong>{{ s.telefone }}</strong> sai do monitor e volta ao bot no status
+            inicial. O rascunho do pedido e a pausa do bot são apagados; mensagens e pedidos
+            continuam gravados.
+          </p>
+          @if (s.status_atual === 'transbordo_humano') {
+            <p class="excluir-aviso">
+              Este cliente pediu atendimento humano. Ele não será avisado: na próxima mensagem, o
+              bot responde com o menu inicial.
+            </p>
+          }
+        </div>
+        @if (erroExclusao()) {
+          <p class="excluir-erro" role="alert">{{ erroExclusao() }}</p>
+        }
+        <div class="excluir-acoes">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            autofocus
+            [disabled]="excluindo()"
+            (click)="cancelarExclusao()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary excluir-confirmar"
+            [disabled]="excluindo()"
+            (click)="confirmarExclusao()"
+          >
+            <app-icon nome="excluir" /> {{ excluindo() ? 'Excluindo…' : 'Excluir conversa' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (conversaAberta(); as telefone) {
+    <div class="conversa-overlay" (click)="fecharConversa()">
+      <section
+        class="conversa-modal glass-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="conversa-titulo"
+        (click)="$event.stopPropagation()"
+        (keydown.escape)="fecharConversa()"
+      >
+        <header class="conversa-topo">
+          <h2 id="conversa-titulo">Conversa com {{ telefone }}</h2>
+          <button
+            type="button"
+            class="handoff-close"
+            (click)="fecharConversa()"
+            aria-label="Fechar conversa"
+          >
+            <app-icon nome="fechar" />
+          </button>
+        </header>
+        <app-conversa-painel [telefone]="telefone" />
+      </section>
     </div>
   }
 </div>

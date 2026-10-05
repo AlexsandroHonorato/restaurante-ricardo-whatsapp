@@ -17,6 +17,10 @@
 .submenu[hidden] {
   display: none;
 }
+/* Tela fora do perfil do usuário. */
+.nav-item[hidden] {
+  display: none !important;
+}
 .submenu .nav-item {
   font-size: 0.78rem;
   padding: 10px 8px;

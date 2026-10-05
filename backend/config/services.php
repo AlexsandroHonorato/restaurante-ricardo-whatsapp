@@ -6,8 +6,24 @@ return [
         'token' => env('NOTIFICACAO_TOKEN'),
     ],
 
+    // Agente de impressão da cozinha (impressora/agente-impressao.mjs). Vazio = rotas /impressora fechadas.
+    'impressora' => [
+        'token' => env('IMPRESSORA_TOKEN'),
+    ],
+
     'empresa' => [
         'nome' => env('EMPRESA_NOME', 'Restaurante Família Ricardo'),
+    ],
+
+    // LGPD: conversas de WhatsApp e clientes sem contato são removidos/anonimizados após estes prazos.
+    'retencao' => [
+        'mensagens_dias' => (int) env('MENSAGENS_RETENCAO_DIAS', 180),
+        'clientes_inativos_dias' => (int) env('CLIENTES_RETENCAO_DIAS', 730),
+    ],
+
+    'alertas' => [
+        // Recebe o aviso quando bot, WhatsApp ou filas de mensagens precisam de atenção (vazio = sem e-mail).
+        'email' => env('ALERTA_EMAIL'),
     ],
 
     /*

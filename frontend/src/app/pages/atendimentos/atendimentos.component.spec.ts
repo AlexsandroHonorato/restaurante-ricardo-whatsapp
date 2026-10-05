@@ -1,5 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
+import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { vi } from 'vitest';
 import { AtendimentosComponent } from './atendimentos.component';
 import { ApiService } from '../../core/services/api.service';
@@ -17,11 +20,13 @@ describe('Solicitação de atendimento humano', () => {
     TestBed.configureTestingModule({
       imports: [AtendimentosComponent],
       providers: [
+        provideRouter([]),
         {
           provide: ApiService,
           useValue: {
             getStatusConversas: consultar,
             getAtendimentos: () => of({ data: [] }),
+            getClientesSemResposta: () => of([]),
           },
         },
       ],
@@ -59,5 +64,131 @@ describe('Solicitação de atendimento humano', () => {
     const chamadas = consultar.mock.calls.length;
     await vi.advanceTimersByTimeAsync(10000);
     expect(consultar).toHaveBeenCalledTimes(chamadas);
+  });
+
+  it('abre a conversa no painel pelo card e fecha pelo botão', () => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({
+      imports: [AtendimentosComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ApiService,
+          useValue: {
+            getStatusConversas: () =>
+              of([{ id: 1, telefone: '5511999999999', status_atual: 'conversa_iniciada' }]),
+            getAtendimentos: () => of({ data: [] }),
+            getClientesSemResposta: () => of([]),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AtendimentosComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('.chat-footer button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const modal = el.querySelector('[role="dialog"]');
+    expect(modal?.textContent).toContain('Conversa com 5511999999999');
+    expect(modal?.querySelector('app-conversa-painel')).not.toBeNull();
+    (el.querySelector('[aria-label="Fechar conversa"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
+    fixture.destroy();
+  });
+
+  it('avisa clientes sem resposta, abre a conversa e some ao dispensar', () => {
+    vi.useFakeTimers();
+    const dispensar = vi.fn(() => of({ ok: true }));
+    TestBed.configureTestingModule({
+      imports: [AtendimentosComponent],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ApiService,
+          useValue: {
+            getStatusConversas: () => of([]),
+            getAtendimentos: () => of({ data: [] }),
+            getClientesSemResposta: () =>
+              of([
+                {
+                  telefone: '5511988887777',
+                  quantidade: 2,
+                  ultima_mensagem: 'quero pedir',
+                  ultima_em: '2026-10-05T15:05:00Z',
+                },
+              ]),
+            dispensarSemResposta: dispensar,
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AtendimentosComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const aviso = el.querySelector('.sem-resposta') as HTMLElement;
+    expect(aviso.textContent).toContain('1 cliente(s) sem resposta');
+    expect(aviso.textContent).toContain('5511988887777');
+    expect(aviso.textContent).toContain('quero pedir');
+    (aviso.querySelector('.btn-primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role="dialog"]')?.textContent).toContain(
+      'Conversa com 5511988887777',
+    );
+    (aviso.querySelector('.dispensar') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(dispensar).toHaveBeenCalledWith('5511988887777');
+    expect(el.querySelector('.sem-resposta')).toBeNull();
+    fixture.destroy();
+  });
+
+  it('exclui o card só depois de confirmar no modal de decisão', () => {
+    vi.useFakeTimers();
+    const resposta = new Subject<{ ok: boolean }>();
+    const excluir = vi.fn(() => resposta);
+    TestBed.configureTestingModule({
+      imports: [AtendimentosComponent],
+      providers: [
+        provideRouter([]),
+        {
+          provide: ApiService,
+          useValue: {
+            getStatusConversas: () =>
+              of([{ id: 1, telefone: '5511999999999', status_atual: 'transbordo_humano' }]),
+            getAtendimentos: () => of({ data: [] }),
+            getClientesSemResposta: () => of([]),
+            excluirConversa: excluir,
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AtendimentosComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const clicar = (seletor: string) => {
+      (el.querySelector(seletor) as HTMLButtonElement).click();
+      fixture.detectChanges();
+    };
+    clicar('.excluir-conversa');
+    const modal = el.querySelector('[role="alertdialog"]');
+    expect(modal?.textContent).toContain('5511999999999');
+    expect(modal?.querySelector('.excluir-aviso')?.textContent).toContain('atendimento humano');
+    clicar('.excluir-acoes .btn-secondary');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(excluir).not.toHaveBeenCalled();
+    clicar('.excluir-conversa');
+    clicar('.excluir-confirmar');
+    clicar('.excluir-confirmar');
+    expect(excluir).toHaveBeenCalledTimes(1);
+    expect(excluir).toHaveBeenCalledWith(1);
+    resposta.next({ ok: true });
+    fixture.detectChanges();
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(el.querySelector('.chat-card')).toBeNull();
+    fixture.destroy();
   });
 });

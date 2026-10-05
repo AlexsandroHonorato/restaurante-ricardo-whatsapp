@@ -17,6 +17,21 @@ import {
   HorariosAtendimentoResponse,
 } from '../models/dashboard.model';
 
+/** Resposta paginada do Laravel (paginate). */
+export interface Paginado<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+
+export interface ClienteSemResposta {
+  telefone: string;
+  quantidade: number;
+  ultima_mensagem: string | null;
+  ultima_em: string;
+}
+
 export interface PeriodoDashboard {
   inicio: string;
   fim: string;
@@ -131,45 +146,41 @@ export class ApiService {
     return this.http.get<{ data: Pedido[] }>(`${this.baseUrl}/pedidos?per_page=5`);
   }
 
-  getPedidos(status?: string, busca?: string): Observable<{ data: Pedido[] }> {
-    let params: string[] = [];
+  /** Falhas chegam à tela, que mostra o erro na própria lista sem apagar o que já estava carregado. */
+  getPedidos(
+    status?: string,
+    busca?: string,
+    pagina = 1,
+    periodo?: PeriodoDashboard,
+  ): Observable<Paginado<Pedido>> {
+    let params: string[] = [`page=${pagina}`];
     if (status) params.push(`status=${status}`);
     if (busca) params.push(`busca=${encodeURIComponent(busca)}`);
-    const qs = params.length ? `?${params.join('&')}` : '';
-
-    return this.http.get<{ data: Pedido[] }>(`${this.baseUrl}/pedidos${qs}`).pipe(
-      catchError(() => {
-        this.registrarFalha();
-        return EMPTY;
-      }),
-    );
+    if (periodo) params.push(`data_inicio=${periodo.inicio}`, `data_fim=${periodo.fim}`);
+    return this.http.get<Paginado<Pedido>>(`${this.baseUrl}/pedidos?${params.join('&')}`);
   }
 
   updatePedidoStatus(id: number, status: string, motivo_cancelamento?: string): Observable<any> {
     return this.http.patch(`${this.baseUrl}/pedidos/${id}/status`, { status, motivo_cancelamento });
   }
 
-  getClientes(busca?: string): Observable<{ data: Cliente[] }> {
-    const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
-    return this.http.get<{ data: Cliente[] }>(`${this.baseUrl}/clientes${qs}`).pipe(
-      catchError(() => {
-        this.registrarFalha();
-        return EMPTY;
-      }),
-    );
+  /** Exclui o pedido definitivamente (itens e histórico juntos); exige a permissão "excluir" em Pedidos. */
+  excluirPedido(id: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/pedidos/${id}`);
+  }
+
+  /** LGPD: apaga os dados pessoais do cliente (somente administrador). */
+  anonimizarCliente(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/clientes/${id}`);
+  }
+
+  getClientes(busca?: string, pagina = 1): Observable<Paginado<Cliente>> {
+    const qs = busca ? `&busca=${encodeURIComponent(busca)}` : '';
+    return this.http.get<Paginado<Cliente>>(`${this.baseUrl}/clientes?page=${pagina}${qs}`);
   }
 
   getCardapioConfiguracao(): Observable<CategoriaCardapio[]> {
     return this.http.get<CategoriaCardapio[]>(`${this.baseUrl}/cardapio`);
-  }
-
-  getCardapio(): Observable<CategoriaCardapio[]> {
-    return this.http.get<CategoriaCardapio[]>(`${this.baseUrl}/cardapio`).pipe(
-      catchError(() => {
-        this.registrarFalha();
-        return EMPTY;
-      }),
-    );
   }
 
   getCategoriasCardapio(): Observable<any[]> {
@@ -210,8 +221,28 @@ export class ApiService {
   iniciarContatoTransbordo(id: number): Observable<{ ok: boolean }> {
     return this.http.post<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/contato`, {});
   }
-  getStatusConversas(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/status-conversa`).pipe(
+  /** Clientes que escreveram com o bot fora do ar e ficaram sem resposta (últimas 24 h). */
+  getClientesSemResposta(): Observable<ClienteSemResposta[]> {
+    return this.http
+      .get<ClienteSemResposta[]>(`${this.baseUrl}/conversas/sem-resposta`)
+      .pipe(catchError(() => EMPTY));
+  }
+  /** A equipe viu o aviso e decidiu não chamar o cliente. */
+  dispensarSemResposta(telefone: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/conversas/${telefone}/sem-resposta`);
+  }
+  /** Tira o cliente da fila de alertas (sem enviar mensagem); a conversa continua no monitor. */
+  excluirAlertaTransbordo(id: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/alerta`);
+  }
+  /** Remove a conversa do monitor; mensagens, pedidos e cliente continuam gravados. */
+  excluirConversa(id: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}`);
+  }
+  /** Monitor: conversas do período (24, 168 ou 720 horas) + transbordos aguardando contato. */
+  getStatusConversas(horas = 24): Observable<any[]> {
+    const qs = horas === 24 ? '' : `?horas=${horas}`;
+    return this.http.get<any[]>(`${this.baseUrl}/status-conversa${qs}`).pipe(
       catchError(() => {
         this.registrarFalha();
         return EMPTY;

@@ -15,7 +15,7 @@ class StoreUserRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->user()?->active && $this->user()?->role === 'admin';
+        return (bool) $this->user()?->active && $this->user()->pode('usuarios', 'criar');
     }
 
     public function rules(): array
@@ -24,7 +24,9 @@ class StoreUserRequest extends FormRequest
             'name' => ['required', 'string', 'min:3', 'max:150'],
             'email' => ['required', 'email:rfc', 'max:254', Rule::unique('users')],
             'phone' => ['nullable', 'regex:/^[+0-9 ()-]{10,20}$/'],
+            // admin = perfil fixo Administrador; operador = segue o perfil escolhido (sem escolha, o padrão).
             'role' => ['required', Rule::in(['admin', 'operador'])],
+            'perfil_id' => ['nullable', 'integer', Rule::exists('perfis', 'id')],
             'active' => ['required', 'boolean'],
             'password' => PasswordPolicy::rules(),
         ];

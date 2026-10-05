@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Atendimento;
 use App\Models\Cliente;
+use App\Models\Empresa;
+use App\Models\MensagemWhatsapp;
 use App\Models\StatusConversa;
+use App\Support\ClientesSemResposta;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -76,7 +80,8 @@ class AtendimentoController extends Controller
         $statusConversa = StatusConversa::updateOrCreate(
             ['telefone' => $tel],
             [
-                'contato_iniciado_em' => ($statusAtual === 'transbordo_humano' && $statusAnterior === $statusAtual) ? $statusConversa?->contato_iniciado_em : null,
+                // Novo pedido de atendente ($transbordo) zera o contato: o cliente volta para a fila de alertas.
+                'contato_iniciado_em' => (! $transbordo && $statusAtual === 'transbordo_humano' && $statusAnterior === $statusAtual) ? $statusConversa?->contato_iniciado_em : null,
                 'status_atual' => $statusAtual,
                 'status_anterior' => $statusAnterior,
                 'rascunho' => $rascunho,
@@ -148,7 +153,7 @@ class AtendimentoController extends Controller
                         ->withToken(config('services.bot.token') ?? '')
                         ->post(config('services.bot.url').'/api/notificar', [
                             'para' => $conversa->telefone,
-                            'texto' => 'Olá! Sou da equipe do '.config('services.empresa.nome').'. Como posso ajudar você?',
+                            'texto' => 'Olá! Sou da equipe do '.Empresa::nomeExibicao().'. Como posso ajudar você?',
                             'idempotency_key' => $chave,
                         ])->throw();
                     if ($resposta->json('ok') !== true) {
@@ -168,9 +173,38 @@ class AtendimentoController extends Controller
         }
     }
 
-    public function getStatusConversas()
+    /** Tira o cliente da fila de alertas sem enviar saudação; a conversa continua no monitor, na mesma etapa. */
+    public function excluirAlerta(int $id): JsonResponse
     {
-        $status = StatusConversa::orderBy('ultimo_contato_em', 'DESC')->get();
+        $conversa = StatusConversa::findOrFail($id);
+        $conversa->update(['contato_iniciado_em' => $conversa->contato_iniciado_em ?? now()]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Remove a conversa do monitor. Mensagens, pedidos e cliente ficam; nova mensagem do cliente recria o registro. */
+    public function excluirConversa(int $id): JsonResponse
+    {
+        $conversa = StatusConversa::findOrFail($id);
+        // A equipe encerrou a conversa: os avisos pendentes deste cliente (envio que falhou, mensagem sem resposta) saem junto.
+        MensagemWhatsapp::where('telefone', $conversa->telefone)->where('direcao', 'saida')->where('status', 'falhou')->update(['status' => 'descartada']);
+        ClientesSemResposta::dispensar($conversa->telefone);
+        $conversa->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function getStatusConversas(Request $request)
+    {
+        // Monitor ao vivo (o painel consulta a cada 5 s): conversas do período (24 h, 7 ou 30 dias; padrão 24 h)
+        // e os transbordos ainda sem contato, estes primeiro para nunca ficarem de fora do limite.
+        $horas = in_array((int) $request->query('horas'), [24, 168, 720], true) ? (int) $request->query('horas') : 24;
+        $status = StatusConversa::where('ultimo_contato_em', '>=', now()->subHours($horas))
+            ->orWhere(fn ($q) => $q->where('status_atual', 'transbordo_humano')->whereNull('contato_iniciado_em'))
+            ->orderByRaw("CASE WHEN status_atual = 'transbordo_humano' AND contato_iniciado_em IS NULL THEN 0 ELSE 1 END")
+            ->orderBy('ultimo_contato_em', 'DESC')
+            ->limit(200)
+            ->get();
 
         return response()->json($status);
     }

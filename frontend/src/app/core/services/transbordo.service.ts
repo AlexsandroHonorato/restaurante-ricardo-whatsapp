@@ -17,7 +17,9 @@ export class TransbordoService {
     this.chegada.clear();
     this.conversas.set([]);
     this.fechados.set(new Set());
+    this.emContato.set(new Set());
     this.eventos.set(0);
+    this.periodoHoras.set(24);
   }
   private recebidos = false;
   private ativos = new Set<string>();
@@ -25,7 +27,12 @@ export class TransbordoService {
   fechados = signal(new Set<string>());
   fila = computed(() =>
     this.conversas()
-      .filter((s) => s.status_atual === 'transbordo_humano' && !s.contato_iniciado_em)
+      .filter(
+        (s) =>
+          s.status_atual === 'transbordo_humano' &&
+          !s.contato_iniciado_em &&
+          !this.emContato().has(s.id),
+      )
       .sort(
         (a, b) => (this.chegada.get(String(a.id)) ?? 0) - (this.chegada.get(String(b.id)) ?? 0),
       ),
@@ -41,19 +48,42 @@ export class TransbordoService {
       ),
     );
   }
+  /** Saudação em envio: o aviso some no clique e volta (reexibir) se o envio falhar. */
+  private emContato = signal(new Set<number>());
+  ocultar(id: number) {
+    this.emContato.update((ids) => new Set([...ids, id]));
+  }
+  reexibir(id: number) {
+    this.emContato.update((ids) => new Set([...ids].filter((x) => x !== id)));
+  }
+  remover(id: number) {
+    this.conversas.update((conversas) => conversas.filter((s) => s.id !== id));
+  }
   mostrarAlertas() {
     this.fechados.set(new Set());
   }
   conversas = signal<any[]>([]);
   aguardando = computed(() => this.fila().length);
   eventos = signal(0);
+  /** Período do Monitor de Atendimentos; o cabeçalho só precisa do padrão (transbordos vêm sempre). */
+  periodoHoras = signal(24);
+
+  mudarPeriodo(horas: number) {
+    if (horas === this.periodoHoras()) return;
+    this.periodoHoras.set(horas);
+    if (this.iniciado) {
+      this.consulta?.unsubscribe();
+      this.iniciado = false;
+      this.iniciar();
+    }
+  }
 
   iniciar() {
     if (this.iniciado) return;
     this.iniciado = true;
     this.consulta = timer(0, 5000)
       .pipe(
-        exhaustMap(() => this.api.getStatusConversas()),
+        exhaustMap(() => this.api.getStatusConversas(this.periodoHoras())),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((conversas) => {

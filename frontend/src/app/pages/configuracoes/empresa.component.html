@@ -1,0 +1,170 @@
+<section class="empresa-page">
+  <header>
+    <span class="eyebrow">CONFIGURAÇÕES</span>
+    <h1 class="page-title">Dados da empresa</h1>
+    <p class="page-subtitle">
+      O bot usa estas informações para se apresentar e responder dúvidas no WhatsApp. Os horários
+      vêm de “Horário de atendimento” e o cardápio de “Cardápio &amp; Preços”.
+    </p>
+  </header>
+
+  @if (carregando()) {
+    <p role="status">Carregando…</p>
+  } @else {
+    <form class="glass-card" (ngSubmit)="salvar()" #f="ngForm">
+      <div class="linha">
+        <label for="empresa-nome"
+          >Nome da empresa
+          <input id="empresa-nome" name="nome" [(ngModel)]="form.nome" required maxlength="150" />
+        </label>
+      </div>
+      <label for="empresa-tipo"
+        >Tipo de negócio
+        <select id="empresa-tipo" name="tipo_negocio" [(ngModel)]="form.tipo_negocio">
+          <option value="restaurante">Restaurante (pratos, bebidas e cozinha)</option>
+          <option value="loja">Loja (produtos, sem etapa de bebidas)</option>
+        </select>
+        <small class="ajuda">Define o vocabulário e as etapas do atendimento no WhatsApp.</small>
+      </label>
+      <div class="linha duas">
+        <label for="empresa-telefone"
+          >Telefone principal
+          <input
+            id="empresa-telefone"
+            name="telefone"
+            [(ngModel)]="form.telefone"
+            #telefone="ngModel"
+            appMascaraTelefone
+            type="tel"
+            inputmode="numeric"
+            maxlength="15"
+            pattern="\(\d{2}\) \d{4,5}-\d{4}"
+            placeholder="(12) 99999-0000"
+          />
+          @if (telefone.invalid) {
+            <small class="campo-erro" role="alert">Telefone incompleto.</small>
+          }
+        </label>
+        <label for="empresa-telefone2"
+          >Telefone alternativo
+          <input
+            id="empresa-telefone2"
+            name="telefone_2"
+            [(ngModel)]="form.telefone_2"
+            #telefone2="ngModel"
+            appMascaraTelefone
+            type="tel"
+            inputmode="numeric"
+            maxlength="15"
+            pattern="\(\d{2}\) \d{4,5}-\d{4}"
+            placeholder="(12) 3333-4444"
+          />
+          @if (telefone2.invalid) {
+            <small class="campo-erro" role="alert">Telefone incompleto.</small>
+          }
+        </label>
+      </div>
+      <label for="empresa-endereco"
+        >Endereço
+        <input id="empresa-endereco" name="endereco" [(ngModel)]="form.endereco" maxlength="255" />
+      </label>
+      <label for="empresa-quem"
+        >Quem somos
+        <textarea
+          id="empresa-quem"
+          name="quem_somos"
+          rows="3"
+          maxlength="4000"
+          [(ngModel)]="form.quem_somos"
+          placeholder="Ex.: Refeições caseiras desde 2018, delivery pelo WhatsApp."
+        ></textarea>
+      </label>
+      <label for="empresa-pagamento"
+        >Formas de pagamento
+        <textarea
+          id="empresa-pagamento"
+          name="formas_pagamento"
+          rows="4"
+          maxlength="4000"
+          [(ngModel)]="form.formas_pagamento"
+          placeholder="Uma por linha. Ex.: - Pix"
+        ></textarea>
+      </label>
+      <label for="empresa-politicas"
+        >Políticas e regras
+        <textarea
+          id="empresa-politicas"
+          name="politicas"
+          rows="5"
+          maxlength="4000"
+          [(ngModel)]="form.politicas"
+          placeholder="Ex.: - Pedido mínimo para entrega: R$ 25,00."
+        ></textarea>
+      </label>
+
+      <fieldset class="tempos">
+        <legend>Mensagens atrasadas do WhatsApp</legend>
+        <p class="ajuda">
+          Quando o bot fica fora do ar, o WhatsApp entrega depois as mensagens que ficaram paradas.
+          Estes tempos evitam que o bot responda atrasado ou várias vezes seguidas.
+        </p>
+        <div class="linha duas">
+          <label for="empresa-antiga"
+            >Ignorar mensagens antigas (minutos)
+            <input
+              id="empresa-antiga"
+              name="minutos_mensagem_antiga"
+              type="number"
+              min="1"
+              max="1440"
+              required
+              [(ngModel)]="form.minutos_mensagem_antiga"
+            />
+            <small class="ajuda"
+              >Recomendado: 10. Mensagem enviada há mais tempo que isso não é respondida; fica só no
+              histórico da conversa.</small
+            >
+          </label>
+          <label for="empresa-fila"
+            >Fila acumulada (minutos)
+            <input
+              id="empresa-fila"
+              name="minutos_fila_acumulada"
+              type="number"
+              min="1"
+              max="60"
+              required
+              [(ngModel)]="form.minutos_fila_acumulada"
+            />
+            <small class="ajuda"
+              >Recomendado: 1. Das mensagens que chegam com atraso maior que isso, só a primeira de
+              cada cliente é respondida.</small
+            >
+          </label>
+        </div>
+      </fieldset>
+
+      @if (erros().length) {
+        <ul class="erros" role="alert">
+          @for (e of erros(); track e) {
+            <li>{{ e }}</li>
+          }
+        </ul>
+      }
+      @if (mensagem()) {
+        <p class="sucesso" role="status">{{ mensagem() }}</p>
+      }
+      <div class="acoes">
+        <button
+          class="btn btn-primary"
+          type="submit"
+          [disabled]="salvando() || !form.nome.trim() || f.invalid || !podeEditar()"
+          [title]="podeEditar() ? '' : 'Seu perfil só pode ver estes dados'"
+          [attr.aria-busy]="salvando()"
+        >
+          {{ salvando() ? 'Salvando…' : 'Salvar dados' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>

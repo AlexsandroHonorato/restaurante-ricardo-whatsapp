@@ -7,8 +7,15 @@ export interface SystemUser {
   name: string;
   email: string;
   phone: string | null;
+  /** admin = perfil fixo Administrador (acesso total); operador = segue o perfil escolhido. */
   role: 'admin' | 'operador';
   active: boolean;
+  perfil_id?: number | null;
+  /** Na lista de usuários. */
+  perfil?: { id: number; nome: string } | null;
+  /** No login: nome do perfil em vigor e telas/ações liberadas. */
+  perfil_nome?: string;
+  permissoes?: Record<string, string[]>;
 }
 @Injectable({ providedIn: 'root' })
 export class SessionState {

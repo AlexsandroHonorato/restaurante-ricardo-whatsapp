@@ -10,19 +10,12 @@
 
   <!-- Navigation -->
   <nav class="nav-list">
-    <div class="nav-section-title">PRINCIPAL</div>
+    @if (auth.pode('pedidos', 'ver') || auth.pode('atendimentos', 'ver')) {
+      <div class="nav-section-title">PRINCIPAL</div>
+    }
 
     <a
-      routerLink="/dashboard"
-      routerLinkActive="active"
-      ariaCurrentWhenActive="page"
-      class="nav-item"
-    >
-      <app-icon nome="dashboard" />
-      <span class="nav-label">Dashboard Geral</span>
-    </a>
-
-    <a
+      [hidden]="!auth.pode('pedidos', 'ver')"
       routerLink="/pedidos"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -36,6 +29,7 @@
     </a>
 
     <a
+      [hidden]="!auth.pode('atendimentos', 'ver')"
       routerLink="/atendimentos"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -43,14 +37,21 @@
     >
       <app-icon nome="atendimentos" />
       <span class="nav-label">Atendimentos IA</span>
-      @if (api.kpis()?.total_transbordo_humano) {
-        <span class="nav-pill alert">{{ api.kpis()?.total_transbordo_humano }}</span>
+      @if (transbordo.aguardando()) {
+        <span
+          class="nav-pill alert"
+          [attr.aria-label]="transbordo.aguardando() + ' cliente(s) aguardando atendimento humano'"
+          >{{ transbordo.aguardando() }}</span
+        >
       }
     </a>
 
-    <div class="nav-section-title">CADASTROS</div>
+    @if (auth.pode('clientes', 'ver')) {
+      <div class="nav-section-title">CADASTROS</div>
+    }
 
     <a
+      [hidden]="!auth.pode('clientes', 'ver')"
       routerLink="/clientes"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -60,53 +61,72 @@
       <span class="nav-label">Clientes & LTV</span>
     </a>
 
-    <a
-      routerLink="/cardapio"
-      routerLinkActive="active"
-      ariaCurrentWhenActive="page"
-      class="nav-item"
-    >
-      <app-icon nome="cardapio" />
-      <span class="nav-label">Cardápio & Preços</span>
-    </a>
-    @if (auth.user()?.role === 'admin') {
-      <a
-        routerLink="/usuarios"
-        routerLinkActive="active"
-        ariaCurrentWhenActive="page"
-        class="nav-item"
-        ><app-icon nome="clientes" /><span class="nav-label">Usuários do sistema</span></a
-      >
-    }
-    <div class="nav-section-title">ADMINISTRAÇÃO</div>
-    <div class="config-menu">
-      <button
-        type="button"
-        class="nav-item config-toggle"
-        (click)="configuracoesAbertas = !configuracoesAbertas"
-        [attr.aria-expanded]="configuracoesAbertas"
-        aria-controls="submenu-configuracoes"
-      >
-        <app-icon nome="configuracoes" /><span class="nav-label">Configurações</span
-        ><span class="chevron" aria-hidden="true">{{ configuracoesAbertas ? '⌄' : '›' }}</span>
-      </button>
-      <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
-        <a
-          routerLink="/configuracoes/horarios"
-          routerLinkActive="active"
-          ariaCurrentWhenActive="page"
-          class="nav-item"
-          >Horário de atendimento</a
+    @if (temConfiguracoes()) {
+      <div class="nav-section-title">ADMINISTRAÇÃO</div>
+      <div class="config-menu">
+        <button
+          type="button"
+          class="nav-item config-toggle"
+          (click)="configuracoesAbertas = !configuracoesAbertas"
+          [attr.aria-expanded]="configuracoesAbertas"
+          aria-controls="submenu-configuracoes"
         >
-        <a
-          routerLink="/configuracoes/pratos-semana"
-          routerLinkActive="active"
-          ariaCurrentWhenActive="page"
-          class="nav-item"
-          >Pratos por dia da semana</a
-        >
+          <app-icon nome="configuracoes" /><span class="nav-label">Configurações</span
+          ><span class="chevron" aria-hidden="true">{{ configuracoesAbertas ? '⌄' : '›' }}</span>
+        </button>
+        <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
+          <a
+            [hidden]="!auth.pode('dashboard', 'ver')"
+            routerLink="/configuracoes/dashboard"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Dashboard Geral</a
+          >
+          <a
+            [hidden]="!auth.pode('cardapio', 'ver')"
+            routerLink="/configuracoes/cardapio"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Cardápio & Preços</a
+          >
+          <a
+            [hidden]="!auth.pode('empresa', 'ver')"
+            routerLink="/configuracoes/empresa"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Dados da empresa</a
+          >
+          <a
+            [hidden]="!auth.pode('horarios', 'ver')"
+            routerLink="/configuracoes/horarios"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Horário de atendimento</a
+          >
+          <a
+            [hidden]="!auth.pode('usuarios', 'ver')"
+            routerLink="/configuracoes/usuarios"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Usuários do sistema</a
+          >
+          @if (auth.user()?.role === 'admin') {
+            <a
+              routerLink="/configuracoes/perfis"
+              routerLinkActive="active"
+              ariaCurrentWhenActive="page"
+              class="nav-item"
+              >Perfis de usuário</a
+            >
+          }
+        </div>
       </div>
-    </div>
+    }
   </nav>
 
   <!-- Bot Status Card -->

@@ -1,0 +1,221 @@
+.perfis-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  max-width: 980px;
+}
+.topo {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+}
+.eyebrow {
+  color: var(--primary-text);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+.aviso {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.aviso.erro {
+  color: var(--danger);
+}
+.aviso.sucesso {
+  color: var(--success);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-6);
+}
+.formulario h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  max-width: 420px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+input:not([type='checkbox']) {
+  width: 100%;
+  padding: 11px 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 400;
+}
+
+.grade-rolagem {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+.grade {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.grade caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.grade th,
+.grade td {
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+}
+.grade tbody tr:last-child th,
+.grade tbody tr:last-child td {
+  border-bottom: 0;
+}
+.grade thead th {
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.grade th:first-child {
+  text-align: left;
+}
+.grade tbody th {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.grade tr.ativa th {
+  color: var(--text-primary);
+}
+.grade tr.ativa {
+  background: var(--primary-glow);
+}
+.grade small {
+  display: block;
+  margin-top: var(--ds-space-1);
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.grade input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.nao-existe {
+  color: var(--text-muted);
+}
+.ajuda {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.acoes-formulario {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--ds-space-3);
+}
+
+.lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+.perfil {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-4) var(--ds-space-6);
+}
+.perfil.selecionado {
+  border-color: var(--primary);
+}
+.perfil.fixo {
+  opacity: 0.85;
+}
+.perfil-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.perfil-info span {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+.perfil-info small {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.selo {
+  margin-left: var(--ds-space-2);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-glow);
+  color: var(--primary-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.perfil-acoes {
+  display: flex;
+  gap: var(--ds-space-2);
+  flex-shrink: 0;
+}
+.action-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.action-btn:hover:not(:disabled) {
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+.action-btn.delete:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .formulario {
+    padding: var(--ds-space-4);
+  }
+  .perfil {
+    padding: var(--ds-space-4);
+  }
+}
