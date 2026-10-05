@@ -56,6 +56,37 @@ export class AtendimentosComponent implements OnInit {
         },
       });
   }
+  /** Conversa aguardando a decisão no modal de exclusão. */
+  conversaParaExcluir = signal<{ id: number; telefone: string; status_atual: string } | null>(null);
+  excluindo = signal(false);
+  erroExclusao = signal('');
+  pedirExclusao(s: { id: number; telefone: string; status_atual: string }) {
+    this.erroExclusao.set('');
+    this.conversaParaExcluir.set(s);
+  }
+  cancelarExclusao() {
+    if (!this.excluindo()) this.conversaParaExcluir.set(null);
+  }
+  confirmarExclusao() {
+    const s = this.conversaParaExcluir();
+    if (!s || this.excluindo()) return;
+    this.excluindo.set(true);
+    this.erroExclusao.set('');
+    this.api
+      .excluirConversa(s.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.transbordo.remover(s.id);
+          this.excluindo.set(false);
+          this.conversaParaExcluir.set(null);
+        },
+        error: () => {
+          this.erroExclusao.set('Não foi possível excluir. Tente novamente.');
+          this.excluindo.set(false);
+        },
+      });
+  }
   transbordos = this.transbordo.fila;
   conversasVisiveis = computed(() =>
     this.filtroTransbordo() === true

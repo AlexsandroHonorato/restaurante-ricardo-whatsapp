@@ -7,6 +7,7 @@ use App\Models\Cliente;
 use App\Models\Empresa;
 use App\Models\StatusConversa;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -77,7 +78,8 @@ class AtendimentoController extends Controller
         $statusConversa = StatusConversa::updateOrCreate(
             ['telefone' => $tel],
             [
-                'contato_iniciado_em' => ($statusAtual === 'transbordo_humano' && $statusAnterior === $statusAtual) ? $statusConversa?->contato_iniciado_em : null,
+                // Novo pedido de atendente ($transbordo) zera o contato: o cliente volta para a fila de alertas.
+                'contato_iniciado_em' => (! $transbordo && $statusAtual === 'transbordo_humano' && $statusAnterior === $statusAtual) ? $statusConversa?->contato_iniciado_em : null,
                 'status_atual' => $statusAtual,
                 'status_anterior' => $statusAnterior,
                 'rascunho' => $rascunho,
@@ -167,6 +169,23 @@ class AtendimentoController extends Controller
 
             return response()->json(['message' => 'Não foi possível enviar a saudação. Tente novamente.'], 502);
         }
+    }
+
+    /** Tira o cliente da fila de alertas sem enviar saudação; a conversa continua no monitor, na mesma etapa. */
+    public function excluirAlerta(int $id): JsonResponse
+    {
+        $conversa = StatusConversa::findOrFail($id);
+        $conversa->update(['contato_iniciado_em' => $conversa->contato_iniciado_em ?? now()]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    /** Remove a conversa do monitor. Mensagens, pedidos e cliente ficam; nova mensagem do cliente recria o registro. */
+    public function excluirConversa(int $id): JsonResponse
+    {
+        StatusConversa::findOrFail($id)->delete();
+
+        return response()->json(['ok' => true]);
     }
 
     public function getStatusConversas(Request $request)

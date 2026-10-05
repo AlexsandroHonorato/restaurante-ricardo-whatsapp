@@ -17,6 +17,7 @@ export class TransbordoService {
     this.chegada.clear();
     this.conversas.set([]);
     this.fechados.set(new Set());
+    this.emContato.set(new Set());
     this.eventos.set(0);
     this.periodoHoras.set(24);
   }
@@ -26,7 +27,12 @@ export class TransbordoService {
   fechados = signal(new Set<string>());
   fila = computed(() =>
     this.conversas()
-      .filter((s) => s.status_atual === 'transbordo_humano' && !s.contato_iniciado_em)
+      .filter(
+        (s) =>
+          s.status_atual === 'transbordo_humano' &&
+          !s.contato_iniciado_em &&
+          !this.emContato().has(s.id),
+      )
       .sort(
         (a, b) => (this.chegada.get(String(a.id)) ?? 0) - (this.chegada.get(String(b.id)) ?? 0),
       ),
@@ -41,6 +47,17 @@ export class TransbordoService {
         s.id === id ? { ...s, contato_iniciado_em: new Date().toISOString() } : s,
       ),
     );
+  }
+  /** Saudação em envio: o aviso some no clique e volta (reexibir) se o envio falhar. */
+  private emContato = signal(new Set<number>());
+  ocultar(id: number) {
+    this.emContato.update((ids) => new Set([...ids, id]));
+  }
+  reexibir(id: number) {
+    this.emContato.update((ids) => new Set([...ids].filter((x) => x !== id)));
+  }
+  remover(id: number) {
+    this.conversas.update((conversas) => conversas.filter((s) => s.id !== id));
   }
   mostrarAlertas() {
     this.fechados.set(new Set());

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { vi } from 'vitest';
@@ -91,6 +91,50 @@ describe('Solicitação de atendimento humano', () => {
     (el.querySelector('[aria-label="Fechar conversa"]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(el.querySelector('[role="dialog"]')).toBeNull();
+    fixture.destroy();
+  });
+
+  it('exclui o card só depois de confirmar no modal de decisão', () => {
+    vi.useFakeTimers();
+    const resposta = new Subject<{ ok: boolean }>();
+    const excluir = vi.fn(() => resposta);
+    TestBed.configureTestingModule({
+      imports: [AtendimentosComponent],
+      providers: [
+        {
+          provide: ApiService,
+          useValue: {
+            getStatusConversas: () =>
+              of([{ id: 1, telefone: '5511999999999', status_atual: 'transbordo_humano' }]),
+            getAtendimentos: () => of({ data: [] }),
+            excluirConversa: excluir,
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AtendimentosComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const clicar = (seletor: string) => {
+      (el.querySelector(seletor) as HTMLButtonElement).click();
+      fixture.detectChanges();
+    };
+    clicar('.excluir-conversa');
+    const modal = el.querySelector('[role="alertdialog"]');
+    expect(modal?.textContent).toContain('5511999999999');
+    expect(modal?.querySelector('.excluir-aviso')?.textContent).toContain('atendimento humano');
+    clicar('.excluir-acoes .btn-secondary');
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(excluir).not.toHaveBeenCalled();
+    clicar('.excluir-conversa');
+    clicar('.excluir-confirmar');
+    clicar('.excluir-confirmar');
+    expect(excluir).toHaveBeenCalledTimes(1);
+    expect(excluir).toHaveBeenCalledWith(1);
+    resposta.next({ ok: true });
+    fixture.detectChanges();
+    expect(el.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(el.querySelector('.chat-card')).toBeNull();
     fixture.destroy();
   });
 });

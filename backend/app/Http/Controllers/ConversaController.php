@@ -57,12 +57,18 @@ class ConversaController extends Controller
         return response()->json(['bot_pausado_ate' => $this->pausadoAte($telefone)]);
     }
 
-    /** Para o bot: se deve ficar em silêncio nesta conversa agora. */
+    /**
+     * Para o bot: se deve ficar em silêncio nesta conversa agora. A etapa gravada (null = conversa excluída)
+     * mostra ao bot que a equipe encerrou o transbordo pelo painel.
+     */
     public function pausaParaBot(string $telefone): JsonResponse
     {
         $this->validarTelefone($telefone);
 
-        return response()->json(['pausado' => $this->pausadoAte($telefone) !== null]);
+        return response()->json([
+            'pausado' => $this->pausadoAte($telefone) !== null,
+            'status' => StatusConversa::where('telefone', $telefone)->value('status_atual'),
+        ]);
     }
 
     private function pausar(string $telefone, bool $pausar): void

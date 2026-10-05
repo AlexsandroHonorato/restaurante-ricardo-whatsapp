@@ -76,6 +76,7 @@ export class TransbordosModalComponent {
     if (!cliente) return;
     this.enviando.update((ids) => new Set([...ids, id]));
     this.erros.update((erros) => ({ ...erros, [id]: '' }));
+    this.transbordo.ocultar(id);
     this.api
       .iniciarContatoTransbordo(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -83,12 +84,35 @@ export class TransbordosModalComponent {
         next: () => {
           this.ultimoContato.set(cliente.telefone);
           this.transbordo.assumir(id);
+          this.transbordo.reexibir(id);
+          this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
+        },
+        error: () => {
+          this.transbordo.reexibir(id);
+          this.erros.update((erros) => ({
+            ...erros,
+            [id]: 'Não foi possível enviar a saudação. Tente novamente.',
+          }));
+          this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
+        },
+      });
+  }
+  excluir(id: number) {
+    if (this.enviando().has(id)) return;
+    this.enviando.update((ids) => new Set([...ids, id]));
+    this.erros.update((erros) => ({ ...erros, [id]: '' }));
+    this.api
+      .excluirAlertaTransbordo(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.transbordo.assumir(id);
           this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
         },
         error: () => {
           this.erros.update((erros) => ({
             ...erros,
-            [id]: 'Não foi possível enviar a saudação. Tente novamente.',
+            [id]: 'Não foi possível excluir o alerta. Tente novamente.',
           }));
           this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
         },

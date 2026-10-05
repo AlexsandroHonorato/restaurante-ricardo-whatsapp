@@ -41,6 +41,13 @@ describe('Avisos de transbordo', () => {
     service.iniciar();
     await vi.advanceTimersByTimeAsync(0);
     expect(service.aguardando()).toBe(5);
+    // Saudação em envio: some no clique, continua oculto na consulta seguinte e volta se o envio falhar.
+    service.ocultar(3);
+    expect(service.aguardando()).toBe(4);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(service.aguardando()).toBe(4);
+    service.reexibir(3);
+    expect(service.aguardando()).toBe(5);
     service.assumir(3);
     expect(service.aguardando()).toBe(4);
     expect(service.alertas().some((s) => s.id === 3)).toBe(false);

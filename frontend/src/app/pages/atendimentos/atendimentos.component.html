@@ -130,6 +130,15 @@
           class="glass-card chat-card"
           [class.alert-border]="s.status_atual === 'transbordo_humano'"
         >
+          <button
+            type="button"
+            class="handoff-close excluir-conversa"
+            (click)="pedirExclusao(s)"
+            title="Excluir conversa"
+            [attr.aria-label]="'Excluir conversa de ' + s.telefone"
+          >
+            <app-icon nome="excluir" />
+          </button>
           <div class="chat-header">
             <div class="chat-user">
               <div class="avatar" aria-hidden="true"><app-icon nome="atendimentos" /></div>
@@ -307,6 +316,57 @@
           }
         </tbody>
       </table>
+    </div>
+  }
+
+  @if (conversaParaExcluir(); as s) {
+    <div class="conversa-overlay" (click)="cancelarExclusao()">
+      <section
+        class="excluir-modal glass-card"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="excluir-titulo"
+        aria-describedby="excluir-descricao"
+        (click)="$event.stopPropagation()"
+        (keydown.escape)="cancelarExclusao()"
+      >
+        <h2 id="excluir-titulo"><app-icon nome="alerta" /> Excluir esta conversa?</h2>
+        <div id="excluir-descricao">
+          <p>
+            A conversa de <strong>{{ s.telefone }}</strong> sai do monitor e volta ao bot no status
+            inicial. O rascunho do pedido e a pausa do bot são apagados; mensagens e pedidos
+            continuam gravados.
+          </p>
+          @if (s.status_atual === 'transbordo_humano') {
+            <p class="excluir-aviso">
+              Este cliente pediu atendimento humano. Ele não será avisado: na próxima mensagem, o
+              bot responde com o menu inicial.
+            </p>
+          }
+        </div>
+        @if (erroExclusao()) {
+          <p class="excluir-erro" role="alert">{{ erroExclusao() }}</p>
+        }
+        <div class="excluir-acoes">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            autofocus
+            [disabled]="excluindo()"
+            (click)="cancelarExclusao()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary excluir-confirmar"
+            [disabled]="excluindo()"
+            (click)="confirmarExclusao()"
+          >
+            <app-icon nome="excluir" /> {{ excluindo() ? 'Excluindo…' : 'Excluir conversa' }}
+          </button>
+        </div>
+      </section>
     </div>
   }
 

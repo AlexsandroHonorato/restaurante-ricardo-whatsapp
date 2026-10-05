@@ -277,6 +277,27 @@ test('conversa assumida pela equipe no painel: bot fica em silêncio e não cham
   } finally { globalThis.fetch = original; }
 });
 
+test('transbordo encerrado pela equipe no painel: bot recarrega do banco e volta ao início', async () => {
+  const original = globalThis.fetch;
+  const tel = '5512999992222';
+  let statusBanco = 'transbordo_humano';
+  globalThis.fetch = async url => ({ ok: true, json: async () => {
+    if (String(url).includes('horarios-atendimento')) return agendaAberta;
+    if (String(url).endsWith('/pausa')) return { pausado: false, status: statusBanco };
+    if (String(url).includes('/bot/conversas/')) return { status: statusBanco, historico: [] };
+    if (String(url).includes('openrouter')) return { choices: [{ message: { content: 'ok' } }] };
+    return {};
+  } });
+  try {
+    cerebro.limparMemoria(tel);
+    await cerebro.responderNaFila(tel, 'oi');
+    assert.equal(cerebro.memoria[tel].status, 'transbordo_humano');
+    statusBanco = 'conversa_iniciada';
+    await cerebro.responderNaFila(tel, 'oi');
+    assert.equal(cerebro.memoria[tel].status, 'conversa_iniciada');
+  } finally { globalThis.fetch = original; }
+});
+
 test('sem a API a conversa não é processada (a mensagem fica pendente para nova tentativa)', async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async url => (String(url).includes('horarios-atendimento')

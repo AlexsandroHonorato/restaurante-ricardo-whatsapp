@@ -63,10 +63,37 @@ class FluxoPedidoTest extends TestCase
         $this->assertNotNull(StatusConversa::find($id)->contato_iniciado_em);
         $this->postJson('/api/status-conversa/sync', ['telefone' => '5512999997777', 'status' => 'transbordo_humano'])->assertOk();
         $this->assertNotNull(StatusConversa::find($id)->contato_iniciado_em);
+        // Cliente pede a equipe de novo ainda em transbordo: volta para a fila de alertas.
+        $this->postJson('/api/status-conversa/sync', ['telefone' => '5512999997777', 'status' => 'transbordo_humano', 'transbordo' => true])->assertOk();
+        $this->assertNull(StatusConversa::find($id)->contato_iniciado_em);
+        StatusConversa::find($id)->update(['contato_iniciado_em' => now()]);
         Http::assertSentCount(1);
         Http::assertSent(fn ($r) => str_contains($r['texto'], 'Como posso ajudar'));
         StatusConversa::find($id)->update(['status_atual' => 'conversa_iniciada']);
         $this->postJson("/api/status-conversa/{$id}/contato")->assertStatus(409);
+    }
+
+    public function test_excluir_alerta_so_tira_da_fila_e_excluir_conversa_devolve_ao_bot_no_inicio(): void
+    {
+        Http::fake();
+        $this->postJson('/api/status-conversa/sync', ['telefone' => '5512999995555', 'status' => 'transbordo_humano', 'transbordo' => true, 'rascunho' => ['pratos' => ['Frango']]])->assertOk();
+        $this->postJson('/api/conversas/5512999995555/pausa', ['pausar' => true])->assertOk();
+        $id = StatusConversa::where('telefone', '5512999995555')->firstOrFail()->id;
+        $this->getJson('/api/bot/conversas/5512999995555/pausa')->assertJsonPath('pausado', true)->assertJsonPath('status', 'transbordo_humano');
+
+        $this->deleteJson("/api/status-conversa/{$id}/alerta")->assertOk();
+        $conversa = StatusConversa::find($id);
+        $this->assertNotNull($conversa->contato_iniciado_em);
+        $this->assertSame(['pratos' => ['Frango']], $conversa->rascunho);
+        $this->getJson('/api/bot/conversas/5512999995555/pausa')->assertJsonPath('pausado', true)->assertJsonPath('status', 'transbordo_humano');
+        $this->getJson('/api/status-conversa')->assertOk()->assertJsonPath('0.telefone', '5512999995555');
+        Http::assertNothingSent();
+
+        $this->deleteJson("/api/status-conversa/{$id}")->assertOk();
+        $this->assertNull(StatusConversa::find($id));
+        $this->getJson('/api/bot/conversas/5512999995555/pausa')->assertJsonPath('pausado', false)->assertJsonPath('status', null);
+        $this->getJson('/api/status-conversa')->assertOk()->assertJsonCount(0);
+        $this->deleteJson("/api/status-conversa/{$id}")->assertNotFound();
     }
 
     private ProdutoVariacao $frango;

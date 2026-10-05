@@ -59,6 +59,25 @@ describe('Conversa no painel', () => {
     http.verify();
   });
 
+  it('rola até a última mensagem quando chega uma nova, sem mexer na rolagem se nada mudou', () => {
+    const { fixture, http, el } = montar();
+    const lista = el.querySelector('.historico') as HTMLElement;
+    Object.defineProperty(lista, 'scrollHeight', { configurable: true, value: 900 });
+    lista.scrollTop = 120;
+    vi.advanceTimersByTime(5000);
+    http.expectOne(URL_MSG).flush(HISTORICO);
+    fixture.detectChanges();
+    expect(lista.scrollTop).toBe(120);
+    vi.advanceTimersByTime(5000);
+    http.expectOne(URL_MSG).flush({
+      ...HISTORICO,
+      mensagens: [...HISTORICO.mensagens, { ...HISTORICO.mensagens[0], id: 3, texto: 'Oi?' }],
+    });
+    fixture.detectChanges();
+    expect(lista.scrollTop).toBe(900);
+    fixture.destroy();
+  });
+
   it('envia a resposta do atendente, mostra que o bot pausou e não envia duas vezes', () => {
     const { fixture, http, el, c } = montar();
     c.texto = 'Olá, aqui é a Ana!';

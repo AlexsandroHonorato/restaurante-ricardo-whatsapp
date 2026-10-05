@@ -489,7 +489,13 @@ export async function responder(tel, texto, contexto = {}) {
   const atendimento = await consultarAtendimento();
   if (!atendimento.aberto) return atendimento.mensagem;
   // A equipe assumiu a conversa pelo painel: a mensagem fica registrada e o bot não responde.
-  if (await apiBot.pausado(tel)) return null;
+  const emTransbordo = memoria[tel]?.status === STATUS_CONVERSA.TRANSBORDO;
+  // Espera o transbordo chegar ao banco antes de comparar com a etapa gravada.
+  if (emTransbordo) await filasSincronizacao.get(tel);
+  const pausa = await apiBot.pausa(tel);
+  if (pausa.pausado === true) return null;
+  // A equipe encerrou o transbordo pelo painel (excluiu o alerta ou a conversa): recomeça do estado do banco.
+  if (emTransbordo && pausa.status !== undefined && pausa.status !== STATUS_CONVERSA.TRANSBORDO) delete memoria[tel];
   // Protege os créditos da IA: acima do limite avisa uma vez e depois não responde (null).
   const limite = limitador.verificar(tel);
   if (limite === 'silencio') return null;

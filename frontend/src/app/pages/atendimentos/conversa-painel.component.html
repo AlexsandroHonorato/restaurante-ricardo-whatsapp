@@ -17,7 +17,7 @@
     </button>
   </div>
 
-  <ol class="historico" aria-label="Mensagens da conversa">
+  <ol #historico class="historico" aria-label="Mensagens da conversa">
     @for (m of mensagens(); track m.id) {
       <li class="balao" [class.cliente]="m.direcao === 'entrada'" [class.equipe]="m.enviada_por">
         <span class="autor">{{

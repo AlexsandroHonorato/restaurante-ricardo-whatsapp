@@ -60,7 +60,27 @@ h2 app-icon {
   display: grid;
   gap: 12px;
 }
+.excluir-alerta {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.excluir-alerta:hover {
+  color: var(--danger);
+  background: var(--bg-surface-elevated);
+}
 .pending-item {
+  position: relative;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -109,6 +129,7 @@ h2 app-icon {
   flex-shrink: 0;
 }
 .pending-info {
+  padding-right: 20px;
   flex: 1;
   min-width: 150px;
   display: flex;

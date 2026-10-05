@@ -28,6 +28,16 @@
   <div class="modal-list">
     @for (s of transbordo.fila(); track s.id; let i = $index) {
       <article class="pending-item">
+        <button
+          type="button"
+          class="excluir-alerta"
+          [disabled]="enviando().has(s.id)"
+          (click)="excluir(s.id)"
+          title="Excluir alerta"
+          [attr.aria-label]="'Excluir alerta de ' + s.telefone"
+        >
+          <app-icon nome="excluir" />
+        </button>
         <span class="queue-number">{{ i + 1 }}</span>
         <div class="pending-info">
           <strong>Cliente solicita atendimento</strong>

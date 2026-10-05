@@ -1,4 +1,14 @@
-import { Component, DestroyRef, OnInit, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  OnInit,
+  afterRenderEffect,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -34,6 +44,19 @@ export class ConversaPainelComponent implements OnInit {
   texto = '';
 
   private destroyRef = inject(DestroyRef);
+  private historico = viewChild<ElementRef<HTMLElement>>('historico');
+  private ultimaRolada?: number;
+
+  constructor() {
+    // Rola até o fim só quando chega mensagem nova: a consulta de 5 s não tira do lugar quem lê as antigas.
+    afterRenderEffect(() => {
+      const ultima = this.mensagens().at(-1)?.id;
+      if (ultima === this.ultimaRolada) return;
+      this.ultimaRolada = ultima;
+      const lista = this.historico()?.nativeElement;
+      if (lista) lista.scrollTop = lista.scrollHeight;
+    });
+  }
 
   ngOnInit() {
     this.carregar();

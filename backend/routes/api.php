@@ -110,6 +110,8 @@ Route::middleware('web')->group(function () {
         Route::prefix('status-conversa')->group(function () {
             Route::get('/', [AtendimentoController::class, 'getStatusConversas']);
             Route::post('/{id}/contato', [AtendimentoController::class, 'iniciarContato'])->whereNumber('id');
+            Route::delete('/{id}/alerta', [AtendimentoController::class, 'excluirAlerta'])->whereNumber('id');
+            Route::delete('/{id}', [AtendimentoController::class, 'excluirConversa'])->whereNumber('id');
 
         });
 

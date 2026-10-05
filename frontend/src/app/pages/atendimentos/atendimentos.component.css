@@ -243,6 +243,7 @@
 }
 
 .chat-card {
+  position: relative;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -290,6 +291,7 @@
   overflow-wrap: anywhere;
 }
 .chat-header {
+  padding-right: 22px;
   flex-wrap: wrap;
   display: flex;
   align-items: center;
@@ -410,6 +412,44 @@
 .conversa-topo h2 {
   margin: 0;
   font-size: 1rem;
+}
+.excluir-modal {
+  width: min(440px, 100%);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.excluir-modal h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.05rem;
+}
+.excluir-modal h2 app-icon {
+  color: var(--warning);
+}
+.excluir-modal p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+.excluir-modal .excluir-aviso {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.14);
+  color: var(--text-primary);
+}
+.excluir-modal .excluir-erro {
+  color: var(--danger);
+}
+.excluir-acoes {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .full {

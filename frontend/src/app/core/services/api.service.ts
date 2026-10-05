@@ -203,6 +203,14 @@ export class ApiService {
   iniciarContatoTransbordo(id: number): Observable<{ ok: boolean }> {
     return this.http.post<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/contato`, {});
   }
+  /** Tira o cliente da fila de alertas (sem enviar mensagem); a conversa continua no monitor. */
+  excluirAlertaTransbordo(id: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/alerta`);
+  }
+  /** Remove a conversa do monitor; mensagens, pedidos e cliente continuam gravados. */
+  excluirConversa(id: number): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}`);
+  }
   /** Monitor: conversas do período (24, 168 ou 720 horas) + transbordos aguardando contato. */
   getStatusConversas(horas = 24): Observable<any[]> {
     const qs = horas === 24 ? '' : `?horas=${horas}`;
