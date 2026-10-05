@@ -1,5 +1,4 @@
-import { authGuard, adminGuard } from './core/auth.guard';
-import { confirmarSaidaSemSalvar } from './core/alteracoes-pendentes.guard';
+import { authGuard, adminGuard, paginaInicialGuard } from './core/auth.guard';
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
@@ -7,23 +6,11 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent),
   },
-  {
-    path: 'usuarios',
-    canActivate: [authGuard, adminGuard],
-    loadComponent: () =>
-      import('./pages/usuarios/usuarios.component').then((m) => m.UsuariosComponent),
-  },
-  {
-    path: '',
-    redirectTo: 'dashboard',
-    pathMatch: 'full',
-  },
-  {
-    path: 'dashboard',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-  },
+  { path: 'usuarios', redirectTo: 'configuracoes/usuarios' },
+  // Página inicial por perfil: administrador vai ao Dashboard, operador aos Pedidos.
+  { path: '', pathMatch: 'full', canActivate: [authGuard, paginaInicialGuard], children: [] },
+  { path: 'dashboard', redirectTo: 'configuracoes/dashboard' },
+  { path: 'cardapio', redirectTo: 'configuracoes/cardapio' },
   {
     path: 'pedidos',
     canActivate: [authGuard],
@@ -37,12 +24,6 @@ export const routes: Routes = [
       import('./pages/clientes/clientes.component').then((m) => m.ClientesComponent),
   },
   {
-    path: 'cardapio',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/cardapio/cardapio.component').then((m) => m.CardapioComponent),
-  },
-  {
     path: 'atendimentos',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -52,7 +33,17 @@ export const routes: Routes = [
     path: 'configuracoes',
     canActivate: [authGuard, adminGuard],
     children: [
-      { path: '', redirectTo: 'horarios', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      },
+      {
+        path: 'cardapio',
+        loadComponent: () =>
+          import('./pages/cardapio/cardapio.component').then((m) => m.CardapioComponent),
+      },
       {
         path: 'empresa',
         loadComponent: () =>
@@ -66,17 +57,15 @@ export const routes: Routes = [
           ),
       },
       {
-        path: 'pratos-semana',
-        canDeactivate: [confirmarSaidaSemSalvar],
+        path: 'usuarios',
         loadComponent: () =>
-          import('./pages/configuracoes/cardapio-semanal.component').then(
-            (m) => m.CardapioSemanalComponent,
-          ),
+          import('./pages/usuarios/usuarios.component').then((m) => m.UsuariosComponent),
       },
+      { path: 'pratos-semana', redirectTo: 'cardapio' },
     ],
   },
   {
     path: '**',
-    redirectTo: 'dashboard',
+    redirectTo: '',
   },
 ];

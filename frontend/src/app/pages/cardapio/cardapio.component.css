@@ -420,3 +420,227 @@
   border-top: 1px solid var(--border-color);
   padding-top: 14px;
 }
+
+/* ---------------------------------------------------------------- configurações: hoje, filtros e dias */
+.eyebrow {
+  color: var(--primary-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.painel-hoje {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border-left: 3px solid var(--primary);
+}
+
+.painel-hoje p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.hoje-rotulo {
+  color: var(--primary-text);
+}
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.filtros label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex: 1 1 160px;
+}
+
+.filtros input,
+.filtros select {
+  padding: 8px 10px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.filtros-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.dias-produto {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dia-chip {
+  min-width: 40px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dia-chip.on {
+  background: var(--primary-glow);
+  border-color: var(--primary);
+  color: var(--primary-text);
+  font-weight: 600;
+}
+
+.dia-chip.hoje {
+  box-shadow: 0 0 0 1px var(--success, #2fe5a7);
+}
+
+.dia-chip.fechado {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.dia-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.dia-chip:disabled {
+  cursor: wait;
+}
+
+/* ---------------------------------------------------------------- formulário: dias disponíveis */
+.dias-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.dias-form legend {
+  padding: 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.dias-atalhos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.atalho {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.atalho.on {
+  border-color: var(--primary);
+  color: var(--primary-text);
+  background: var(--primary-glow);
+}
+
+.dias-grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.dia-opcao {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dia-opcao .dia-abrev {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.dia-opcao small {
+  min-height: 1em;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.dia-opcao.on {
+  border-color: var(--primary);
+  background: var(--primary-glow);
+  color: var(--primary-text);
+}
+
+.dia-opcao.hoje small {
+  color: var(--success, #2fe5a7);
+}
+
+.dia-opcao.fechado {
+  border-style: dashed;
+}
+
+.dia-opcao.fechado .dia-abrev {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.atalho:focus-visible,
+.dia-opcao:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.dias-resumo {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.dias-resumo.erro {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.dias-aviso {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--warning, #f5b041);
+}
+
+@media (max-width: 420px) {
+  .dias-grade {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

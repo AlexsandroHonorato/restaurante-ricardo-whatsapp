@@ -8,7 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-/** Operador cuida da operação do dia; cardápio, preços e horários são do administrador. */
+/** Operador cuida de pedidos, atendimentos e clientes; Configurações (dashboard, cardápio, horários) são do administrador. */
 class PermissoesPerfilTest extends TestCase
 {
     use RefreshDatabase;
@@ -40,16 +40,21 @@ class PermissoesPerfilTest extends TestCase
         $this->assertDatabaseHas('produto_variacoes', ['produto_id' => $id, 'preco' => 30]);
     }
 
-    public function test_operador_ve_o_cardapio_e_pausa_prato_que_acabou(): void
+    public function test_operador_nao_pausa_prato_nem_ve_graficos_mas_ve_contadores(): void
     {
         $this->comoOperador();
-        $this->getJson('/api/cardapio')->assertOk();
-        $this->patchJson("/api/cardapio/produtos/{$this->produto->id}/toggle")->assertOk()->assertJsonPath('ativo', false);
+        $this->patchJson("/api/cardapio/produtos/{$this->produto->id}/toggle")->assertForbidden();
+        $this->assertTrue($this->produto->fresh()->ativo);
+        $this->getJson('/api/dashboard/analises')->assertForbidden();
+        $this->getJson('/api/dashboard/vendas-grafico')->assertForbidden();
+        $this->getJson('/api/dashboard/kpis')->assertOk();
     }
 
     public function test_administrador_mantem_acesso_completo(): void
     {
         $this->putJson("/api/cardapio/produtos/{$this->produto->id}", ['variacoes' => [['tamanho' => 'Grande', 'preco' => 32]]])->assertOk();
         $this->putJson('/api/horarios-atendimento/7', ['ativo' => false])->assertOk();
+        $this->patchJson("/api/cardapio/produtos/{$this->produto->id}/toggle")->assertOk()->assertJsonPath('ativo', false);
+        $this->getJson('/api/dashboard/vendas-grafico')->assertOk();
     }
 }

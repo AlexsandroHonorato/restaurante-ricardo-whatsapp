@@ -13,16 +13,6 @@
     <div class="nav-section-title">PRINCIPAL</div>
 
     <a
-      routerLink="/dashboard"
-      routerLinkActive="active"
-      ariaCurrentWhenActive="page"
-      class="nav-item"
-    >
-      <app-icon nome="dashboard" />
-      <span class="nav-label">Dashboard Geral</span>
-    </a>
-
-    <a
       routerLink="/pedidos"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -60,24 +50,6 @@
       <span class="nav-label">Clientes & LTV</span>
     </a>
 
-    <a
-      routerLink="/cardapio"
-      routerLinkActive="active"
-      ariaCurrentWhenActive="page"
-      class="nav-item"
-    >
-      <app-icon nome="cardapio" />
-      <span class="nav-label">Cardápio & Preços</span>
-    </a>
-    @if (auth.user()?.role === 'admin') {
-      <a
-        routerLink="/usuarios"
-        routerLinkActive="active"
-        ariaCurrentWhenActive="page"
-        class="nav-item"
-        ><app-icon nome="clientes" /><span class="nav-label">Usuários do sistema</span></a
-      >
-    }
     @if (auth.user()?.role === 'admin') {
       <div class="nav-section-title">ADMINISTRAÇÃO</div>
       <div class="config-menu">
@@ -93,6 +65,20 @@
         </button>
         <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
           <a
+            routerLink="/configuracoes/dashboard"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Dashboard Geral</a
+          >
+          <a
+            routerLink="/configuracoes/cardapio"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Cardápio & Preços</a
+          >
+          <a
             routerLink="/configuracoes/empresa"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
@@ -107,11 +93,11 @@
             >Horário de atendimento</a
           >
           <a
-            routerLink="/configuracoes/pratos-semana"
+            routerLink="/configuracoes/usuarios"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
             class="nav-item"
-            >Pratos por dia da semana</a
+            >Usuários do sistema</a
           >
         </div>
       </div>

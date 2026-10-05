@@ -12,5 +12,17 @@ export const adminGuard: CanActivateFn = () => {
     router = inject(Router);
   return auth
     .check()
-    .pipe(map((user) => (user?.role === 'admin' ? true : router.createUrlTree(['/dashboard']))));
+    .pipe(map((user) => (user?.role === 'admin' ? true : router.createUrlTree(['/pedidos']))));
+};
+/** Configurações (inclui Dashboard e Cardápio) são só do administrador; operador começa nos Pedidos. */
+export const paginaInicialGuard: CanActivateFn = () => {
+  const auth = inject(AuthService),
+    router = inject(Router);
+  return auth
+    .check()
+    .pipe(
+      map((user) =>
+        router.createUrlTree([user?.role === 'admin' ? '/configuracoes/dashboard' : '/pedidos']),
+      ),
+    );
 };

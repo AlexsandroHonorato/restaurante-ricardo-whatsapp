@@ -43,6 +43,8 @@ Route::middleware('web')->group(function () {
 
         Route::get('/usuarios', [UserController::class, 'index']);
         Route::post('/usuarios', [UserController::class, 'store'])->middleware('throttle:30,1');
+        Route::put('/usuarios/{id}', [UserController::class, 'update'])->whereNumber('id')->middleware('throttle:30,1');
+        Route::delete('/usuarios/{id}', [UserController::class, 'destroy'])->whereNumber('id')->middleware(AdminOnly::class);
         Route::get('/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
         Route::get('/sistema/saude', SaudeController::class);
         Route::get('/empresa', [EmpresaController::class, 'show']);
@@ -52,13 +54,16 @@ Route::middleware('web')->group(function () {
         Route::put('/empresa', [EmpresaController::class, 'update'])->middleware(AdminOnly::class);
         // Rotas do Dashboard
         Route::prefix('dashboard')->group(function () {
-            Route::get('/analises', [DashboardController::class, 'getAnalises']);
+            // KPIs alimentam os contadores do menu e a tela de Pedidos (todos os perfis); o resto é do Dashboard, só administrador.
             Route::get('/kpis', [DashboardController::class, 'getKpis']);
-            Route::get('/vendas-grafico', [DashboardController::class, 'getSalesChart']);
-            Route::get('/top-produtos', [DashboardController::class, 'getTopProducts']);
-            Route::get('/mapa-bairros', [DashboardController::class, 'getDeliveryByNeighborhood']);
-            Route::get('/formas-pagamento', [DashboardController::class, 'getPaymentMethods']);
-            Route::get('/metricas-ia', [DashboardController::class, 'getAiMetrics']);
+            Route::middleware(AdminOnly::class)->group(function () {
+                Route::get('/analises', [DashboardController::class, 'getAnalises']);
+                Route::get('/vendas-grafico', [DashboardController::class, 'getSalesChart']);
+                Route::get('/top-produtos', [DashboardController::class, 'getTopProducts']);
+                Route::get('/mapa-bairros', [DashboardController::class, 'getDeliveryByNeighborhood']);
+                Route::get('/formas-pagamento', [DashboardController::class, 'getPaymentMethods']);
+                Route::get('/metricas-ia', [DashboardController::class, 'getAiMetrics']);
+            });
         });
 
         // Rotas de Pedidos
@@ -87,7 +92,7 @@ Route::middleware('web')->group(function () {
             Route::get('/produtos/{id}', [CardapioController::class, 'show']);
             Route::put('/produtos/{id}', [CardapioController::class, 'update'])->middleware(AdminOnly::class);
             Route::delete('/produtos/{id}', [CardapioController::class, 'destroy'])->middleware(AdminOnly::class);
-            Route::patch('/produtos/{id}/toggle', [CardapioController::class, 'toggleProdutoStatus']);
+            Route::patch('/produtos/{id}/toggle', [CardapioController::class, 'toggleProdutoStatus'])->middleware(AdminOnly::class);
         });
 
         // Rotas de Atendimentos & Status Conversacional

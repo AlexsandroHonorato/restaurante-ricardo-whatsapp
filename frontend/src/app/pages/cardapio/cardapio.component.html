@@ -12,21 +12,21 @@
 
   <div class="page-header">
     <div>
-      <h1 class="page-title">Gestão do Cardápio & Preços</h1>
+      <span class="eyebrow">CONFIGURAÇÕES</span>
+      <h1 class="page-title">Cardápio & Preços</h1>
       <p class="page-subtitle">
-        Cadastre, edite e pause pratos e bebidas em tempo real no atendimento do WhatsApp
+        Cadastre itens, preços e os dias em que cada um é oferecido no WhatsApp
       </p>
     </div>
 
     <div class="header-actions">
-      @if (ehAdmin()) {
-        <button class="btn btn-primary" (click)="abrirModalNovo()">
-          <app-icon nome="adicionar" /> Novo Prato / Item
-        </button>
-      }
+      <button class="btn btn-primary" (click)="abrirModalNovo()">
+        <app-icon nome="adicionar" /> Novo Prato / Item
+      </button>
       <button
         class="refresh-btn glass-card"
         (click)="carregarCardapio()"
+        [disabled]="carregando()"
         title="Atualizar Cardápio"
       >
         <app-icon nome="atualizar" /> Atualizar
@@ -34,16 +34,98 @@
     </div>
   </div>
 
+  @if (cardapio().length) {
+    <aside class="painel-hoje glass-card" aria-label="Oferecido hoje">
+      <strong class="hoje-rotulo">Hoje · {{ hoje().nomeDia }}</strong>
+      @if (diaFechado(diaHoje)) {
+        <p>O estabelecimento não atende hoje.</p>
+      } @else {
+        <p>
+          O bot oferece <strong>{{ hoje().total }} itens</strong> hoje.
+          @if (hoje().especiais.length) {
+            Só de alguns dias: {{ hoje().especiais.join(', ') }}.
+          }
+        </p>
+      }
+    </aside>
+  }
+
+  <div class="filtros glass-card">
+    <label>
+      Buscar
+      <input
+        type="search"
+        placeholder="Nome do prato ou item"
+        [value]="busca()"
+        (input)="busca.set($any($event.target).value)"
+      />
+    </label>
+    <label>
+      Categoria
+      <select
+        [value]="categoriaFiltro() ?? ''"
+        (change)="categoriaFiltro.set(+$any($event.target).value || null)"
+      >
+        <option value="">Todas</option>
+        @for (c of cardapio(); track c.id) {
+          <option [value]="c.id">{{ c.nome }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Dia da semana
+      <select [value]="diaFiltro()" (change)="diaFiltro.set($any($event.target).value)">
+        <option value="">Todos os dias</option>
+        @for (dia of diasSemana; track dia.valor) {
+          <option [value]="dia.valor">{{ dia.nome }}</option>
+        }
+      </select>
+    </label>
+    <label>
+      Situação
+      <select [value]="situacaoFiltro()" (change)="situacaoFiltro.set($any($event.target).value)">
+        <option value="">Todos</option>
+        <option value="ativos">Ativos</option>
+        <option value="pausados">Pausados</option>
+      </select>
+    </label>
+    <span class="filtros-total" role="status">
+      {{ totalVisivel() }} itens
+      @if (filtrando()) {
+        <button type="button" class="btn btn-secondary btn-sm" (click)="limparFiltros()">
+          Limpar filtros
+        </button>
+      }
+    </span>
+  </div>
+
+  @if (erroLista()) {
+    <div class="lista-erro" role="alert">
+      <span>{{ erroLista() }}</span>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="carregarCardapio()">
+        Tentar novamente
+      </button>
+    </div>
+  }
+  @if (erroAcao()) {
+    <div class="lista-erro" role="alert">
+      <span>{{ erroAcao() }}</span>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="erroAcao.set(null)">
+        Fechar
+      </button>
+    </div>
+  }
+
   <!-- Lista de Categorias e Produtos -->
   <div class="categories-list">
-    @for (cat of cardapio(); track cat.id) {
+    @for (cat of categoriasVisiveis(); track cat.id) {
       <div class="glass-card category-card">
         <div class="category-header">
           <div class="cat-title-group">
             <h2>{{ cat.nome }}</h2>
             <p>{{ cat.descricao }}</p>
           </div>
-          <span class="badge badge-prep">{{ cat.produtos.length }} itens cadastrados</span>
+          <span class="badge badge-prep">{{ cat.produtos.length }} itens</span>
         </div>
 
         <div class="products-table">
@@ -67,7 +149,26 @@
                 </div>
               </div>
 
-              <span class="prod-desc">{{ nomeDias(prod.dias_disponiveis) }}</span>
+              <!-- Dias: clique liga/desliga e salva na hora -->
+              <div class="dias-produto" role="group" [attr.aria-label]="'Dias de ' + prod.nome">
+                @for (dia of diasSemana; track dia.valor; let i = $index) {
+                  <button
+                    type="button"
+                    class="dia-chip"
+                    [class.on]="lerDias(prod.dias_disponiveis).includes(dia.valor)"
+                    [class.fechado]="diaFechado(i)"
+                    [class.hoje]="i === diaHoje"
+                    [attr.aria-pressed]="lerDias(prod.dias_disponiveis).includes(dia.valor)"
+                    [attr.aria-label]="prod.nome + ' — ' + dia.nome"
+                    [title]="dia.nome + (diaFechado(i) ? ' (fechado)' : '')"
+                    [disabled]="ocupados().has(prod.id)"
+                    (click)="alternarDiaProduto(prod, dia.valor)"
+                  >
+                    {{ dia.nome.slice(0, 3) }}
+                  </button>
+                }
+              </div>
+
               <!-- Variações e Preços -->
               <div class="prod-variations">
                 @for (v of prod.variacoes; track v.id) {
@@ -86,6 +187,7 @@
                   class="btn btn-sm toggle-btn"
                   [class.btn-success]="prod.ativo"
                   [class.btn-secondary]="!prod.ativo"
+                  [disabled]="ocupados().has(prod.id)"
                   (click)="toggleProduto(prod)"
                   title="Alternar disponibilidade no robô"
                 >
@@ -94,25 +196,23 @@
                   }}</span>
                 </button>
 
-                @if (ehAdmin()) {
-                  <button
-                    class="action-icon-btn edit"
-                    (click)="abrirModalEditar(prod, cat.id)"
-                    [attr.aria-label]="'Editar ' + prod.nome"
-                    title="Editar Prato"
-                  >
-                    <app-icon nome="editar" />
-                  </button>
+                <button
+                  class="action-icon-btn edit"
+                  (click)="abrirModalEditar(prod, cat.id)"
+                  [attr.aria-label]="'Editar ' + prod.nome"
+                  title="Editar Prato"
+                >
+                  <app-icon nome="editar" />
+                </button>
 
-                  <button
-                    class="action-icon-btn delete"
-                    (click)="confirmarExcluir(prod)"
-                    [attr.aria-label]="'Excluir ' + prod.nome"
-                    title="Excluir Prato"
-                  >
-                    <app-icon nome="excluir" />
-                  </button>
-                }
+                <button
+                  class="action-icon-btn delete"
+                  (click)="confirmarExcluir(prod)"
+                  [attr.aria-label]="'Excluir ' + prod.nome"
+                  title="Excluir Prato"
+                >
+                  <app-icon nome="excluir" />
+                </button>
               </div>
             </div>
           } @empty {
@@ -120,6 +220,16 @@
           }
         </div>
       </div>
+    } @empty {
+      @if (!carregando() && !erroLista()) {
+        <p class="empty-cat">
+          {{
+            filtrando()
+              ? 'Nenhum item encontrado com esses filtros.'
+              : 'Nenhum item cadastrado. Use "Novo Prato / Item".'
+          }}
+        </p>
+      }
     }
   </div>
 
@@ -166,26 +276,50 @@
             />
           </div>
 
-          <fieldset
-            class="form-group"
-            style="border: 1px solid var(--border-color); padding: 12px; border-radius: 8px"
-          >
+          <fieldset class="dias-form">
             <legend>Dias disponíveis *</legend>
-            <div style="display: flex; flex-wrap: wrap; gap: 12px">
-              @for (dia of diasSemana; track dia.valor) {
-                <label style="display: flex; align-items: center; gap: 6px"
-                  ><input
-                    type="checkbox"
-                    style="width: auto"
-                    [checked]="formDias.includes(dia.valor)"
-                    (change)="alternarDia(dia.valor)"
-                    [disabled]="salvando()"
-                  />{{ dia.nome }}</label
+            <div class="dias-atalhos" role="group" aria-label="Atalhos de dias">
+              @for (atalho of atalhosDias(); track atalho.rotulo) {
+                <button
+                  type="button"
+                  class="atalho"
+                  [class.on]="atalhoAtivo(atalho.dias)"
+                  [attr.aria-pressed]="atalhoAtivo(atalho.dias)"
+                  [disabled]="salvando()"
+                  (click)="aplicarAtalho(atalho.dias)"
                 >
+                  {{ atalho.rotulo }}
+                </button>
               }
             </div>
-            @if (!formDias.length) {
-              <p role="alert">Selecione pelo menos um dia.</p>
+            <div class="dias-grade">
+              @for (dia of diasSemana; track dia.valor; let i = $index) {
+                <button
+                  type="button"
+                  class="dia-opcao"
+                  [class.on]="formDias.includes(dia.valor)"
+                  [class.fechado]="diaFechado(i)"
+                  [class.hoje]="i === diaHoje"
+                  [attr.aria-pressed]="formDias.includes(dia.valor)"
+                  [attr.aria-label]="dia.nome + (diaFechado(i) ? ' (fechado)' : '')"
+                  [disabled]="salvando()"
+                  (click)="alternarDia(dia.valor)"
+                >
+                  <span class="dia-abrev">{{ dia.nome.slice(0, 3) }}</span>
+                  <small>{{ diaFechado(i) ? 'fechado' : i === diaHoje ? 'hoje' : '' }}</small>
+                </button>
+              }
+            </div>
+            <p class="dias-resumo" [class.erro]="!formDias.length" role="status">
+              {{
+                formDias.length ? 'Oferecido: ' + resumoDiasForm() : 'Selecione pelo menos um dia.'
+              }}
+            </p>
+            @if (diasFechadosMarcados().length) {
+              <p class="dias-aviso">
+                {{ diasFechadosMarcados().join(', ') }}: o estabelecimento não abre nesse dia, então
+                o bot não oferece o item.
+              </p>
             }
           </fieldset>
           <!-- Variações de Tamanhos e Preços -->

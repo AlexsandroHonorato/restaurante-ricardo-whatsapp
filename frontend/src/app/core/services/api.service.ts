@@ -165,15 +165,6 @@ export class ApiService {
     return this.http.get<CategoriaCardapio[]>(`${this.baseUrl}/cardapio`);
   }
 
-  getCardapio(): Observable<CategoriaCardapio[]> {
-    return this.http.get<CategoriaCardapio[]>(`${this.baseUrl}/cardapio`).pipe(
-      catchError(() => {
-        this.registrarFalha();
-        return EMPTY;
-      }),
-    );
-  }
-
   getCategoriasCardapio(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/cardapio/categorias`).pipe(
       catchError(() => {

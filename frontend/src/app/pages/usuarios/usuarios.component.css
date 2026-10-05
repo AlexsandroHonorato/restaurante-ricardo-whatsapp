@@ -91,35 +91,6 @@ ul {
 li.valid {
   color: var(--success);
 }
-.user-list article {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border-color);
-}
-.user-list article > div:last-child {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.user-list span,
-.user-list small {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  overflow-wrap: anywhere;
-}
-.avatar {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  color: var(--primary-text);
-  background: var(--primary-glow);
-}
 .error {
   color: var(--danger);
   font-size: 0.82rem;
@@ -142,4 +113,17 @@ li.valid {
   .user-list {
     padding: 18px;
   }
+}
+.hint {
+  margin: 12px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+label small.error {
+  font-weight: 400;
 }
