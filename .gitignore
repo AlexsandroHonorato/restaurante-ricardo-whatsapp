@@ -23,6 +23,9 @@ Thumbs.db
 # Editores e IDEs
 .vscode/
 .idea/
+.skills/
+# Atalho (junction) para .skills, por onde o Claude Code carrega as skills do projeto
+.claude/skills
 *.suo
 *.ntvs*
 *.njsproj
@@ -33,3 +36,7 @@ Thumbs.db
 memoria.json.tmp
 pedidos.json.tmp
 conversas.log.tmp
+
+# Pacotes gerados localmente para publicar
+runtime/
+__pycache__/

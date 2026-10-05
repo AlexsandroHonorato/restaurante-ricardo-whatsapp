@@ -8,6 +8,7 @@ use App\Models\StatusPedido;
 use App\PedidoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,23 @@ class PedidoController extends Controller
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+
+        // Período personalizado: dias inteiros no fuso do restaurante (início 00:00, fim até 23:59 do último dia).
+        $datas = $request->validate([
+            'data_inicio' => 'nullable|required_with:data_fim|date_format:Y-m-d',
+            'data_fim' => 'nullable|required_with:data_inicio|date_format:Y-m-d|after_or_equal:data_inicio',
+        ]);
+        if (! empty($datas['data_inicio']) && ! empty($datas['data_fim'])) {
+            if (Carbon::parse($datas['data_inicio'])->diffInDays(Carbon::parse($datas['data_fim'])) + 1 > 365) {
+                throw ValidationException::withMessages(['data_fim' => 'Selecione um intervalo de até 365 dias.']);
+            }
+            $query->where('created_at', '>=', Carbon::parse($datas['data_inicio'], 'America/Sao_Paulo')->startOfDay()->utc())
+                ->where('created_at', '<', Carbon::parse($datas['data_fim'], 'America/Sao_Paulo')->startOfDay()->addDay()->utc());
+        }
+
+        if ($request->boolean('sem_comanda')) {
+            $query->whereNull('comanda_impressa_em')->whereIn('status', ['pendente', 'confirmado', 'em_preparo']);
         }
 
         if ($request->filled('busca')) {
@@ -50,6 +68,39 @@ class PedidoController extends Controller
         $pedido = Pedido::with(['cliente', 'endereco', 'itens.adicionais', 'historicoStatus', 'atendimento'])->findOrFail($id);
 
         return response()->json($pedido);
+    }
+
+    /**
+     * Registra a impressão da comanda. "primeira" só é true para quem marcou primeiro: a impressão
+     * automática imprime apenas nesse caso, então dois aparelhos na cozinha não imprimem em dobro.
+     */
+    public function registrarComanda($id): JsonResponse
+    {
+        Pedido::findOrFail($id);
+        $marcados = Pedido::whereKey($id)->whereNull('comanda_impressa_em')->update(['comanda_impressa_em' => now()]);
+
+        return response()->json(['primeira' => $marcados === 1]);
+    }
+
+    /**
+     * Exclui o pedido definitivamente (itens e histórico saem junto; o atendimento fica sem o vínculo).
+     * O pedido deixa de contar no faturamento e nos totais do cliente. Fica registrado no log quem excluiu.
+     */
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        DB::transaction(function () use ($request, $id) {
+            $pedido = Pedido::with('cliente')->lockForUpdate()->findOrFail($id);
+            if ($cliente = $pedido->cliente) {
+                $cliente->update([
+                    'total_pedidos' => max(0, $cliente->total_pedidos - 1),
+                    'total_gasto' => max(0, (float) $cliente->total_gasto - (float) $pedido->valor_total),
+                ]);
+            }
+            $pedido->delete();
+            Log::info('Pedido excluído', ['codigo' => $pedido->codigo_pedido, 'valor_total' => $pedido->valor_total, 'status' => $pedido->status, 'por' => $request->user()->email]);
+        });
+
+        return response()->json(['ok' => true]);
     }
 
     /**
@@ -115,7 +166,9 @@ class PedidoController extends Controller
                 if ($notificacaoEnviada) {
                     $mensagemNotificacao = $mensagem;
                 } else {
-                    $erroNotificacao = 'O serviço não confirmou o envio.';
+                    $erroNotificacao = $resposta->json('pendente') === true
+                        ? 'Notificação na fila: o WhatsApp não respondeu e ela será reenviada automaticamente.'
+                        : 'O serviço não confirmou o envio.';
                 }
             } catch (\Throwable $e) {
                 Log::warning('Falha na notificação de despacho', ['pedido_id' => $pedido->id, 'erro' => $e->getMessage()]);
@@ -139,16 +192,18 @@ class PedidoController extends Controller
     public function store(Request $request)
     {
         $dados = $request->validate([
-            'codigo_pedido' => 'required|string|max:30',
+            'codigo_pedido' => 'nullable|string|max:30',
+            'chave_idempotencia' => 'nullable|string|max:150',
             'telefone' => ['required', 'regex:/^\d{10,15}$/'],
             'nome' => 'required|string|max:150',
             'endereco' => 'required|string|max:255',
             'bairro' => 'nullable|string|max:100',
-            'formaPagamento' => 'required|string',
-            'total' => 'required',
+            'formaPagamento' => 'required|string|max:50',
             'trocoPara' => 'nullable',
             'taxa_entrega' => 'nullable',
             'itens' => 'required|array|min:1|max:100',
+            'itens.*.variacao_id' => 'required|integer|min:1',
+            'itens.*.quantidade' => 'required|integer|min:1|max:100',
             'observacoes' => 'nullable|string|max:2000',
         ]);
         $pedido = app(PedidoService::class)->registrar($dados);

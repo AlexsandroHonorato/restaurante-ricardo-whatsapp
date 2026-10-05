@@ -1,0 +1,96 @@
+.conversa {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.estado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--success-glow);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+.estado.pausado {
+  background: rgba(251, 191, 36, 0.14);
+}
+.historico {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(55vh, 520px);
+  overflow-y: auto;
+}
+.balao {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px 12px 4px 12px;
+  background: var(--primary-glow);
+  border: 1px solid rgba(var(--primary-rgb), 0.35);
+}
+.balao.cliente {
+  align-self: flex-start;
+  border-radius: 12px 12px 12px 4px;
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-color);
+}
+.balao.equipe {
+  background: rgba(47, 229, 167, 0.12);
+  border-color: rgba(47, 229, 167, 0.35);
+}
+.balao p {
+  margin: 2px 0;
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+}
+.autor {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary-text);
+}
+time,
+.falha {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.falha {
+  margin-left: 8px;
+  color: var(--warning);
+}
+.vazio {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.erro {
+  color: var(--warning);
+  font-size: 0.8rem;
+}
+.resposta {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.resposta textarea {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font: inherit;
+  resize: vertical;
+}
+
+/* Perfil só com "ver" em Atendimentos: lê a conversa, sem responder nem pausar o bot. */
+.so-leitura .resposta,
+.so-leitura .pausa {
+  display: none;
+}

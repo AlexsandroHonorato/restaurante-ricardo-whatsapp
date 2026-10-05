@@ -1,9 +1,11 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { HorarioAtendimento } from '../../core/models/dashboard.model';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 interface DiaEditavel extends HorarioAtendimento {
   salvando: boolean;
@@ -20,6 +22,9 @@ interface DiaEditavel extends HorarioAtendimento {
 })
 export class ConfiguracoesComponent implements OnInit {
   private api = inject(ApiService);
+  private confirmacao = inject(ConfirmacaoService);
+  private auth = inject(AuthService);
+  podeEditar = computed(() => this.auth.pode('horarios', 'editar'));
   private originais = new Map<number, string>();
   dias = signal<DiaEditavel[]>([]);
   carregando = signal(false);
@@ -84,6 +89,20 @@ export class ConfiguracoesComponent implements OnInit {
       this.editar(dia.dia_semana, { erro });
       return;
     }
+    this.confirmacao.pedir(
+      {
+        titulo: 'Salvar horário?',
+        mensagem: dia.ativo
+          ? `${dia.nome_dia}: atendimento das ${dia.hora_inicio} às ${dia.hora_fim}. O bot passa a seguir este horário.`
+          : `${dia.nome_dia} ficará fechado. O bot não atenderá neste dia.`,
+        confirmar: 'Salvar horário',
+      },
+      () => this.salvarConfirmado(dia),
+    );
+  }
+
+  private salvarConfirmado(dia: DiaEditavel) {
+    if (this.dias().find((d) => d.dia_semana === dia.dia_semana)?.salvando) return;
     this.editar(dia.dia_semana, { salvando: true });
     this.api
       .atualizarHorarioAtendimento(dia.dia_semana, {

@@ -19,10 +19,12 @@ class StatusConversa extends Model
         'rascunho',
         'ultimo_contato_em',
         'expira_em',
+        'bot_pausado_ate',
     ];
 
     protected $casts = [
         'contato_iniciado_em' => 'datetime',
+        'bot_pausado_ate' => 'datetime',
         'rascunho' => 'array',
         'ultimo_contato_em' => 'datetime',
         'expira_em' => 'datetime',

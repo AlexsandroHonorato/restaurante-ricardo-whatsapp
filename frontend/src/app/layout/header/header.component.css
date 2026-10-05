@@ -1,3 +1,7 @@
+/* Perfil sem acesso a Atendimentos não vê o sino. */
+.transbordo-bell[hidden] {
+  display: none !important;
+}
 .transbordo-bell {
   position: relative;
   display: inline-flex;

@@ -3,6 +3,7 @@
     {{ api.erro() }}
   </div>
 }
+<app-avisos-sistema />
 <header class="header">
   <div class="header-left">
     <button
@@ -79,6 +80,7 @@
     </button>
 
     <button
+      [hidden]="!auth.pode('atendimentos', 'ver')"
       type="button"
       class="transbordo-bell"
       (click)="transbordosModal.abrir($event.currentTarget)"
@@ -129,7 +131,7 @@
       <div class="user-info">
         <span class="user-name">{{ auth.user()?.name }}</span>
         <span class="user-role">{{
-          auth.user()?.role === 'admin' ? 'Administrador' : 'Operador'
+          auth.user()?.perfil_nome || (auth.user()?.role === 'admin' ? 'Administrador' : 'Operador')
         }}</span>
       </div>
     </div>

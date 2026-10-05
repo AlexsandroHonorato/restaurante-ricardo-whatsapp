@@ -105,3 +105,18 @@ a:focus-visible {
     transform: none;
   }
 }
+
+.lista-erro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--danger);
+  background: var(--danger-glow);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}

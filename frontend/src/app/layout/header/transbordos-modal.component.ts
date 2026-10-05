@@ -3,6 +3,7 @@ import {
   ElementRef,
   ViewChild,
   DestroyRef,
+  computed,
   inject,
   signal,
   HostListener,
@@ -12,7 +13,9 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 @Component({
   selector: 'app-transbordos-modal',
@@ -25,6 +28,10 @@ export class TransbordosModalComponent {
   @ViewChild('dialog') dialog!: ElementRef<HTMLDialogElement>;
   transbordo = inject(TransbordoService);
   private api = inject(ApiService);
+  private confirmacao = inject(ConfirmacaoService);
+  private auth = inject(AuthService);
+  podeEditar = computed(() => this.auth.pode('atendimentos', 'editar'));
+  podeExcluir = computed(() => this.auth.pode('atendimentos', 'excluir'));
   private destroyRef = inject(DestroyRef);
   enviando = signal(new Set<number>());
   erros = signal<Record<number, string>>({});
@@ -76,6 +83,7 @@ export class TransbordosModalComponent {
     if (!cliente) return;
     this.enviando.update((ids) => new Set([...ids, id]));
     this.erros.update((erros) => ({ ...erros, [id]: '' }));
+    this.transbordo.ocultar(id);
     this.api
       .iniciarContatoTransbordo(id)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -83,12 +91,48 @@ export class TransbordosModalComponent {
         next: () => {
           this.ultimoContato.set(cliente.telefone);
           this.transbordo.assumir(id);
+          this.transbordo.reexibir(id);
+          this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
+        },
+        error: () => {
+          this.transbordo.reexibir(id);
+          this.erros.update((erros) => ({
+            ...erros,
+            [id]: 'Não foi possível enviar a saudação. Tente novamente.',
+          }));
+          this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
+        },
+      });
+  }
+  excluir(id: number) {
+    if (this.enviando().has(id)) return;
+    const cliente = this.transbordo.fila().find((s) => s.id === id);
+    this.confirmacao.pedir(
+      {
+        titulo: 'Excluir alerta?',
+        mensagem: `O aviso de ${cliente?.telefone ?? 'atendimento'} sai da fila para toda a equipe, sem enviar mensagem. A conversa continua no monitor.`,
+        confirmar: 'Excluir alerta',
+        perigo: true,
+      },
+      () => this.excluirConfirmado(id),
+    );
+  }
+  private excluirConfirmado(id: number) {
+    if (this.enviando().has(id)) return;
+    this.enviando.update((ids) => new Set([...ids, id]));
+    this.erros.update((erros) => ({ ...erros, [id]: '' }));
+    this.api
+      .excluirAlertaTransbordo(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.transbordo.assumir(id);
           this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
         },
         error: () => {
           this.erros.update((erros) => ({
             ...erros,
-            [id]: 'Não foi possível enviar a saudação. Tente novamente.',
+            [id]: 'Não foi possível excluir o alerta. Tente novamente.',
           }));
           this.enviando.update((ids) => new Set([...ids].filter((x) => x !== id)));
         },

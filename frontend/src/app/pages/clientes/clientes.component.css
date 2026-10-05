@@ -107,3 +107,13 @@
   padding: 40px;
   color: var(--text-muted);
 }
+
+.apagar-dados {
+  margin-left: 6px;
+  color: var(--danger);
+}
+.mensagem-lgpd {
+  margin-top: 14px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}

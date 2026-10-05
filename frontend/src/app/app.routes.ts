@@ -1,5 +1,4 @@
-import { authGuard, adminGuard } from './core/auth.guard';
-import { confirmarSaidaSemSalvar } from './core/alteracoes-pendentes.guard';
+import { authGuard, adminGuard, paginaInicialGuard, permissaoGuard } from './core/auth.guard';
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
@@ -7,44 +6,26 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent),
   },
-  {
-    path: 'usuarios',
-    canActivate: [authGuard, adminGuard],
-    loadComponent: () =>
-      import('./pages/usuarios/usuarios.component').then((m) => m.UsuariosComponent),
-  },
-  {
-    path: '',
-    redirectTo: 'dashboard',
-    pathMatch: 'full',
-  },
-  {
-    path: 'dashboard',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
-  },
+  { path: 'usuarios', redirectTo: 'configuracoes/usuarios' },
+  // Página inicial por perfil: a primeira tela que o perfil do usuário pode ver.
+  { path: '', pathMatch: 'full', canActivate: [authGuard, paginaInicialGuard], children: [] },
+  { path: 'dashboard', redirectTo: 'configuracoes/dashboard' },
+  { path: 'cardapio', redirectTo: 'configuracoes/cardapio' },
   {
     path: 'pedidos',
-    canActivate: [authGuard],
+    canActivate: [authGuard, permissaoGuard('pedidos')],
     loadComponent: () =>
       import('./pages/pedidos/pedidos.component').then((m) => m.PedidosComponent),
   },
   {
     path: 'clientes',
-    canActivate: [authGuard],
+    canActivate: [authGuard, permissaoGuard('clientes')],
     loadComponent: () =>
       import('./pages/clientes/clientes.component').then((m) => m.ClientesComponent),
   },
   {
-    path: 'cardapio',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/cardapio/cardapio.component').then((m) => m.CardapioComponent),
-  },
-  {
     path: 'atendimentos',
-    canActivate: [authGuard],
+    canActivate: [authGuard, permissaoGuard('atendimentos')],
     loadComponent: () =>
       import('./pages/atendimentos/atendimentos.component').then((m) => m.AtendimentosComponent),
   },
@@ -52,26 +33,50 @@ export const routes: Routes = [
     path: 'configuracoes',
     canActivate: [authGuard],
     children: [
-      { path: '', redirectTo: 'horarios', pathMatch: 'full' },
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      {
+        path: 'dashboard',
+        canActivate: [permissaoGuard('dashboard')],
+        loadComponent: () =>
+          import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      },
+      {
+        path: 'cardapio',
+        canActivate: [permissaoGuard('cardapio')],
+        loadComponent: () =>
+          import('./pages/cardapio/cardapio.component').then((m) => m.CardapioComponent),
+      },
+      {
+        path: 'empresa',
+        canActivate: [permissaoGuard('empresa')],
+        loadComponent: () =>
+          import('./pages/configuracoes/empresa.component').then((m) => m.EmpresaComponent),
+      },
       {
         path: 'horarios',
+        canActivate: [permissaoGuard('horarios')],
         loadComponent: () =>
           import('./pages/configuracoes/configuracoes.component').then(
             (m) => m.ConfiguracoesComponent,
           ),
       },
       {
-        path: 'pratos-semana',
-        canDeactivate: [confirmarSaidaSemSalvar],
+        path: 'usuarios',
+        canActivate: [permissaoGuard('usuarios')],
         loadComponent: () =>
-          import('./pages/configuracoes/cardapio-semanal.component').then(
-            (m) => m.CardapioSemanalComponent,
-          ),
+          import('./pages/usuarios/usuarios.component').then((m) => m.UsuariosComponent),
       },
+      {
+        path: 'perfis',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./pages/perfis/perfis.component').then((m) => m.PerfisComponent),
+      },
+      { path: 'pratos-semana', redirectTo: 'cardapio' },
     ],
   },
   {
     path: '**',
-    redirectTo: 'dashboard',
+    redirectTo: '',
   },
 ];
