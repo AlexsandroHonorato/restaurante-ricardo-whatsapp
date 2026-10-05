@@ -474,6 +474,23 @@ test('mensagem enviada há mais de 10 minutos (reentrega tardia da Meta) é reco
   assert.equal(mensagemAntiga({ timestamp: 'x' }, agora), false);
 });
 
+test('fila acumulada com o bot parado: só a primeira mensagem atrasada de cada telefone é respondida', async () => {
+  const { criarFiltroDeAtrasadas } = await import('../lib/webhook.js');
+  const ignorar = criarFiltroDeAtrasadas();
+  const t0 = Date.parse('2026-10-05T12:00:00Z');
+  const msg = (from, enviadaMs) => ({ from, timestamp: String(Math.floor(enviadaMs / 1000)) });
+  // Três "Oi" enviados com o bot parado, reentregues com 20 s de intervalo depois que ele voltou.
+  assert.equal(ignorar(msg('5511999990001', t0 - 300000), t0), false);
+  assert.equal(ignorar(msg('5511999990001', t0 - 240000), t0 + 20000), true);
+  assert.equal(ignorar(msg('5511999990001', t0 - 180000), t0 + 40000), true);
+  // Mensagem nova, entregue na hora, e a de outro telefone seguem normalmente.
+  assert.equal(ignorar(msg('5511999990001', t0 + 50000), t0 + 51000), false);
+  assert.equal(ignorar(msg('5511999990002', t0 - 300000), t0 + 52000), false);
+  // Duas mensagens seguidas entregues fora de ordem, sem atraso, não são ignoradas.
+  assert.equal(ignorar(msg('5511999990003', t0 + 61000), t0 + 62000), false);
+  assert.equal(ignorar(msg('5511999990003', t0 + 60000), t0 + 62500), false);
+});
+
 test('rota de notificação exige token configurado, mesmo para chamadas locais', async () => {
   const { notificacaoAutorizada } = await import('../lib/webhook.js');
   assert.equal(notificacaoAutorizada(undefined, undefined), false);

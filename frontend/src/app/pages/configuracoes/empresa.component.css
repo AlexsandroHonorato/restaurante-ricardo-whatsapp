@@ -40,6 +40,33 @@ select {
   font-weight: 400;
   resize: vertical;
 }
+.tempos {
+  margin: 8px 0 0;
+  min-width: 0;
+  padding: 14px 20px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.tempos legend {
+  margin-left: -8px;
+  padding: 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.tempos p {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.tempos .duas {
+  align-items: start;
+  gap: 16px 24px;
+}
+.tempos input {
+  max-width: 140px;
+}
+.tempos small {
+  line-height: 1.4;
+}
 .erros {
   margin: 0 0 0 18px;
   color: var(--danger);

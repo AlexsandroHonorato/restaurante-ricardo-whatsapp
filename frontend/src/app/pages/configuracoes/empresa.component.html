@@ -85,6 +85,48 @@
         ></textarea>
       </label>
 
+      <fieldset class="tempos">
+        <legend>Mensagens atrasadas do WhatsApp</legend>
+        <p class="ajuda">
+          Quando o bot fica fora do ar, o WhatsApp entrega depois as mensagens que ficaram paradas.
+          Estes tempos evitam que o bot responda atrasado ou várias vezes seguidas.
+        </p>
+        <div class="linha duas">
+          <label for="empresa-antiga"
+            >Ignorar mensagens antigas (minutos)
+            <input
+              id="empresa-antiga"
+              name="minutos_mensagem_antiga"
+              type="number"
+              min="1"
+              max="1440"
+              required
+              [(ngModel)]="form.minutos_mensagem_antiga"
+            />
+            <small class="ajuda"
+              >Recomendado: 10. Mensagem enviada há mais tempo que isso não é respondida; fica só no
+              histórico da conversa.</small
+            >
+          </label>
+          <label for="empresa-fila"
+            >Fila acumulada (minutos)
+            <input
+              id="empresa-fila"
+              name="minutos_fila_acumulada"
+              type="number"
+              min="1"
+              max="60"
+              required
+              [(ngModel)]="form.minutos_fila_acumulada"
+            />
+            <small class="ajuda"
+              >Recomendado: 1. Das mensagens que chegam com atraso maior que isso, só a primeira de
+              cada cliente é respondida.</small
+            >
+          </label>
+        </div>
+      </fieldset>
+
       @if (erros().length) {
         <ul class="erros" role="alert">
           @for (e of erros(); track e) {
@@ -99,7 +141,7 @@
         <button
           class="btn btn-primary"
           type="submit"
-          [disabled]="salvando() || !form.nome.trim()"
+          [disabled]="salvando() || !form.nome.trim() || f.invalid"
           [attr.aria-busy]="salvando()"
         >
           {{ salvando() ? 'Salvando…' : 'Salvar dados' }}

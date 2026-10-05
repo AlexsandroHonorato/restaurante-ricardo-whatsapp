@@ -59,6 +59,23 @@ class EmpresaTest extends TestCase
         $this->getJson('/api/empresa')->assertJsonPath('tipo_negocio', 'loja');
     }
 
+    public function test_tempos_de_mensagens_atrasadas_tem_padrao_sao_validados_e_vao_para_o_bot(): void
+    {
+        $this->getJson('/api/empresa')->assertOk()->assertJsonPath('minutos_mensagem_antiga', 10)->assertJsonPath('minutos_fila_acumulada', 1);
+        $this->getJson('/api/bot/empresa')->assertJsonPath('minutos_mensagem_antiga', 10)->assertJsonPath('minutos_fila_acumulada', 1);
+
+        $this->putJson('/api/empresa', [...$this->dados(), 'minutos_mensagem_antiga' => 5, 'minutos_fila_acumulada' => 2])->assertOk();
+        $this->getJson('/api/bot/empresa')->assertJsonPath('minutos_mensagem_antiga', 5)->assertJsonPath('minutos_fila_acumulada', 2);
+        // Salvar sem os tempos (cliente antigo) mantém o que estava.
+        $this->putJson('/api/empresa', $this->dados())->assertOk();
+        $this->getJson('/api/empresa')->assertJsonPath('minutos_mensagem_antiga', 5);
+
+        $this->putJson('/api/empresa', [...$this->dados(), 'minutos_mensagem_antiga' => 0])->assertUnprocessable();
+        $this->putJson('/api/empresa', [...$this->dados(), 'minutos_fila_acumulada' => 61])->assertUnprocessable();
+        $this->putJson('/api/empresa', [...$this->dados(), 'minutos_mensagem_antiga' => 3, 'minutos_fila_acumulada' => 4])
+            ->assertUnprocessable()->assertJsonValidationErrors('minutos_fila_acumulada');
+    }
+
     public function test_ficha_vazia_devolve_texto_vazio_para_o_bot_usar_o_arquivo_padrao(): void
     {
         $this->getJson('/api/bot/empresa')->assertOk()->assertJsonPath('texto', '')->assertJsonPath('nome', null);

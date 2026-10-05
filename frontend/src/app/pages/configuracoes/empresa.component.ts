@@ -12,6 +12,8 @@ interface FichaEmpresa {
   quem_somos: string | null;
   formas_pagamento: string | null;
   politicas: string | null;
+  minutos_mensagem_antiga: number;
+  minutos_fila_acumulada: number;
 }
 
 /** Dados que o bot usa para se apresentar e responder dúvidas (antes só editáveis no arquivo negocio.md). */
@@ -32,6 +34,8 @@ export class EmpresaComponent {
     quem_somos: null,
     formas_pagamento: null,
     politicas: null,
+    minutos_mensagem_antiga: 10,
+    minutos_fila_acumulada: 1,
   };
   carregando = signal(true);
   salvando = signal(false);
@@ -65,6 +69,8 @@ export class EmpresaComponent {
       quem_somos,
       formas_pagamento,
       politicas,
+      minutos_mensagem_antiga,
+      minutos_fila_acumulada,
     } = this.form;
     this.http
       .put<FichaEmpresa>(`${API_BASE}/empresa`, {
@@ -76,6 +82,8 @@ export class EmpresaComponent {
         quem_somos,
         formas_pagamento,
         politicas,
+        minutos_mensagem_antiga,
+        minutos_fila_acumulada,
       })
       .subscribe({
         next: () => {

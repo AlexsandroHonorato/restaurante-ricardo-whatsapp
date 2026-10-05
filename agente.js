@@ -1,8 +1,8 @@
 // agente.js: passo 2 e passo 8. O servidor que a Meta chama (webhook) e que responde pelo WhatsApp.
 // Rode com:  npm start   (lê o .env pelo --env-file do Node 20.6+)
 import { createServer } from 'node:http';
-import { assinaturaValida, mensagemAntiga, notificacaoAutorizada } from './lib/webhook.js';
-import { EMPRESA } from './lib/empresa.js';
+import { assinaturaValida, criarFiltroDeAtrasadas, mensagemAntiga, notificacaoAutorizada } from './lib/webhook.js';
+import { EMPRESA, definirFicha } from './lib/empresa.js';
 import { criarFilaPorChave } from './lib/fila.js';
 import { criarMensageiro } from './lib/mensageiro.js';
 import { criarNotificador } from './lib/notificacoes.js';
@@ -72,6 +72,10 @@ function repetidaPelaRede(msg) {
   return anterior !== undefined && agora - anterior < 3000;
 }
 
+const atrasadaRepetida = criarFiltroDeAtrasadas();
+// Tempos configurados no painel já valem para a fila que a Meta entrega logo após o bot subir.
+apiBot.empresa().then(definirFicha).catch(erro => console.warn(JSON.stringify({ evento: 'ficha_empresa_indisponivel', erro: erro.message })));
+
 // Notificações do painel também passam pela saída durável (reenvio automático se falhar).
 const notificar = criarNotificador(async (para, texto, chave) => {
   const { mensagem } = await apiBot.criarSaida({ telefone: para, texto, chave });
@@ -136,9 +140,13 @@ createServer((req, res) => {
         return;
       }
       res.writeHead(200).end();
-      const antigas = new Set(mensagens.filter(m => mensagemAntiga(m)).map(m => m.id));
+      const novasIds = new Set(novas.map(entrada => entrada.wa_message_id));
+      const agora = Date.now();
+      const antigas = new Set(mensagens.filter(m => novasIds.has(m.id) && (
+        mensagemAntiga(m, agora, EMPRESA.minutosMensagemAntiga * 60000) || atrasadaRepetida(m, agora, EMPRESA.minutosFilaAcumulada * 60000)
+      )).map(m => m.id));
       for (const entrada of novas) {
-        // Reentrega tardia da Meta: fica no histórico da conversa, mas o bot não responde nem muda a etapa.
+        // Reentrega tardia da Meta ou fila acumulada: fica no histórico da conversa, mas o bot não responde nem muda a etapa.
         if (antigas.has(entrada.wa_message_id)) {
           console.warn(JSON.stringify({ evento: 'mensagem_antiga_ignorada', mensagem: entrada.id, telefone: entrada.telefone }));
           apiBot.atualizar(entrada.id, { status: 'processada' }).catch(erro => console.error(JSON.stringify({ evento: 'mensagem_antiga_nao_marcada', mensagem: entrada.id, erro: erro.message })));

@@ -7,6 +7,7 @@ use App\Models\HorarioAtendimento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class EmpresaController extends Controller
 {
@@ -29,8 +30,15 @@ class EmpresaController extends Controller
             'quem_somos' => 'nullable|string|max:4000',
             'formas_pagamento' => 'nullable|string|max:4000',
             'politicas' => 'nullable|string|max:4000',
+            'minutos_mensagem_antiga' => 'sometimes|integer|min:1|max:1440',
+            'minutos_fila_acumulada' => 'sometimes|integer|min:1|max:60',
         ]);
         $empresa = Empresa::atual();
+        $antiga = $dados['minutos_mensagem_antiga'] ?? $empresa->minutos_mensagem_antiga;
+        $fila = $dados['minutos_fila_acumulada'] ?? $empresa->minutos_fila_acumulada;
+        if ($fila > $antiga) {
+            throw ValidationException::withMessages(['minutos_fila_acumulada' => 'O tempo da fila acumulada não pode ser maior que o tempo para ignorar mensagens antigas.']);
+        }
         $empresa->update($dados);
 
         return response()->json($empresa);
@@ -56,6 +64,7 @@ class EmpresaController extends Controller
 
         return response()->json([
             'nome' => $empresa->nome, 'tipo_negocio' => $empresa->tipo_negocio ?? 'restaurante', 'telefone' => $empresa->telefone, 'telefone_2' => $empresa->telefone_2, 'texto' => $texto,
+            'minutos_mensagem_antiga' => $empresa->minutos_mensagem_antiga, 'minutos_fila_acumulada' => $empresa->minutos_fila_acumulada,
         ]);
     }
 }

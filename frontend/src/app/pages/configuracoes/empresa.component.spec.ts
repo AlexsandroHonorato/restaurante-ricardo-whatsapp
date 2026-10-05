@@ -13,6 +13,8 @@ const FICHA = {
   quem_somos: 'Comida caseira.',
   formas_pagamento: '- Pix',
   politicas: null,
+  minutos_mensagem_antiga: 5,
+  minutos_fila_acumulada: 2,
 };
 
 function montar() {

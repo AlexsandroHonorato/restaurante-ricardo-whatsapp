@@ -10,7 +10,12 @@ class Empresa extends Model
 
     public const TIPOS = ['restaurante', 'loja'];
 
-    protected $fillable = ['nome', 'tipo_negocio', 'telefone', 'telefone_2', 'endereco', 'quem_somos', 'formas_pagamento', 'politicas'];
+    protected $fillable = ['nome', 'tipo_negocio', 'telefone', 'telefone_2', 'endereco', 'quem_somos', 'formas_pagamento', 'politicas', 'minutos_mensagem_antiga', 'minutos_fila_acumulada'];
+
+    /** Mesmos padrões da migration, para a ficha recém-criada já sair com eles. */
+    protected $attributes = ['minutos_mensagem_antiga' => 10, 'minutos_fila_acumulada' => 1];
+
+    protected $casts = ['minutos_mensagem_antiga' => 'integer', 'minutos_fila_acumulada' => 'integer'];
 
     /** Única ficha desta instalação (cada empresa tem a própria instalação do BotClient). */
     public static function atual(): self

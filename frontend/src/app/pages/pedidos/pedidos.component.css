@@ -303,8 +303,15 @@
 
 .order-card-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 8px 12px;
+}
+/* Status em uma linha só: sem espaço ao lado do código, desce inteiro para a linha de baixo. */
+.order-card-header app-pedido-status {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .order-id-group {
@@ -317,6 +324,7 @@
   font-weight: 800;
   font-size: 1.05rem;
   color: var(--text-primary);
+  white-space: nowrap;
 }
 
 .order-time {

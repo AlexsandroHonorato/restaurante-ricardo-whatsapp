@@ -87,6 +87,8 @@ CREATE TABLE `empresa` (
   `politicas` text COLLATE utf8mb4_unicode_ci,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
+  `minutos_mensagem_antiga` smallint unsigned NOT NULL DEFAULT '10',
+  `minutos_fila_acumulada` smallint unsigned NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
