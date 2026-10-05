@@ -1,7 +1,8 @@
 // Teste ponta a ponta: API Laravel de verdade (SQLite temporário) + bot de verdade (agente.js),
 // com Meta e OpenRouter simulados num servidor local. Rode com: npm run test:e2e (precisa de PHP e do backend instalado).
 // Cobre: webhook assinado -> mensagem gravada -> IA fecha o pedido por código -> API calcula preço -> comprovante
-// no WhatsApp -> webhook repetido não duplica -> painel (login + CSRF) despacha -> cliente é notificado.
+// no WhatsApp -> webhook repetido não duplica -> agente da cozinha imprime a comanda (ESC/POS) uma vez
+// -> painel (login + CSRF) despacha -> cliente é notificado.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
@@ -12,12 +13,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import net from 'node:net';
+import { criarAgente, enviarParaImpressora } from '../../impressora/agente-impressao.mjs';
 
 const RAIZ = fileURLToPath(new URL('../../', import.meta.url));
 const BACKEND = join(RAIZ, 'backend');
 const TELEFONE = '5512999990001';
 const SEGREDO_META = 'segredo-e2e';
 const TOKEN_BOT = randomBytes(24).toString('hex'); // BotAccess exige 32+ caracteres
+const TOKEN_IMPRESSORA = randomBytes(24).toString('hex');
 const SENHA = 'Senha#E2e123';
 
 const pasta = mkdtempSync(join(tmpdir(), 'botclient-e2e-'));
@@ -104,7 +108,7 @@ test('mensagem no WhatsApp vira pedido com preço do servidor e o despacho pelo 
     DB_CONNECTION: 'sqlite', DB_DATABASE: banco, DB_URL: '',
     SESSION_DRIVER: 'database', SESSION_SECURE_COOKIE: 'false', CACHE_STORE: 'array', QUEUE_CONNECTION: 'sync',
     LOG_CHANNEL: 'stderr', MAIL_MAILER: 'array',
-    NOTIFICACAO_TOKEN: TOKEN_BOT, BOT_URL: `http://127.0.0.1:${portaBot}`,
+    NOTIFICACAO_TOKEN: TOKEN_BOT, BOT_URL: `http://127.0.0.1:${portaBot}`, IMPRESSORA_TOKEN: TOKEN_IMPRESSORA,
   };
   execFileSync('php', php('artisan', 'migrate', '--force'), { cwd: BACKEND, env: envApi, stdio: 'pipe' });
   execFileSync('php', php('artisan', 'db:seed', '--class=CardapioSeeder', '--force'), { cwd: BACKEND, env: envApi, stdio: 'pipe' });
@@ -165,6 +169,21 @@ test('mensagem no WhatsApp vira pedido com preço do servidor e o despacho pelo 
   await new Promise(resolve => setTimeout(resolve, 1500));
   assert.equal(textos().filter(t => /PED-/.test(t)).length, 1);
   assert.equal(pedidosAoModelo.length, 1);
+
+  // ------------------------------------------------ cozinha: agente de impressão pega o pedido e manda para a térmica
+  const recebidoImpressora = [];
+  const impressora = net.createServer(s => s.on('data', d => recebidoImpressora.push(d)));
+  await new Promise(resolve => impressora.listen(0, '127.0.0.1', resolve));
+  const cicloImpressao = criarAgente({
+    apiUrl: `http://127.0.0.1:${portaPainel}/api`, token: TOKEN_IMPRESSORA, log: () => {},
+    imprimir: bytes => enviarParaImpressora(bytes, { ip: '127.0.0.1', porta: impressora.address().port }),
+  });
+  await cicloImpressao();
+  await cicloImpressao(); // segunda passada não imprime de novo
+  await new Promise(resolve => impressora.close(resolve));
+  const impresso = Buffer.concat(recebidoImpressora).toString('latin1');
+  assert.equal(impresso.split(`COMANDA ${codigoPedido}`).length - 1, 1, 'comanda impressa uma vez');
+  assert.match(impresso, /2x Fil\x82 de Frango Acebolado \(Grande\) +R\$ 60,00/); // "é" em PC850
 
   // ------------------------------------------------ painel: login com CSRF e despacho do pedido
   const cookies = new Map();

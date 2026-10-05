@@ -169,11 +169,12 @@ class AtendimentoController extends Controller
         }
     }
 
-    public function getStatusConversas()
+    public function getStatusConversas(Request $request)
     {
-        // Monitor ao vivo (o painel consulta a cada 5 s): só as conversas das últimas 24 h e os transbordos
-        // ainda sem contato, estes primeiro para nunca ficarem de fora do limite.
-        $status = StatusConversa::where('ultimo_contato_em', '>=', now()->subDay())
+        // Monitor ao vivo (o painel consulta a cada 5 s): conversas do período (24 h, 7 ou 30 dias; padrão 24 h)
+        // e os transbordos ainda sem contato, estes primeiro para nunca ficarem de fora do limite.
+        $horas = in_array((int) $request->query('horas'), [24, 168, 720], true) ? (int) $request->query('horas') : 24;
+        $status = StatusConversa::where('ultimo_contato_em', '>=', now()->subHours($horas))
             ->orWhere(fn ($q) => $q->where('status_atual', 'transbordo_humano')->whereNull('contato_iniciado_em'))
             ->orderByRaw("CASE WHEN status_atual = 'transbordo_humano' AND contato_iniciado_em IS NULL THEN 0 ELSE 1 END")
             ->orderBy('ultimo_contato_em', 'DESC')

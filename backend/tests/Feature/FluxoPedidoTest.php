@@ -45,6 +45,12 @@ class FluxoPedidoTest extends TestCase
         $this->assertSame('551290000000'.'0', $lista[1]['telefone'], 'depois as mais recentes');
         $this->assertNotContains('5512000000001', array_column($lista, 'telefone'));
         $this->assertNotContains('5512000000003', array_column($lista, 'telefone'));
+
+        // Período maior (7 dias) traz a conversa de 3 dias atrás; valor fora da lista volta para 24 h.
+        StatusConversa::where('telefone', 'like', '55129%')->delete();
+        $semana = array_column($this->getJson('/api/status-conversa?horas=168')->assertOk()->json(), 'telefone');
+        $this->assertContains('5512000000001', $semana);
+        $this->assertNotContains('5512000000001', array_column($this->getJson('/api/status-conversa?horas=99999')->json(), 'telefone'));
     }
 
     public function test_contato_envia_saudacao_uma_vez_e_rejeita_conversa_sem_transbordo(): void

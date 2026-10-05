@@ -18,6 +18,7 @@ export class TransbordoService {
     this.conversas.set([]);
     this.fechados.set(new Set());
     this.eventos.set(0);
+    this.periodoHoras.set(24);
   }
   private recebidos = false;
   private ativos = new Set<string>();
@@ -47,13 +48,25 @@ export class TransbordoService {
   conversas = signal<any[]>([]);
   aguardando = computed(() => this.fila().length);
   eventos = signal(0);
+  /** Período do Monitor de Atendimentos; o cabeçalho só precisa do padrão (transbordos vêm sempre). */
+  periodoHoras = signal(24);
+
+  mudarPeriodo(horas: number) {
+    if (horas === this.periodoHoras()) return;
+    this.periodoHoras.set(horas);
+    if (this.iniciado) {
+      this.consulta?.unsubscribe();
+      this.iniciado = false;
+      this.iniciar();
+    }
+  }
 
   iniciar() {
     if (this.iniciado) return;
     this.iniciado = true;
     this.consulta = timer(0, 5000)
       .pipe(
-        exhaustMap(() => this.api.getStatusConversas()),
+        exhaustMap(() => this.api.getStatusConversas(this.periodoHoras())),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((conversas) => {

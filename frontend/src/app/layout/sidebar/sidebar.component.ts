@@ -5,6 +5,7 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
+import { TransbordoService } from '../../core/services/transbordo.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -17,4 +18,6 @@ export class SidebarComponent {
   configuracoesAbertas = true;
   api = inject(ApiService);
   auth = inject(AuthService);
+  // Contador de Atendimentos = clientes aguardando atendimento humano agora (o mesmo do sino do cabeçalho).
+  transbordo = inject(TransbordoService);
 }

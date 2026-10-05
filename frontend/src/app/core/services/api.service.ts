@@ -203,8 +203,10 @@ export class ApiService {
   iniciarContatoTransbordo(id: number): Observable<{ ok: boolean }> {
     return this.http.post<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/contato`, {});
   }
-  getStatusConversas(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/status-conversa`).pipe(
+  /** Monitor: conversas do período (24, 168 ou 720 horas) + transbordos aguardando contato. */
+  getStatusConversas(horas = 24): Observable<any[]> {
+    const qs = horas === 24 ? '' : `?horas=${horas}`;
+    return this.http.get<any[]>(`${this.baseUrl}/status-conversa${qs}`).pipe(
       catchError(() => {
         this.registrarFalha();
         return EMPTY;

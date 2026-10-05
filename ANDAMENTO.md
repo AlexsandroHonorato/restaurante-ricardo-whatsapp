@@ -646,3 +646,31 @@ Alterações desta etapa ainda sem novo commit.
 - Código: lista extraída para `pages/usuarios/equipe-lista.component.ts` (+ CSS próprio); a página só passa dados e trata editar/excluir/carregar mais. Estilos da lista saíram de `usuarios.component.css`.
 - Visual/uso: resumo "N pessoas · N administradores · N inativos"; busca por nome, e-mail ou telefone (sem acento; telefone por dígitos) e filtros de perfil e status, com "Limpar filtros"; avatar redondo com iniciais (destacado para administrador); selos Administrador/Operador, Ativo/Inativo e "Você"; inativos esmaecidos; item em edição destacado; "Carregar mais (N restantes)". Erro ao carregar a equipe aparece na própria lista com "Tentar novamente" (antes ia para a mensagem do formulário). Busca/filtros valem para o que já foi carregado (30 por página).
 - Testes: Angular 79/79 (3 novos da lista); build OK. Não conferido no navegador. Sem commit.
+
+## 58. Impressão automática na Bematech MP-4200 TH — 04/10/2026
+
+- Pedido do usuário: além do botão de imprimir, a comanda deve sair sozinha na térmica Bematech MP-4200 TH quando o cliente finaliza o pedido. Escolhas do usuário: **agente local** (não depende do painel aberto) e impressora **em rede (Ethernet)**.
+- Agente `impressora/agente-impressao.mjs` (Node 20+, sem dependências) no computador da cozinha: a cada 5 s busca `GET /api/impressora/pendentes` (sem comanda, status pendente/confirmado/em_preparo, últimas 12 h, mais antigo primeiro), pega cada pedido com `POST /api/impressora/pedidos/{id}/comanda` (atômico; só quem pegou primeiro imprime — não duplica com o navegador) e envia ESC/POS para IP:9100: ESC @, página PC850 (ESC t 2; acentos convertidos, emoji removido), título em negrito/altura dupla, 48 colunas, avanço e corte parcial (GS V 1). Impressora falhou: `DELETE .../comanda` devolve o pedido para a fila e tenta no próximo ciclo. Modo `--teste` imprime página com acentos e régua de colunas. `iniciar.cmd` reinicia o agente se cair e grava `impressao.log`.
+- API: token próprio `IMPRESSORA_TOKEN` (middleware `ImpressoraAccess`, mínimo 32 caracteres; vazio = rotas fechadas; não abre o painel nem as rotas do bot). `ImpressoraController` (pendentes, pegar, devolver). `.env.example` documentado.
+- Guia `docs/IMPRESSORA.md`: configurar a impressora em ESC/POS + página 850 + IP fixo (Bematech User Software), gerar o token na VPS, instalar Node no PC da cozinha, `.env` do agente, teste, início automático pelo Agendador de Tarefas (schtasks), tabela de problemas.
+- Testes: Laravel 80 (3 novos), Node 55 (6 novos: formato 48 colunas, PC850, bytes ESC/POS, envio TCP, ciclo com falha/devolução, pedido já pego), ponta a ponta agora inclui o agente imprimindo o pedido do WhatsApp uma vez numa impressora TCP simulada. Não testado em uma MP-4200 TH real. Sem commit.
+- Pendências do usuário: configurar a impressora em ESC/POS/850 e IP fixo; gerar `IMPRESSORA_TOKEN` na VPS; instalar o agente no PC da cozinha e rodar `--teste`; desligar a "Impressão automática" do navegador nesse PC.
+
+## 59. Variáveis da impressora nos .env locais — 04/10/2026
+
+- Usuário não achou as variáveis no `.env` (abriu o da raiz, que é do bot e não usa). Até então só existiam nos exemplos.
+- Criados localmente: `IMPRESSORA_TOKEN` (48 caracteres, gerado) no fim de `backend/.env` e `impressora/.env` (copiado do exemplo, `API_URL=http://127.0.0.1:8080/api`, mesmo token). `impressora/.env` é ignorado pelo git. `IMPRESSORA_IP` ainda é o exemplo 192.168.0.50: o usuário deve trocar pelo IP real e rodar `--teste`. Na VPS cada empresa precisa do próprio token (docs/IMPRESSORA.md, passo 2).
+
+## 60. Monitor de Atendimentos vazio e contador "10" no menu — 04/10/2026
+
+- Relato do usuário: Monitor de Atendimentos vazio e menu marcando 10.
+- Causas: (1) o contador do menu usava `total_transbordo_humano` dos KPIs = todos os atendimentos que já tiveram transbordo, em qualquer data (10 no banco local, dados de exemplo), não quem aguarda agora; (2) desde a seção 52/item 16 o monitor mostra só conversas das últimas 24 h, e a conversa mais recente do banco local é de 03/10; a tela não explicava o período.
+- Correções: menu passa a mostrar `TransbordoService.aguardando()` (clientes aguardando atendimento humano agora, o mesmo do sino; some quando é 0). Monitor ganhou seletor "Últimas 24 horas / Últimos 7 dias / Últimos 30 dias" (`GET /api/status-conversa?horas=24|168|720`, valor inválido volta a 24; transbordos pendentes vêm sempre); ao sair da tela volta a 24 h. Mensagem vazia diz o período e sugere ampliar.
+- Testes: Laravel 80, Angular 80 (novo: período do monitor); build OK. Sem commit.
+
+## 61. Lentidão ao entrar no sistema — 04/10/2026
+
+- Relato do usuário: após clicar Entrar aparecem menu e logo e só depois a tela "Operação do restaurante" (Dashboard); demora para entrar.
+- Causa: cada guarda de rota chamava `AuthService.check()`, que sempre ia à API (`/auth/csrf` + `/auth/me`). O caminho `/` → página inicial → `/configuracoes` → `/configuracoes/dashboard` passa por 4 guardas = 8 chamadas em sequência logo depois do login (que já trouxe o usuário). O layout (menu/cabeçalho) aparece assim que o login responde e dispara as próprias consultas; no `php artisan serve` (uma requisição por vez no Windows) tudo enfileira. Medido: ~60 ms por chamada isolada.
+- Correção: `check()` responde na hora quando o usuário já é conhecido (login ou sessão já conferida); só a primeira abertura (F5) consulta a API, e consultas simultâneas compartilham a mesma ida (`shareReplay`). Sessão expirada continua sendo detectada pelo interceptor no primeiro 401/419. Rotas com `withPreloading(PreloadAllModules)`: telas baixadas em segundo plano. Depois do login: 2 chamadas (csrf + login) em vez de 10 antes do Dashboard.
+- Testes: Angular 82 (2 novos: sem chamadas extras após login; consultas simultâneas viram uma); build OK. Não medido no navegador. Sem commit.

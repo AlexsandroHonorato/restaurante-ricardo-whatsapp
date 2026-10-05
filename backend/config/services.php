@@ -6,6 +6,11 @@ return [
         'token' => env('NOTIFICACAO_TOKEN'),
     ],
 
+    // Agente de impressão da cozinha (impressora/agente-impressao.mjs). Vazio = rotas /impressora fechadas.
+    'impressora' => [
+        'token' => env('IMPRESSORA_TOKEN'),
+    ],
+
     'empresa' => [
         'nome' => env('EMPRESA_NOME', 'Restaurante Família Ricardo'),
     ],

@@ -9,6 +9,24 @@ describe('Avisos de transbordo', () => {
     TestBed.resetTestingModule();
     vi.useRealTimers();
   });
+  it('período do monitor: troca consulta na hora e volta a 24 h ao sair', async () => {
+    vi.useFakeTimers();
+    const consultar = vi.fn(() => of([]));
+    TestBed.configureTestingModule({
+      providers: [{ provide: ApiService, useValue: { getStatusConversas: consultar } }],
+    });
+    const service = TestBed.inject(TransbordoService);
+    service.iniciar();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(consultar).toHaveBeenLastCalledWith(24);
+    service.mudarPeriodo(168);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(consultar).toHaveBeenLastCalledWith(168);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(consultar).toHaveBeenLastCalledWith(168);
+    service.parar();
+    expect(service.periodoHoras()).toBe(24);
+  });
   it('reduz cinco avisos para quatro após contato confirmado e mantém após nova consulta', async () => {
     vi.useFakeTimers();
     let dados = Array.from({ length: 5 }, (_, i) => ({

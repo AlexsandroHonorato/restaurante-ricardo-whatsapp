@@ -63,14 +63,30 @@ export class AtendimentosComponent implements OnInit {
       : this.statusConversas(),
   );
 
+  periodos = [
+    { horas: 24, rotulo: 'Últimas 24 horas', texto: 'nas últimas 24 horas' },
+    { horas: 168, rotulo: 'Últimos 7 dias', texto: 'nos últimos 7 dias' },
+    { horas: 720, rotulo: 'Últimos 30 dias', texto: 'nos últimos 30 dias' },
+  ];
+  periodoHoras = this.transbordo.periodoHoras;
+  textoPeriodo = computed(
+    () => this.periodos.find((p) => p.horas === this.periodoHoras())?.texto ?? '',
+  );
+
   ngOnInit() {
     this.carregar();
     this.transbordo.iniciar();
+    // Fora desta tela o monitor volta ao padrão leve (24 h) usado pelo cabeçalho.
+    this.destroyRef.onDestroy(() => this.transbordo.mudarPeriodo(24));
+  }
+
+  mudarPeriodo(horas: number) {
+    this.transbordo.mudarPeriodo(horas);
   }
 
   carregar() {
     this.api
-      .getStatusConversas()
+      .getStatusConversas(this.periodoHoras())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((res) => {
         this.statusConversas.set(res);

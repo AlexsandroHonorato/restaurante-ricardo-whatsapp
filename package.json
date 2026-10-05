@@ -14,7 +14,7 @@
     "start:front": "cd frontend && npm start",
     "simular": "node --env-file=.env simular.js",
     "testar": "node --env-file=.env testar.js",
-    "test": "node --test tests/regressoes.test.js tests/horario-atendimento.test.js tests/mensageiro.test.js tests/log-conversas.test.js tests/caixa-postal.test.js tests/limite-mensagens.test.js",
+    "test": "node --test tests/regressoes.test.js tests/horario-atendimento.test.js tests/mensageiro.test.js tests/log-conversas.test.js tests/caixa-postal.test.js tests/limite-mensagens.test.js tests/impressora.test.js",
     "test:e2e": "node --test tests/e2e/ponta-a-ponta.test.js"
   }
 }

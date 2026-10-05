@@ -33,8 +33,12 @@
     >
       <app-icon nome="atendimentos" />
       <span class="nav-label">Atendimentos IA</span>
-      @if (api.kpis()?.total_transbordo_humano) {
-        <span class="nav-pill alert">{{ api.kpis()?.total_transbordo_humano }}</span>
+      @if (transbordo.aguardando()) {
+        <span
+          class="nav-pill alert"
+          [attr.aria-label]="transbordo.aguardando() + ' cliente(s) aguardando atendimento humano'"
+          >{{ transbordo.aguardando() }}</span
+        >
       }
     </a>
 

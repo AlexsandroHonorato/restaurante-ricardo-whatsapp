@@ -29,6 +29,16 @@
         </button>
       </div>
 
+      <select
+        class="periodo-select glass-card"
+        aria-label="Período das conversas"
+        [value]="periodoHoras()"
+        (change)="mudarPeriodo(+$any($event.target).value)"
+      >
+        @for (p of periodos; track p.horas) {
+          <option [value]="p.horas">{{ p.rotulo }}</option>
+        }
+      </select>
       <button class="refresh-btn glass-card" (click)="carregar()" title="Recarregar Dados">
         <app-icon nome="atualizar" /> Atualizar Status
       </button>
@@ -189,10 +199,12 @@
       } @empty {
         <div class="empty-state glass-card">
           <span class="empty-icon">🤖</span>
-          <h3>Nenhuma conversa ativa no momento</h3>
+          <h3>Nenhuma conversa {{ textoPeriodo() }}</h3>
           <p>
-            Assim que um cliente enviar uma mensagem no WhatsApp ou simulador, o status aparecerá
-            aqui.
+            Assim que um cliente enviar uma mensagem no WhatsApp, o status aparecerá aqui.
+            @if (periodoHoras() < 720) {
+              Para ver conversas mais antigas, escolha um período maior acima.
+            }
           </p>
         </div>
       }
@@ -288,7 +300,7 @@
               <td colspan="6" class="empty-table-cell">
                 <div class="empty-state-mini">
                   <span>🤖</span>
-                  <p>Nenhuma conversa ativa no momento.</p>
+                  <p>Nenhuma conversa {{ textoPeriodo() }}.</p>
                 </div>
               </td>
             </tr>

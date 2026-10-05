@@ -579,3 +579,20 @@
   margin-bottom: 12px;
   display: block;
 }
+
+.periodo-select {
+  background: var(--bg-surface-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.periodo-select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

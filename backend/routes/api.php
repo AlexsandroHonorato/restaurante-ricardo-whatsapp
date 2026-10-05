@@ -10,12 +10,14 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HorarioAtendimentoController;
+use App\Http\Controllers\ImpressoraController;
 use App\Http\Controllers\PedidoController;
 use App\Http\Controllers\SaudeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\ActiveUser;
 use App\Http\Middleware\AdminOnly;
 use App\Http\Middleware\BotAccess;
+use App\Http\Middleware\ImpressoraAccess;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
@@ -33,6 +35,11 @@ Route::middleware(BotAccess::class)->group(function () {
     Route::get('/bot/conversas/{telefone}', [BotMensagemController::class, 'conversa']);
     Route::get('/bot/empresa', [EmpresaController::class, 'paraBot']);
     Route::get('/bot/conversas/{telefone}/pausa', [ConversaController::class, 'pausaParaBot']);
+});
+Route::middleware(ImpressoraAccess::class)->prefix('impressora')->group(function () {
+    Route::get('/pendentes', [ImpressoraController::class, 'pendentes']);
+    Route::post('/pedidos/{id}/comanda', [ImpressoraController::class, 'pegar'])->whereNumber('id');
+    Route::delete('/pedidos/{id}/comanda', [ImpressoraController::class, 'devolver'])->whereNumber('id');
 });
 Route::middleware('web')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth');
