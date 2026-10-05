@@ -7,6 +7,7 @@ import { ApiService } from '../../core/services/api.service';
 import { Cliente } from '../../core/models/dashboard.model';
 import { PaginacaoComponent } from '../../shared/ui/paginacao.component';
 import { Subscription } from 'rxjs';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 @Component({
   selector: 'app-clientes',
@@ -18,6 +19,7 @@ import { Subscription } from 'rxjs';
 export class ClientesComponent implements OnInit {
   api = inject(ApiService);
   private auth = inject(AuthService);
+  private confirmacao = inject(ConfirmacaoService);
   clientes = signal<Cliente[]>([]);
   termoBusca: string = '';
   ehAdmin = computed(() => this.auth.user()?.role === 'admin');
@@ -26,11 +28,21 @@ export class ClientesComponent implements OnInit {
 
   /** LGPD: a pedido do cliente. Os pedidos continuam no faturamento, sem identificar a pessoa. */
   apagarDados(c: Cliente) {
-    const ok = confirm(
-      `Apagar os dados pessoais de ${c.nome}? Nome, telefone, endereços e conversas serão removidos ` +
-        'definitivamente. Os pedidos continuam no faturamento, sem identificação.',
+    if (this.apagando()) return;
+    this.confirmacao.pedir(
+      {
+        titulo: 'Apagar dados do cliente?',
+        mensagem:
+          `Nome, telefone, endereços e conversas de ${c.nome} serão removidos definitivamente. ` +
+          'Os pedidos continuam no faturamento, sem identificação.',
+        confirmar: 'Apagar dados',
+        perigo: true,
+      },
+      () => this.apagarConfirmado(c),
     );
-    if (!ok || this.apagando()) return;
+  }
+  private apagarConfirmado(c: Cliente) {
+    if (this.apagando()) return;
     this.apagando.set(c.id);
     this.api.anonimizarCliente(c.id).subscribe({
       next: () => {

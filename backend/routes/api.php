@@ -54,7 +54,10 @@ Route::middleware('web')->group(function () {
         Route::delete('/usuarios/{id}', [UserController::class, 'destroy'])->whereNumber('id')->middleware(AdminOnly::class);
         Route::get('/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
         Route::get('/sistema/saude', SaudeController::class);
+        Route::get('/sistema/saude/{codigo}', [SaudeController::class, 'detalhes']);
         Route::get('/empresa', [EmpresaController::class, 'show']);
+        Route::get('/conversas/sem-resposta', [ConversaController::class, 'semResposta']);
+        Route::delete('/conversas/{telefone}/sem-resposta', [ConversaController::class, 'dispensarSemResposta']);
         Route::get('/conversas/{telefone}/mensagens', [ConversaController::class, 'mensagens']);
         Route::post('/conversas/{telefone}/mensagens', [ConversaController::class, 'enviar'])->middleware('throttle:60,1');
         Route::post('/conversas/{telefone}/pausa', [ConversaController::class, 'alterarPausa']);

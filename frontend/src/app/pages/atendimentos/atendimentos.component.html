@@ -122,6 +122,49 @@
     </section>
   }
 
+  @if (semResposta().length) {
+    <section class="sem-resposta glass-card" aria-labelledby="sem-resposta-titulo">
+      <h2 id="sem-resposta-titulo">
+        <app-icon nome="alerta" /> {{ semResposta().length }} cliente(s) sem resposta
+      </h2>
+      <p>
+        Escreveram com o bot fora do ar e a mensagem chegou tarde demais para ele responder. Decida
+        se a equipe chama o cliente.
+      </p>
+      <ul>
+        @for (c of semResposta(); track c.telefone) {
+          <li>
+            <div class="sem-resposta-info">
+              <strong>WhatsApp {{ c.telefone }}</strong>
+              <span
+                >{{ c.ultima_em | date: 'dd/MM HH:mm' }} · {{ c.quantidade }} mensagem(ns) · “{{
+                  c.ultima_mensagem || 'mensagem sem texto'
+                }}”</span
+              >
+            </div>
+            <div class="sem-resposta-acoes">
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                (click)="abrirConversa(c.telefone)"
+              >
+                <app-icon nome="atendimentos" /> Conversar pelo painel
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm dispensar"
+                [disabled]="dispensando().has(c.telefone)"
+                (click)="dispensarSemResposta(c.telefone)"
+              >
+                Dispensar
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
   <!-- 1. VISÃO EM CARDS (FEED DE CONVERSAS) -->
   @if (modoVisao() === 'cards') {
     <div class="chat-feed-grid">

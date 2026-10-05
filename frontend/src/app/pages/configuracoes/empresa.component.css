@@ -67,6 +67,11 @@ select {
 .tempos small {
   line-height: 1.4;
 }
+.campo-erro {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--danger);
+}
 .erros {
   margin: 0 0 0 18px;
   color: var(--danger);

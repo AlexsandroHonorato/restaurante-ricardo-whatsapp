@@ -142,14 +142,20 @@ createServer((req, res) => {
       res.writeHead(200).end();
       const novasIds = new Set(novas.map(entrada => entrada.wa_message_id));
       const agora = Date.now();
-      const antigas = new Set(mensagens.filter(m => novasIds.has(m.id) && (
-        mensagemAntiga(m, agora, EMPRESA.minutosMensagemAntiga * 60000) || atrasadaRepetida(m, agora, EMPRESA.minutosFilaAcumulada * 60000)
-      )).map(m => m.id));
+      // Sem resposta do bot: "ignorada" = chegou tarde demais, o cliente ficou sem resposta e a equipe é avisada no painel;
+      // "processada" = repetição da fila acumulada, o cliente já recebeu a resposta da primeira mensagem.
+      const semResposta = new Map();
+      for (const m of mensagens) {
+        if (!novasIds.has(m.id)) continue;
+        if (mensagemAntiga(m, agora, EMPRESA.minutosMensagemAntiga * 60000)) semResposta.set(m.id, 'ignorada');
+        else if (atrasadaRepetida(m, agora, EMPRESA.minutosFilaAcumulada * 60000)) semResposta.set(m.id, 'processada');
+      }
       for (const entrada of novas) {
-        // Reentrega tardia da Meta ou fila acumulada: fica no histórico da conversa, mas o bot não responde nem muda a etapa.
-        if (antigas.has(entrada.wa_message_id)) {
-          console.warn(JSON.stringify({ evento: 'mensagem_antiga_ignorada', mensagem: entrada.id, telefone: entrada.telefone }));
-          apiBot.atualizar(entrada.id, { status: 'processada' }).catch(erro => console.error(JSON.stringify({ evento: 'mensagem_antiga_nao_marcada', mensagem: entrada.id, erro: erro.message })));
+        // Fica no histórico da conversa, mas o bot não responde nem muda a etapa.
+        const status = semResposta.get(entrada.wa_message_id);
+        if (status) {
+          console.warn(JSON.stringify({ evento: 'mensagem_antiga_ignorada', mensagem: entrada.id, telefone: entrada.telefone, status }));
+          apiBot.atualizar(entrada.id, { status }).catch(erro => console.error(JSON.stringify({ evento: 'mensagem_antiga_nao_marcada', mensagem: entrada.id, erro: erro.message })));
           continue;
         }
         mensageiro.registrar(entrada.telefone, entrada.wa_message_id);

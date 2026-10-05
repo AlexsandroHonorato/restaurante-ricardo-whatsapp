@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ConfiguracoesComponent } from './configuracoes.component';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 const baseUrl = 'http://localhost:8080/api/horarios-atendimento';
 const segunda = {
@@ -18,7 +19,15 @@ describe('Configurações de atendimento', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [ConfiguracoesComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        // Modal de decisão confirma na hora.
+        {
+          provide: ConfirmacaoService,
+          useValue: { pedir: (_: unknown, aoConfirmar: () => void) => aoConfirmar() },
+        },
+      ],
     });
     http = TestBed.inject(HttpTestingController);
   });

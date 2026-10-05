@@ -9,6 +9,7 @@ import {
   mascararTelefone,
 } from '../../shared/ui/mascara-telefone.directive';
 import { EquipeListaComponent } from './equipe-lista.component';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 @Component({
   selector: 'app-usuarios',
   standalone: true,
@@ -166,6 +167,7 @@ import { EquipeListaComponent } from './equipe-lista.component';
 })
 export class UsuariosComponent implements OnInit {
   private http = inject(HttpClient);
+  private confirmacao = inject(ConfirmacaoService);
   sessao = inject(SessionState);
   usuarios = signal<SystemUser[]>([]);
   total = signal(0);
@@ -265,8 +267,18 @@ export class UsuariosComponent implements OnInit {
   }
   excluir(user: SystemUser, form: NgForm) {
     if (this.ehEu(user) || this.excluindo()) return;
-    if (!confirm(`Excluir o acesso de "${user.name}"? A pessoa não conseguirá mais entrar.`))
-      return;
+    this.confirmacao.pedir(
+      {
+        titulo: 'Excluir usuário?',
+        mensagem: `O acesso de "${user.name}" será excluído e a pessoa não conseguirá mais entrar.`,
+        confirmar: 'Excluir usuário',
+        perigo: true,
+      },
+      () => this.excluirConfirmado(user, form),
+    );
+  }
+  private excluirConfirmado(user: SystemUser, form: NgForm) {
+    if (this.excluindo()) return;
     this.excluindo.set(user.id);
     this.erro.set('');
     this.sucesso.set('');
@@ -291,6 +303,24 @@ export class UsuariosComponent implements OnInit {
       this.salvando()
     )
       return;
+    const editando = this.editando();
+    this.confirmacao.pedir(
+      editando
+        ? {
+            titulo: 'Salvar alterações?',
+            mensagem: `Os dados de "${editando.name}" serão atualizados.`,
+            confirmar: 'Salvar alterações',
+          }
+        : {
+            titulo: 'Cadastrar usuário?',
+            mensagem: `"${this.dados.name}" passará a ter acesso ao painel.`,
+            confirmar: 'Cadastrar usuário',
+          },
+      () => this.salvarConfirmado(form),
+    );
+  }
+  private salvarConfirmado(form: NgForm) {
+    if (this.salvando()) return;
     this.salvando.set(true);
     this.erro.set('');
     this.sucesso.set('');

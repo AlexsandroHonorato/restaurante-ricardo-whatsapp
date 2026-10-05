@@ -51,7 +51,8 @@ class BotMensagemController extends Controller
     public function atualizar(Request $request, int $id): JsonResponse
     {
         $dados = $request->validate([
-            'status' => 'required|in:processando,processada,enviada,pendente',
+            // ignorada: entrada que chegou tarde demais para o bot responder; a equipe é avisada no painel.
+            'status' => 'required|in:processando,processada,enviada,pendente,ignorada',
             'erro' => 'nullable|string|max:255',
             'meta_message_id' => 'nullable|string|max:150',
         ]);

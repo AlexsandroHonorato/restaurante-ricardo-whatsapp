@@ -33,9 +33,17 @@
             id="empresa-telefone"
             name="telefone"
             [(ngModel)]="form.telefone"
-            maxlength="30"
+            #telefone="ngModel"
+            appMascaraTelefone
+            type="tel"
+            inputmode="numeric"
+            maxlength="15"
+            pattern="\(\d{2}\) \d{4,5}-\d{4}"
             placeholder="(12) 99999-0000"
           />
+          @if (telefone.invalid) {
+            <small class="campo-erro" role="alert">Telefone incompleto.</small>
+          }
         </label>
         <label for="empresa-telefone2"
           >Telefone alternativo
@@ -43,8 +51,17 @@
             id="empresa-telefone2"
             name="telefone_2"
             [(ngModel)]="form.telefone_2"
-            maxlength="30"
+            #telefone2="ngModel"
+            appMascaraTelefone
+            type="tel"
+            inputmode="numeric"
+            maxlength="15"
+            pattern="\(\d{2}\) \d{4,5}-\d{4}"
+            placeholder="(12) 3333-4444"
           />
+          @if (telefone2.invalid) {
+            <small class="campo-erro" role="alert">Telefone incompleto.</small>
+          }
         </label>
       </div>
       <label for="empresa-endereco"

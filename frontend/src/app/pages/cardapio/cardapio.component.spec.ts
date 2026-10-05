@@ -5,6 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { vi } from 'vitest';
 import { CardapioComponent } from './cardapio.component';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 registerLocaleData(localePt, 'pt-BR');
 
@@ -35,7 +36,15 @@ const HORARIOS = {
 function montar(cardapio: object | 'erro' = CARDAPIO) {
   TestBed.configureTestingModule({
     imports: [CardapioComponent],
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      // Modal de decisão confirma na hora.
+      {
+        provide: ConfirmacaoService,
+        useValue: { pedir: (_: unknown, aoConfirmar: () => void) => aoConfirmar() },
+      },
+    ],
   });
   const fixture = TestBed.createComponent(CardapioComponent);
   fixture.detectChanges();

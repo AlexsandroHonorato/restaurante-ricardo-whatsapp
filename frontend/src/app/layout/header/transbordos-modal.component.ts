@@ -13,6 +13,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { ApiService } from '../../core/services/api.service';
 import { IconComponent } from '../../shared/ui/icon.component';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 @Component({
   selector: 'app-transbordos-modal',
@@ -25,6 +26,7 @@ export class TransbordosModalComponent {
   @ViewChild('dialog') dialog!: ElementRef<HTMLDialogElement>;
   transbordo = inject(TransbordoService);
   private api = inject(ApiService);
+  private confirmacao = inject(ConfirmacaoService);
   private destroyRef = inject(DestroyRef);
   enviando = signal(new Set<number>());
   erros = signal<Record<number, string>>({});
@@ -98,6 +100,19 @@ export class TransbordosModalComponent {
       });
   }
   excluir(id: number) {
+    if (this.enviando().has(id)) return;
+    const cliente = this.transbordo.fila().find((s) => s.id === id);
+    this.confirmacao.pedir(
+      {
+        titulo: 'Excluir alerta?',
+        mensagem: `O aviso de ${cliente?.telefone ?? 'atendimento'} sai da fila para toda a equipe, sem enviar mensagem. A conversa continua no monitor.`,
+        confirmar: 'Excluir alerta',
+        perigo: true,
+      },
+      () => this.excluirConfirmado(id),
+    );
+  }
+  private excluirConfirmado(id: number) {
     if (this.enviando().has(id)) return;
     this.enviando.update((ids) => new Set([...ids, id]));
     this.erros.update((erros) => ({ ...erros, [id]: '' }));

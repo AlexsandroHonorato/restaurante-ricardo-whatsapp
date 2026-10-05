@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { EmpresaComponent } from './empresa.component';
 import { API_BASE } from '../../core/services/session-state';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 const FICHA = {
   nome: 'Restaurante Família Ricardo',
@@ -20,7 +21,15 @@ const FICHA = {
 function montar() {
   TestBed.configureTestingModule({
     imports: [EmpresaComponent],
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      // Modal de decisão confirma na hora.
+      {
+        provide: ConfirmacaoService,
+        useValue: { pedir: (_: unknown, aoConfirmar: () => void) => aoConfirmar() },
+      },
+    ],
   });
   const fixture = TestBed.createComponent(EmpresaComponent);
   const http = TestBed.inject(HttpTestingController);
@@ -46,6 +55,28 @@ describe('Dados da empresa', () => {
     fixture.detectChanges();
     expect(el.querySelector('[role="status"]')?.textContent).toContain('Dados salvos');
     http.verify();
+  });
+
+  it('telefones recebem máscara ao carregar e enquanto digita', async () => {
+    TestBed.configureTestingModule({
+      imports: [EmpresaComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const fixture = TestBed.createComponent(EmpresaComponent);
+    const http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    http.expectOne(`${API_BASE}/empresa`).flush({ ...FICHA, telefone: '5512997500045' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect((el.querySelector('#empresa-telefone') as HTMLInputElement).value).toBe(
+      '(12) 99750-0045',
+    );
+    const alternativo = el.querySelector('#empresa-telefone2') as HTMLInputElement;
+    alternativo.value = '1233334444';
+    alternativo.dispatchEvent(new Event('input'));
+    expect(alternativo.value).toBe('(12) 3333-4444');
+    expect(fixture.componentInstance.form.telefone_2).toBe('(12) 3333-4444');
   });
 
   it('mostra os erros de validação da API e mantém o que foi digitado', () => {

@@ -10,6 +10,8 @@ import { CommonModule } from '@angular/common';
 import { finalize } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
+import { MascaraMoedaDirective } from '../../shared/ui/mascara-moeda.directive';
 import {
   CategoriaCardapio,
   HorarioAtendimento,
@@ -36,12 +38,13 @@ function indiceHoje(): number {
 @Component({
   selector: 'app-cardapio',
   standalone: true,
-  imports: [IconComponent, CommonModule, FormsModule],
+  imports: [IconComponent, CommonModule, FormsModule, MascaraMoedaDirective],
   templateUrl: './cardapio.component.html',
   styleUrls: ['../../shared/ui/page-actions.css', './cardapio.component.css'],
 })
 export class CardapioComponent implements OnInit {
   api = inject(ApiService);
+  private confirmacao = inject(ConfirmacaoService);
   diasSemana = DIAS_CARDAPIO;
   formDias = lerDiasCardapio('todos');
   nomeDias = nomeDiasCardapio;
@@ -299,6 +302,19 @@ export class CardapioComponent implements OnInit {
 
   salvarProduto() {
     if (!this.formValido() || this.salvando()) return;
+    const editando = this.modoEdicao() && !!this.editandoId;
+    this.confirmacao.pedir(
+      {
+        titulo: editando ? 'Salvar alterações do prato?' : 'Adicionar prato ao cardápio?',
+        mensagem: `"${this.formNome.trim()}" será ${editando ? 'atualizado' : 'adicionado'} e o bot passa a usar estes dados no WhatsApp.`,
+        confirmar: editando ? 'Salvar alterações' : 'Adicionar prato',
+      },
+      () => this.salvarProdutoConfirmado(),
+    );
+  }
+
+  private salvarProdutoConfirmado() {
+    if (this.salvando()) return;
     this.salvando.set(true);
     const payload = {
       categoria_id: this.formCategoriaId,
@@ -342,16 +358,24 @@ export class CardapioComponent implements OnInit {
   }
 
   confirmarExcluir(prod: ProdutoCardapio) {
-    if (confirm(`Tem certeza que deseja remover "${prod.nome}" do cardápio?`)) {
-      this.erroAcao.set(null);
-      this.api.excluirProduto(prod.id).subscribe({
-        next: () => {
-          this.mostrarToast(`Prato "${prod.nome}" foi removido do cardápio.`);
-          this.carregarCardapio();
-        },
-        error: () => this.erroAcao.set(`${prod.nome}: não foi possível excluir.`),
-      });
-    }
+    this.confirmacao.pedir(
+      {
+        titulo: 'Excluir prato?',
+        mensagem: `"${prod.nome}" será removido do cardápio, com todos os tamanhos e preços.`,
+        confirmar: 'Excluir prato',
+        perigo: true,
+      },
+      () => {
+        this.erroAcao.set(null);
+        this.api.excluirProduto(prod.id).subscribe({
+          next: () => {
+            this.mostrarToast(`Prato "${prod.nome}" foi removido do cardápio.`);
+            this.carregarCardapio();
+          },
+          error: () => this.erroAcao.set(`${prod.nome}: não foi possível excluir.`),
+        });
+      },
+    );
   }
 
   mostrarToast(msg: string) {

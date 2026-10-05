@@ -61,6 +61,33 @@ class ConversaPainelTest extends TestCase
         $this->getJson('/api/bot/conversas/'.self::TEL.'/pausa')->assertJsonPath('pausado', false);
     }
 
+    public function test_cliente_sem_resposta_aparece_no_aviso_ate_ser_atendido_ou_dispensado(): void
+    {
+        Http::fake(['*' => Http::response(['ok' => true, 'enviado' => true])]);
+        $entrada = fn (string $tel, string $id, string $texto) => MensagemWhatsapp::create(['direcao' => 'entrada', 'telefone' => $tel, 'wa_message_id' => $id, 'texto' => $texto, 'status' => 'pendente']);
+        $ana = $entrada(self::TEL, 'w1', 'Oi');
+        $ana2 = $entrada(self::TEL, 'w2', 'quero pedir');
+        $joao = $entrada('5512999990002', 'w3', 'tem feijoada?');
+        $antiga = $entrada('5512999990003', 'w4', 'ontem');
+        foreach ([$ana, $ana2, $joao, $antiga] as $m) {
+            $this->patchJson("/api/bot/mensagens/{$m->id}", ['status' => 'ignorada'])->assertOk();
+        }
+        MensagemWhatsapp::whereKey($antiga->id)->update(['created_at' => now()->subHours(25)]);
+
+        $this->getJson('/api/conversas/sem-resposta')->assertOk()->assertJsonCount(2)
+            ->assertJsonPath('0.telefone', self::TEL)->assertJsonPath('0.quantidade', 2)->assertJsonPath('0.ultima_mensagem', 'quero pedir');
+        $this->assertStringContainsString('2 cliente(s)', collect($this->getJson('/api/sistema/saude')->json('problemas'))->firstWhere('codigo', 'clientes_sem_resposta')['mensagem']);
+        // Não entram na fila de retomada do bot.
+        $this->assertSame([], $this->getJson('/api/bot/mensagens/pendentes')->json('entradas'));
+
+        // Equipe responde à Ana: ela sai do aviso. João é dispensado.
+        $this->postJson('/api/conversas/'.self::TEL.'/mensagens', ['texto' => 'Oi Ana, ainda quer pedir?'])->assertCreated();
+        $this->getJson('/api/conversas/sem-resposta')->assertJsonCount(1)->assertJsonPath('0.telefone', '5512999990002');
+        $this->deleteJson('/api/conversas/5512999990002/sem-resposta')->assertOk();
+        $this->getJson('/api/conversas/sem-resposta')->assertJsonCount(0);
+        $this->assertSame('processada', $joao->fresh()->status);
+    }
+
     public function test_validacao_de_texto_e_telefone(): void
     {
         $this->postJson('/api/conversas/'.self::TEL.'/mensagens', ['texto' => '   '])->assertUnprocessable();

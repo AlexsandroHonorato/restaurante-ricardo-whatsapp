@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MensagemWhatsapp;
 use App\Models\StatusConversa;
+use App\Support\ClientesSemResposta;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -24,6 +25,20 @@ class ConversaController extends Controller
             ->orderByDesc('id')->limit(100)->get(['id', 'direcao', 'texto', 'status', 'enviada_por', 'created_at'])->reverse()->values();
 
         return response()->json(['mensagens' => $mensagens, 'bot_pausado_ate' => $this->pausadoAte($telefone)]);
+    }
+
+    /** Clientes que escreveram com o bot fora do ar e ficaram sem resposta (últimas 24 h). */
+    public function semResposta(): JsonResponse
+    {
+        return response()->json(ClientesSemResposta::lista());
+    }
+
+    public function dispensarSemResposta(string $telefone): JsonResponse
+    {
+        $this->validarTelefone($telefone);
+        ClientesSemResposta::dispensar($telefone);
+
+        return response()->json(['ok' => true]);
     }
 
     public function enviar(Request $request, string $telefone): JsonResponse

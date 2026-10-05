@@ -1,7 +1,8 @@
 import { IconComponent } from '../../shared/ui/icon.component';
 import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ApiService } from '../../core/services/api.service';
+import { ActivatedRoute, Router } from '@angular/router';
+import { ApiService, ClienteSemResposta } from '../../core/services/api.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { Atendimento } from '../../core/models/dashboard.model';
@@ -17,6 +18,8 @@ import { ConversaPainelComponent } from './conversa-painel.component';
 export class AtendimentosComponent implements OnInit {
   api = inject(ApiService);
   private destroyRef = inject(DestroyRef);
+  private rota = inject(ActivatedRoute);
+  private router = inject(Router);
   atendimentos = signal<Atendimento[]>([]);
   transbordo = inject(TransbordoService);
   statusConversas = this.transbordo.conversas;
@@ -30,6 +33,11 @@ export class AtendimentosComponent implements OnInit {
 
   fecharConversa() {
     this.conversaAberta.set(null);
+    // Tira ?conversa= do endereço para o mesmo link dos avisos poder abrir de novo.
+    if (this.rota.snapshot.queryParamMap.has('conversa'))
+      this.router.navigate([], { relativeTo: this.rota, queryParams: {} });
+    // Se a equipe respondeu pelo painel, o cliente sai do aviso de sem resposta.
+    this.carregarSemResposta();
   }
 
   enviandoContato = signal(new Set<number>());
@@ -56,6 +64,31 @@ export class AtendimentosComponent implements OnInit {
         },
       });
   }
+  /** Clientes que escreveram com o bot fora do ar e não foram respondidos; some ao responder ou dispensar. */
+  semResposta = signal<ClienteSemResposta[]>([]);
+  dispensando = signal(new Set<string>());
+  private carregarSemResposta() {
+    this.api
+      .getClientesSemResposta()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((lista) => this.semResposta.set(lista));
+  }
+  dispensarSemResposta(telefone: string) {
+    if (this.dispensando().has(telefone)) return;
+    this.dispensando.update((tels) => new Set([...tels, telefone]));
+    this.api
+      .dispensarSemResposta(telefone)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.semResposta.update((lista) => lista.filter((c) => c.telefone !== telefone));
+          this.dispensando.update((tels) => new Set([...tels].filter((t) => t !== telefone)));
+        },
+        error: () =>
+          this.dispensando.update((tels) => new Set([...tels].filter((t) => t !== telefone))),
+      });
+  }
+
   /** Conversa aguardando a decisão no modal de exclusão. */
   conversaParaExcluir = signal<{ id: number; telefone: string; status_atual: string } | null>(null);
   excluindo = signal(false);
@@ -107,6 +140,13 @@ export class AtendimentosComponent implements OnInit {
   ngOnInit() {
     this.carregar();
     this.transbordo.iniciar();
+    // Link dos avisos do topo: /atendimentos?conversa=<telefone> abre a conversa desse cliente.
+    this.rota.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((parametros) => {
+      const telefone = parametros.get('conversa');
+      if (telefone && /^\d{10,15}$/.test(telefone)) this.abrirConversa(telefone);
+    });
+    const timer = setInterval(() => this.carregarSemResposta(), 30000);
+    this.destroyRef.onDestroy(() => clearInterval(timer));
     // Fora desta tela o monitor volta ao padrão leve (24 h) usado pelo cabeçalho.
     this.destroyRef.onDestroy(() => this.transbordo.mudarPeriodo(24));
   }
@@ -116,6 +156,7 @@ export class AtendimentosComponent implements OnInit {
   }
 
   carregar() {
+    this.carregarSemResposta();
     this.api
       .getStatusConversas(this.periodoHoras())
       .pipe(takeUntilDestroyed(this.destroyRef))

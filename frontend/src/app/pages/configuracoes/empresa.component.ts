@@ -2,6 +2,11 @@ import { Component, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { API_BASE } from '../../core/services/session-state';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
+import {
+  MascaraTelefoneDirective,
+  mascararTelefone,
+} from '../../shared/ui/mascara-telefone.directive';
 
 interface FichaEmpresa {
   nome: string;
@@ -19,12 +24,13 @@ interface FichaEmpresa {
 /** Dados que o bot usa para se apresentar e responder dúvidas (antes só editáveis no arquivo negocio.md). */
 @Component({
   selector: 'app-empresa',
-  imports: [FormsModule],
+  imports: [FormsModule, MascaraTelefoneDirective],
   templateUrl: './empresa.component.html',
   styleUrl: './empresa.component.css',
 })
 export class EmpresaComponent {
   private http = inject(HttpClient);
+  private confirmacao = inject(ConfirmacaoService);
   form: FichaEmpresa = {
     nome: '',
     tipo_negocio: 'restaurante',
@@ -45,7 +51,14 @@ export class EmpresaComponent {
   constructor() {
     this.http.get<FichaEmpresa>(`${API_BASE}/empresa`).subscribe({
       next: (ficha) => {
-        this.form = { ...this.form, ...ficha, nome: ficha.nome ?? '' };
+        this.form = {
+          ...this.form,
+          ...ficha,
+          nome: ficha.nome ?? '',
+          // Telefone salvo antes da máscara (só dígitos, com +55) já aparece formatado.
+          telefone: ficha.telefone && mascararTelefone(ficha.telefone),
+          telefone_2: ficha.telefone_2 && mascararTelefone(ficha.telefone_2),
+        };
         this.carregando.set(false);
       },
       error: () => {
@@ -56,6 +69,18 @@ export class EmpresaComponent {
   }
 
   salvar() {
+    if (this.salvando()) return;
+    this.confirmacao.pedir(
+      {
+        titulo: 'Salvar dados da empresa?',
+        mensagem: 'O bot passa a usar estas informações no atendimento pelo WhatsApp.',
+        confirmar: 'Salvar dados',
+      },
+      () => this.salvarConfirmado(),
+    );
+  }
+
+  private salvarConfirmado() {
     if (this.salvando()) return;
     this.salvando.set(true);
     this.mensagem.set('');

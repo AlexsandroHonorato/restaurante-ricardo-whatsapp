@@ -6,6 +6,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ClientesComponent } from './clientes.component';
 import { API_BASE, SessionState, SystemUser } from '../../core/services/session-state';
+import { ConfirmacaoService, PedidoConfirmacao } from '../../shared/ui/confirmacao.service';
 
 registerLocaleData(localePt, 'pt-BR');
 const CLIENTE = {
@@ -18,12 +19,17 @@ const CLIENTE = {
   enderecos: [],
 };
 
+// Modal de decisão: guarda o pedido; cada teste decide se confirma.
+const pedir = vi.fn<(pedido: PedidoConfirmacao, aoConfirmar: () => void) => void>();
+
 function montar(role: SystemUser['role']) {
+  pedir.mockReset();
   TestBed.configureTestingModule({
     imports: [ClientesComponent],
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      { provide: ConfirmacaoService, useValue: { pedir } },
       {
         provide: SessionState,
         useValue: {
@@ -44,23 +50,21 @@ function montar(role: SystemUser['role']) {
 describe('Clientes — exclusão de dados (LGPD)', () => {
   it('administrador apaga os dados após confirmar e a lista é recarregada', () => {
     const { fixture, http, el } = montar('admin');
-    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
     (el.querySelector('[aria-label="Apagar dados de Maria Souza"]') as HTMLButtonElement).click();
-    expect(confirmar.mock.calls[0][0]).toContain('Maria Souza');
+    expect(pedir.mock.calls[0][0].mensagem).toContain('Maria Souza');
+    pedir.mock.calls[0][1]();
     http.expectOne({ method: 'DELETE', url: `${API_BASE}/clientes/9` }).flush({ message: 'ok' });
     http.expectOne(`${API_BASE}/clientes?page=1`).flush({ data: [] });
     fixture.detectChanges();
     expect(el.textContent).toContain('Dados pessoais de Maria Souza removidos.');
-    confirmar.mockRestore();
     http.verify();
   });
 
   it('sem confirmação nada é enviado', () => {
     const { http, el } = montar('admin');
-    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(false);
     (el.querySelector('[aria-label="Apagar dados de Maria Souza"]') as HTMLButtonElement).click();
+    expect(pedir).toHaveBeenCalledTimes(1);
     http.verify();
-    confirmar.mockRestore();
   });
 
   it('falha ao carregar mostra erro na lista e "Tentar novamente" recarrega', () => {

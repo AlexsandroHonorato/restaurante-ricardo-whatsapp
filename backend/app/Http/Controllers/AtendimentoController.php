@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Atendimento;
 use App\Models\Cliente;
 use App\Models\Empresa;
+use App\Models\MensagemWhatsapp;
 use App\Models\StatusConversa;
+use App\Support\ClientesSemResposta;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -183,7 +185,11 @@ class AtendimentoController extends Controller
     /** Remove a conversa do monitor. Mensagens, pedidos e cliente ficam; nova mensagem do cliente recria o registro. */
     public function excluirConversa(int $id): JsonResponse
     {
-        StatusConversa::findOrFail($id)->delete();
+        $conversa = StatusConversa::findOrFail($id);
+        // A equipe encerrou a conversa: os avisos pendentes deste cliente (envio que falhou, mensagem sem resposta) saem junto.
+        MensagemWhatsapp::where('telefone', $conversa->telefone)->where('direcao', 'saida')->where('status', 'falhou')->update(['status' => 'descartada']);
+        ClientesSemResposta::dispensar($conversa->telefone);
+        $conversa->delete();
 
         return response()->json(['ok' => true]);
     }

@@ -344,8 +344,9 @@
                   <div class="price-input-wrap">
                     <span class="currency-prefix">R$</span>
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputmode="numeric"
+                      appMascaraMoeda
                       [(ngModel)]="v.preco"
                       [name]="'preco_' + idx"
                       placeholder="0,00"

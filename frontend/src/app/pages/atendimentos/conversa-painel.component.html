@@ -25,9 +25,12 @@
         }}</span>
         <p>{{ m.texto }}</p>
         <time [attr.datetime]="m.created_at">{{ m.created_at | date: 'dd/MM HH:mm' }}</time>
-        @if (m.status === 'pendente' || m.status === 'falhou') {
+        @if (m.status === 'ignorada') {
+          <span class="falha">chegou atrasada, o bot não respondeu</span>
+        }
+        @if (m.status === 'pendente' || m.status === 'falhou' || m.status === 'descartada') {
           <span class="falha">{{
-            m.status === 'falhou' ? 'não enviada' : 'na fila de envio'
+            m.status === 'pendente' ? 'na fila de envio' : 'não enviada'
           }}</span>
         }
       </li>

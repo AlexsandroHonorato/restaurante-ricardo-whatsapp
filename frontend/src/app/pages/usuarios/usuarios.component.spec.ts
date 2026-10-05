@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { vi } from 'vitest';
 import { UsuariosComponent } from './usuarios.component';
 import { API_BASE, SessionState, SystemUser } from '../../core/services/session-state';
+import { ConfirmacaoService, PedidoConfirmacao } from '../../shared/ui/confirmacao.service';
 
 const EU: SystemUser = {
   id: 1,
@@ -23,13 +24,18 @@ const ANA: SystemUser = {
   active: true,
 };
 
+// Modal de decisão: nos testes confirma na hora e guarda o que foi perguntado.
+const pedir = vi.fn((_pedido: PedidoConfirmacao, aoConfirmar: () => void) => aoConfirmar());
+
 async function montar() {
+  pedir.mockClear();
   TestBed.configureTestingModule({
     imports: [UsuariosComponent],
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: SessionState, useValue: { user: signal(EU), csrf: signal('') } },
+      { provide: ConfirmacaoService, useValue: { pedir } },
     ],
   });
   const fixture = TestBed.createComponent(UsuariosComponent);
@@ -77,6 +83,7 @@ describe('Usuários do sistema', () => {
     campo(el, 'name').value = 'Ana Souza';
     campo(el, 'name').dispatchEvent(new Event('input'));
     (el.querySelector('form button[type="submit"]') as HTMLButtonElement).click();
+    expect(pedir.mock.calls[0][0].titulo).toBe('Salvar alterações?');
     const req = http.expectOne({ method: 'PUT', url: `${API_BASE}/usuarios/2` });
     expect(req.request.body).toMatchObject({ name: 'Ana Souza', password: '', role: 'operador' });
     req.flush({ user: { ...ANA, name: 'Ana Souza' } });
@@ -96,15 +103,14 @@ describe('Usuários do sistema', () => {
     expect(campo(el, 'role').disabled).toBe(true);
     expect(campo(el, 'active').disabled).toBe(true);
 
-    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true);
     botao(el, 'Excluir Ana Lima').click();
-    expect(confirmar.mock.calls[0][0]).toContain('Ana Lima');
+    expect(pedir.mock.calls[0][0].mensagem).toContain('Ana Lima');
+    expect(pedir.mock.calls[0][0].perigo).toBe(true);
     http.expectOne({ method: 'DELETE', url: `${API_BASE}/usuarios/2` }).flush({ ok: true });
     http.expectOne(`${API_BASE}/usuarios?page=1`).flush({ data: { data: [EU], total: 1 } });
     fixture.detectChanges();
     expect(el.textContent).toContain('Usuário Ana Lima excluído.');
     expect(el.textContent).not.toContain('ana@x.com');
-    confirmar.mockRestore();
     http.verify();
   });
 });

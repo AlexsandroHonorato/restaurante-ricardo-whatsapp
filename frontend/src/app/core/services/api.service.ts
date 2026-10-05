@@ -25,6 +25,13 @@ export interface Paginado<T> {
   total: number;
 }
 
+export interface ClienteSemResposta {
+  telefone: string;
+  quantidade: number;
+  ultima_mensagem: string | null;
+  ultima_em: string;
+}
+
 export interface PeriodoDashboard {
   inicio: string;
   fim: string;
@@ -202,6 +209,18 @@ export class ApiService {
 
   iniciarContatoTransbordo(id: number): Observable<{ ok: boolean }> {
     return this.http.post<{ ok: boolean }>(`${this.baseUrl}/status-conversa/${id}/contato`, {});
+  }
+  /** Clientes que escreveram com o bot fora do ar e ficaram sem resposta (últimas 24 h). */
+  getClientesSemResposta(): Observable<ClienteSemResposta[]> {
+    return this.http
+      .get<ClienteSemResposta[]>(`${this.baseUrl}/conversas/sem-resposta`)
+      .pipe(catchError(() => EMPTY));
+  }
+  /** A equipe viu o aviso e decidiu não chamar o cliente. */
+  dispensarSemResposta(telefone: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(
+      `${this.baseUrl}/conversas/${telefone}/sem-resposta`,
+    );
   }
   /** Tira o cliente da fila de alertas (sem enviar mensagem); a conversa continua no monitor. */
   excluirAlertaTransbordo(id: number): Observable<{ ok: boolean }> {

@@ -18,4 +18,13 @@ class SaudeController extends Controller
             'verificado_em' => now()->toIso8601String(),
         ]);
     }
+
+    /** Mensagens de um aviso, para a equipe abrir a conversa de cada uma. */
+    public function detalhes(string $codigo): JsonResponse
+    {
+        $mensagens = SaudeSistema::detalhes($codigo);
+        abort_if($mensagens === null, 404);
+
+        return response()->json($mensagens);
+    }
 }

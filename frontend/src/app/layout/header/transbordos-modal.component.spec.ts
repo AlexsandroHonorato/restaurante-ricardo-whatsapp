@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { TransbordosModalComponent } from './transbordos-modal.component';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { ApiService } from '../../core/services/api.service';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 describe('Modal de transbordos', () => {
   function preparar() {
@@ -26,6 +27,11 @@ describe('Modal de transbordos', () => {
         {
           provide: ApiService,
           useValue: { iniciarContatoTransbordo: enviar, excluirAlertaTransbordo: enviar },
+        },
+        // Modal de decisão confirma na hora.
+        {
+          provide: ConfirmacaoService,
+          useValue: { pedir: (_: unknown, aoConfirmar: () => void) => aoConfirmar() },
         },
       ],
     });
