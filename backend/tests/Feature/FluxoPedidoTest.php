@@ -186,6 +186,23 @@ class FluxoPedidoTest extends TestCase
         $this->getJson('/api/pedidos?data_inicio=2025-01-01&data_fim=2026-10-01')->assertUnprocessable();
     }
 
+    public function test_total_para_o_bot_usa_precos_do_banco_e_nao_grava_pedido(): void
+    {
+        $itens = [['variacao_id' => $this->frango->id, 'quantidade' => 2], ['variacao_id' => $this->coca->id, 'quantidade' => 1]];
+        $this->postJson('/api/bot/pedidos/total', ['itens' => $itens])->assertOk()
+            ->assertJsonPath('total', 80)
+            ->assertJsonPath('itens.0.nome', 'Frango')->assertJsonPath('itens.0.tamanho', 'Grande')
+            ->assertJsonPath('itens.0.quantidade', 2)->assertJsonPath('itens.0.subtotal', 60)
+            ->assertJsonPath('itens.1.subtotal', 20);
+        $this->assertDatabaseCount('pedidos', 0);
+
+        // Mesmas recusas do fechamento, com motivo legível.
+        $this->frango->update(['ativo' => false]);
+        $this->postJson('/api/bot/pedidos/total', ['itens' => $itens])->assertUnprocessable()->assertJsonValidationErrors('itens');
+        $this->postJson('/api/bot/pedidos/total', ['itens' => [['variacao_id' => 99999, 'quantidade' => 1]]])->assertUnprocessable();
+        $this->postJson('/api/bot/pedidos/total', ['itens' => []])->assertUnprocessable();
+    }
+
     public function test_reenvio_do_pedido_nao_duplica_itens_cliente_ou_atendimento(): void
     {
         $this->postJson('/api/pedidos', $this->dados())->assertCreated();

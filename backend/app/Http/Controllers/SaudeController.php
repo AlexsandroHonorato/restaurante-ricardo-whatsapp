@@ -27,4 +27,13 @@ class SaudeController extends Controller
 
         return response()->json($mensagens);
     }
+
+    /** Tira do aviso uma mensagem (com id) ou todas as mensagens dele. */
+    public function dispensar(string $codigo, ?int $id = null): JsonResponse
+    {
+        $dispensadas = SaudeSistema::dispensar($codigo, $id);
+        abort_if($dispensadas === null || ($id && $dispensadas === 0), 404);
+
+        return response()->json(['dispensadas' => $dispensadas]);
+    }
 }
