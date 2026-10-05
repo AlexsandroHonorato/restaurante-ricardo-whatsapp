@@ -8,7 +8,7 @@ import { criarLimitador } from './lib/limite-mensagens.js';
 import { EMPRESA, definirFicha } from './lib/empresa.js';
 import { perfilNegocio } from './lib/perfil-negocio.js';
 import { consultarAtendimento } from './lib/horario-atendimento.js';
-import { registrarPedido, consultarStatusPedido } from './pedidos.js';
+import { registrarPedido, consultarStatusPedido, calcularTotalPedido, nomeSituacaoPedido } from './pedidos.js';
 
 const FUSO = process.env.FUSO || 'America/Sao_Paulo';
 const MODELO = process.env.MODELO || 'google/gemini-3.7-flash';
@@ -162,6 +162,12 @@ export function atualizarStatusCliente(tel, novoStatus, dadosRascunho = {}, extr
   return c;
 }
 
+/** Pedido das últimas 12 horas que ainda não foi entregue nem cancelado. */
+function pedidoEmAberto(pedido) {
+  return !!pedido && !['entregue', 'cancelado'].includes(pedido.status)
+    && Date.now() - new Date(pedido.created_at).getTime() < 12 * 60 * 60 * 1000;
+}
+
 export function historico(tel) {
   const c = obterEstadoCliente(tel);
   return c.msgs || [];
@@ -241,9 +247,10 @@ function etapasDoPerfil(perfil) {
     perfil.etapaBebidas,
     `Se status for 'coletando_endereco':
    - ${perfil.jaEscolheu} Colete os dados de entrega.
-   - Ao receber o endereço, use 'atualizar_status_conversa' com status 'coletando_pagamento' e solicite a forma de pagamento (Cartão de Crédito, Débito, Pix ou Dinheiro).`,
+   - Ao receber o endereço, chame 'calcular_total_pedido' com TODOS os itens escolhidos (código + quantidade) e use 'atualizar_status_conversa' com status 'coletando_pagamento'.
+   - Na mesma resposta, mostre o resumo dos itens e o *valor total* devolvido pela ferramenta e só então pergunte a forma de pagamento (Cartão de Crédito, Débito, Pix ou Dinheiro): o cliente decide como pagar sabendo quanto vai pagar.`,
     `Se status for 'coletando_pagamento':
-   - O cliente está definindo o pagamento.
+   - O cliente está definindo o pagamento e precisa saber o valor total: se o TOTAL JÁ INFORMADO no ESTADO DO CLIENTE estiver vazio ou os itens mudaram, chame 'calcular_total_pedido' e informe o total antes de aceitar a forma de pagamento.
    - Se for Dinheiro, pergunte se precisa de troco e para quanto.
      * Troco para valor exato da compra: avise gentilmente que não precisa de troco.
      * Troco para valor menor que a compra: avise que deve ser maior que o total e pergunte a nota.
@@ -270,7 +277,8 @@ function promptDeSistema(tel, cardapioTexto = null) {
   // Último pedido vem do banco (carregarConversa) e é atualizado ao fechar um pedido nesta conversa.
   const ultimo = estado?.ultimoPedido;
   const ultimoPedido = ultimo ? { id: ultimo.codigo_pedido, status: ultimo.status, nome: ultimo.nome, dataHora: ultimo.created_at } : null;
-  const temPedidoAtivo = ultimoPedido && (Date.now() - new Date(ultimoPedido.dataHora).getTime() < 12 * 60 * 60 * 1000);
+  // Entregue ou cancelado não é mais "em andamento": a saudação volta ao menu comum.
+  const temPedidoAtivo = pedidoEmAberto(ultimo);
   const perfil = perfilNegocio(EMPRESA.tipo);
 
   const fixo = `Você é o atendente virtual do ${EMPRESA.nome} no WhatsApp.
@@ -289,7 +297,8 @@ REGRA DE MENSAGEM FORA DO CONTEXTO:
 REGRAS RÍGIDAS:
 - NUNCA dê desconto, não altere os preços da tabela e não invente ${perfil.itens} fora do ${perfil.catalogo} oficial.
 - Cada tamanho do ${perfil.catalogo} tem um código "[cod N]". Use-o em 'fechar_pedido' (codigo + quantidade). Nunca mostre esses códigos ao cliente.
-- O valor final é calculado pelo sistema ao fechar o pedido; o comprovante enviado ao cliente sai do sistema.
+- Valores saem do sistema: para informar o total use sempre 'calcular_total_pedido' (nunca some os preços você mesmo); o valor final é conferido de novo ao fechar o pedido e o comprovante enviado ao cliente sai do sistema.
+- Nunca mostre ao cliente códigos internos do sistema (palavras com sublinhado, como "em_preparo" ou "coletando_pagamento"): escreva sempre em português comum, por exemplo "Em preparação" ou "Saiu para entrega".
 - Respostas dinâmicas, simpáticas, bem formatadas com emojis e quebras de linha para leitura agradável no WhatsApp.
 
 INFORMAÇÕES ${perfil.artigo} ${perfil.rotulo}:
@@ -306,7 +315,8 @@ ${calendario()}
 [ESTADO DO CLIENTE]:
 - STATUS ATUAL: "${statusAtual}"
 - ITENS REGISTRADOS NO RASCUNHO: ${rascunhoStr}
-- PEDIDO RECENTE/ATIVO IDENTIFICADO: ${temPedidoAtivo ? `${ultimoPedido.id} (Status atual: "${ultimoPedido.status}", Cliente: "${ultimoPedido.nome || 'Cliente'}")` : 'Nenhum pedido ativo recente'}
+- TOTAL JÁ INFORMADO AO CLIENTE: ${rascunho.total || 'ainda não calculado'}
+- PEDIDO RECENTE/ATIVO IDENTIFICADO: ${temPedidoAtivo ? `${ultimoPedido.id} (Status atual: "${nomeSituacaoPedido(ultimoPedido.status)}", Cliente: "${ultimoPedido.nome || 'Cliente'}")` : 'Nenhum pedido ativo recente'}
 `;
 
   return [
@@ -375,6 +385,31 @@ const FERRAMENTAS = [
           observacoes: { type: 'string', description: 'Observações do cliente (opcional)' },
         },
         required: ['nome', 'itens', 'endereco', 'formaPagamento'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'calcular_total_pedido',
+      description: 'Calcula o valor total do pedido em montagem com os preços do sistema, sem fechar o pedido. Use antes de perguntar a forma de pagamento, para informar o total ao cliente. Se recusar (item indisponível ou fora do dia), explique o motivo ao cliente.',
+      parameters: {
+        type: 'object',
+        properties: {
+          itens: {
+            type: 'array',
+            description: 'Todos os itens escolhidos: o código [cod N] do TAMANHO no cardápio oficial e a quantidade.',
+            items: {
+              type: 'object',
+              properties: {
+                codigo: { type: 'integer', description: 'Número do [cod N] do tamanho escolhido (ex: 13)' },
+                quantidade: { type: 'integer', description: 'Quantidade desse item (1 a 100)' },
+              },
+              required: ['codigo', 'quantidade'],
+            },
+          },
+        },
+        required: ['itens'],
       },
     },
   },
@@ -451,6 +486,12 @@ async function executar(tel, nome, args, contexto = {}) {
 
     return resPedido;
   }
+  if (nome === 'calcular_total_pedido') {
+    const calculo = await calcularTotalPedido(args.itens);
+    // Fica no rascunho: aparece no ESTADO DO CLIENTE das próximas mensagens e no monitor do painel.
+    obterEstadoCliente(tel).rascunho.total = calculo.total;
+    return calculo;
+  }
   if (nome === 'consultar_status_pedido') {
     return consultarStatusPedido(args.idOuTelefone || tel, tel);
   }
@@ -501,6 +542,14 @@ export async function responder(tel, texto, contexto = {}) {
   if (limite === 'silencio') return null;
   if (limite === 'avisar') return `Recebi muitas mensagens seguidas 😅 Aguarde um minutinho e me mande de novo, por favor. Se for urgente, ligue para ${EMPRESA.telefone}.`;
   await carregarConversa(tel);
+  // A cozinha muda o status pelo painel: com pedido em aberto, confere a situação atual no banco.
+  if (pedidoEmAberto(memoria[tel].ultimoPedido)) {
+    try {
+      memoria[tel].ultimoPedido = (await apiBot.conversa(tel)).ultimo_pedido || memoria[tel].ultimoPedido;
+    } catch (erro) {
+      console.warn(JSON.stringify({ evento: 'status_do_pedido_indisponivel', erro: erro.message }));
+    }
+  }
   await atualizarFicha();
   obterEstadoCliente(tel); // valida inatividade
   const cardapioTexto = await obterCardapioAtivo();
@@ -545,6 +594,11 @@ export async function responder(tel, texto, contexto = {}) {
       const passoStatus = passos.find((p) => p.ferramenta === 'consultar_status_pedido' && p.saida?.mensagemStatus);
       if (passoStatus) {
         resposta = passoStatus.saida.mensagemStatus;
+      }
+      // Total calculado nesta mensagem: o cliente precisa vê-lo antes de escolher o pagamento, mesmo se a IA não citar.
+      const total = passos.findLast((p) => p.ferramenta === 'calcular_total_pedido' && p.saida?.ok)?.saida.total;
+      if (total && !passoStatus && !resposta.includes(total.replace('R$ ', ''))) {
+        resposta += `\n\n💰 *Total do pedido:* ${total}`;
       }
     }
   } catch (err) {

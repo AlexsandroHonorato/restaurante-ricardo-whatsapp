@@ -27,6 +27,7 @@ Route::get('/health', HealthController::class);
 Route::middleware(BotAccess::class)->group(function () {
     Route::post('/pedidos', [PedidoController::class, 'store']);
     Route::get('/pedidos/consulta/bot', [PedidoController::class, 'consultaBot']);
+    Route::post('/bot/pedidos/total', [PedidoController::class, 'totalParaBot']);
     Route::get('/cardapio/texto', [CardapioController::class, 'getTextoCardapio']);
     Route::post('/status-conversa/sync', [AtendimentoController::class, 'syncStatus']);
     Route::get('/bot/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
@@ -70,6 +71,8 @@ Route::middleware('web')->group(function () use ($pode) {
         Route::get('/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
         Route::get('/sistema/saude', SaudeController::class);
         Route::get('/sistema/saude/{codigo}', [SaudeController::class, 'detalhes']);
+        // Dispensar mensagens de um aviso conta como "editar" em Atendimentos.
+        Route::delete('/sistema/saude/{codigo}/{id?}', [SaudeController::class, 'dispensar'])->whereNumber('id')->middleware($pode('atendimentos', 'editar'));
         Route::get('/dashboard/kpis', [DashboardController::class, 'getKpis']);
         Route::get('/status-pedidos', [PedidoController::class, 'getStatusCatalog']);
 

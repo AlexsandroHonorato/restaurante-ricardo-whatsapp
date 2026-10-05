@@ -26,10 +26,34 @@ export function formatarMensagemConfirmacaoCliente(pedido) {
     `Agradecemos a sua preferência! 😊`;
 }
 
+// Situação do pedido em palavras do cliente (os códigos são os da tabela status_pedidos).
+// "aguardando": ainda vale mostrar o tempo estimado.
+const SITUACAO_PEDIDO = {
+  pendente: { icone: '⏳', nome: 'Aguardando confirmação', detalhe: 'Recebemos o seu pedido e a cozinha já vai confirmar.', aguardando: true },
+  confirmado: { icone: '📋', nome: 'Confirmado', detalhe: 'Pedido aceito. A cozinha já vai começar o preparo.', aguardando: true },
+  em_preparo: { icone: '👨‍🍳', nome: 'Em preparação', detalhe: 'O seu pedido está na cozinha, sendo preparado agora.', aguardando: true },
+  saiu_para_entrega: { icone: '🛵', nome: 'Saiu para entrega', detalhe: 'O seu pedido já está a caminho do endereço.' },
+  entregue: { icone: '✅', nome: 'Entregue', detalhe: 'O seu pedido já foi entregue. Bom apetite!' },
+  cancelado: { icone: '❌', nome: 'Cancelado', detalhe: 'Este pedido foi cancelado.' },
+};
+
+/**
+ * Nome da situação para o cliente ("Em preparação"), nunca o código interno ("em_preparo").
+ * Código fora da tabela vira texto comum: sem sublinhado e com inicial maiúscula.
+ */
+export function nomeSituacaoPedido(status) {
+  const texto = SITUACAO_PEDIDO[status]?.nome || String(status ?? '').replace(/_/g, ' ').trim();
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 /**
  * Formata a mensagem oficial de consulta de status consultada na tabela de pedidos
  */
 export function formatarMensagemStatusCliente(pedido) {
+  const situacao = { icone: '', detalhe: '', ...SITUACAO_PEDIDO[pedido.status], nome: nomeSituacaoPedido(pedido.status) };
+  const detalhe = pedido.status === 'cancelado' && pedido.motivoCancelamento
+    ? `${situacao.detalhe} Motivo: ${pedido.motivoCancelamento}`
+    : situacao.detalhe;
   const itensFormatados = Array.isArray(pedido.itens)
     ? pedido.itens.map((i) => `• ${typeof i === 'string' ? i : `${i.qtd || 1}x ${i.nome}`}`).join('\n')
     : `• ${pedido.itens}`;
@@ -38,12 +62,13 @@ export function formatarMensagemStatusCliente(pedido) {
 
   return `📋 *SITUAÇÃO DO SEU PEDIDO* 🍽️\n\n` +
     `• *Número do Pedido:* \`${pedido.id}\`\n` +
-    `• *Status Atual:* *${pedido.status}*\n` +
+    `• *Status Atual:* *${`${situacao.icone} ${situacao.nome}`.trim()}*\n` +
+    (detalhe ? `  ${detalhe}\n` : '') +
     `• *Horário do Pedido:* ${dataHoraFmt}\n` +
     `• *Itens:* \n${itensFormatados}\n` +
     `• *Endereço:* ${pedido.endereco}\n` +
     `• *Total:* ${pedido.total}\n\n` +
-    `⏳ *Tempo estimado total:* 40 a 60 minutos.\n` +
+    (situacao.aguardando ? `⏳ *Tempo estimado total:* 40 a 60 minutos.\n` : '') +
     `Qualquer dúvida estamos à disposição! 😊`;
 }
 
@@ -71,6 +96,38 @@ async function gravarNaApi(corpo) {
     throw new Error('Sistema de pedidos indisponível no momento; o pedido NÃO foi registrado. Oriente o cliente a ligar para a loja.');
   }
   return dados.pedido;
+}
+
+/**
+ * Total do pedido em montagem, calculado pela API com os preços do cardápio: o bot informa ao cliente
+ * antes de perguntar a forma de pagamento. Cada item é { codigo, quantidade }. Não grava nada.
+ */
+export async function calcularTotalPedido(itens) {
+  const itemValido = i => i && Number.isInteger(i.codigo) && i.codigo > 0 && Number.isInteger(i.quantidade) && i.quantidade >= 1 && i.quantidade <= 100;
+  if (!Array.isArray(itens) || !itens.length || itens.length > 100 || !itens.every(itemValido)) {
+    throw new Error('Informe cada item com o código [cod N] do cardápio e a quantidade.');
+  }
+  let resposta;
+  try {
+    resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/bot/pedidos/total`, {
+      method: 'POST', signal: AbortSignal.timeout(8000),
+      headers: { ...cabecalhosApiBot(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itens: itens.map(i => ({ variacao_id: i.codigo, quantidade: i.quantidade })) }),
+    });
+  } catch (erro) {
+    console.error('API de pedidos inacessível:', erro.message);
+    resposta = null;
+  }
+  const dados = resposta ? await resposta.json().catch(() => ({})) : {};
+  // Motivo legível (item pausado, fora do dia) para a IA explicar ao cliente.
+  if (resposta?.status === 422) throw new Error(Object.values(dados.errors || {}).flat()[0] || dados.message || 'Itens recusados pelo sistema.');
+  if (!resposta?.ok || !Array.isArray(dados.itens)) throw new Error('Não foi possível calcular o total agora. Não informe valor ao cliente; peça para tentar de novo em instantes.');
+  return {
+    ok: true,
+    total: `R$ ${reais(dados.total)}`,
+    itens: dados.itens.map(i => `${i.quantidade}x ${i.nome} (${i.tamanho}) - R$ ${reais(i.subtotal)}`),
+    instrucao: 'Mostre ao cliente estes itens e exatamente este total antes de perguntar a forma de pagamento.',
+  };
 }
 
 /**
@@ -133,7 +190,7 @@ export async function consultarStatusPedido(idOuTelefone, telefoneCliente) {
     const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos/consulta/bot?${parametros}`, { headers: cabecalhosApiBot(), signal: AbortSignal.timeout(5000) });
     if (!resposta.ok && resposta.status !== 404) throw new Error(`API retornou ${resposta.status}`);
     const remoto = resposta.ok ? (await resposta.json()).pedido : null;
-    if (remoto) pedido = { id: remoto.codigo_pedido, telefone: remoto.cliente.telefone, nome: remoto.cliente.nome, status: remoto.status, dataHora: remoto.created_at, endereco: remoto.endereco?.logradouro || 'Retirada no balcão', total: `R$ ${reais(remoto.valor_total)}`, itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, qtd: i.quantidade, tamanho: i.tamanho_snapshot, preco: reais(i.preco_unitario) })) };
+    if (remoto) pedido = { id: remoto.codigo_pedido, telefone: remoto.cliente.telefone, nome: remoto.cliente.nome, status: remoto.status, motivoCancelamento: remoto.motivo_cancelamento, dataHora: remoto.created_at, endereco: remoto.endereco?.logradouro || 'Retirada no balcão', total: `R$ ${reais(remoto.valor_total)}`, itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, qtd: i.quantidade, tamanho: i.tamanho_snapshot, preco: reais(i.preco_unitario) })) };
   } catch (erro) {
     console.warn('Consulta de pedido indisponível:', erro.message);
     return {
@@ -148,7 +205,7 @@ export async function consultarStatusPedido(idOuTelefone, telefoneCliente) {
     return {
       ok: true,
       id: pedido.id,
-      status: pedido.status,
+      status: nomeSituacaoPedido(pedido.status),
       itens: pedido.itens,
       dataHora: pedido.dataHora,
       nome: pedido.nome,

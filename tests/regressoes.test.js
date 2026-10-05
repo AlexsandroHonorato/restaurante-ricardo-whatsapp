@@ -360,7 +360,7 @@ test('consulta de status usa a API e não expõe pedido de outro telefone', asyn
     : { ok: false, status: 404, json: async () => ({ pedido: null }) });
   try {
     const dono = await pedidos.consultarStatusPedido('PED-A', '5512999991111');
-    assert.equal(dono.status, 'entregue');
+    assert.equal(dono.status, 'Entregue');
     assert.equal((await pedidos.consultarStatusPedido('PED-A', '5512999992222')).ok, undefined);
   } finally { globalThis.fetch = original; }
 });
@@ -498,6 +498,105 @@ test('rota de notificação exige token configurado, mesmo para chamadas locais'
   assert.equal(notificacaoAutorizada('Bearer errado', 'token-certo'), false);
   assert.equal(notificacaoAutorizada('token-certo', 'token-certo'), false);
   assert.equal(notificacaoAutorizada('Bearer token-certo', 'token-certo'), true);
+});
+
+test('consulta de status mostra a situação do pedido em palavras do cliente, não o código interno', async () => {
+  const original = globalThis.fetch;
+  const remoto = status => ({
+    codigo_pedido: 'PED-261005-976', status, motivo_cancelamento: status === 'cancelado' ? 'Cliente desistiu' : null,
+    created_at: '2026-10-05T17:58:50Z', valor_total: '53.00', cliente: { telefone: '5512999990000', nome: 'Silvia' },
+    endereco: { logradouro: 'Av Irineu 1531' }, itens: [{ nome_snapshot: 'Omelete', quantidade: 1, tamanho_snapshot: 'M', preco_unitario: '28.00' }],
+  });
+  const consultar = async status => {
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ pedido: remoto(status) }) });
+    return (await pedidos.consultarStatusPedido('PED-261005-976', '5512999990000')).mensagemStatus;
+  };
+  try {
+    const cozinha = await consultar('em_preparo');
+    assert.match(cozinha, /\*Status Atual:\* \*👨‍🍳 Em preparação\*/);
+    assert.match(cozinha, /está na cozinha/);
+    assert.match(cozinha, /Tempo estimado total/);
+    assert.doesNotMatch(cozinha, /em_preparo|_/);
+    // Código que não está na tabela também sai sem sublinhado.
+    assert.match(await consultar('aguardando_retirada'), /\*Status Atual:\* \*Aguardando retirada\*/);
+    assert.equal(pedidos.nomeSituacaoPedido('em_preparo'), 'Em preparação');
+
+    assert.match(await consultar('pendente'), /Aguardando confirmação/);
+    assert.match(await consultar('saiu_para_entrega'), /🛵 Saiu para entrega/);
+    assert.doesNotMatch(await consultar('saiu_para_entrega'), /saiu_para_entrega|Tempo estimado/);
+
+    const entregue = await consultar('entregue');
+    assert.match(entregue, /\*Status Atual:\* \*✅ Entregue\*/);
+    assert.match(entregue, /já foi entregue/);
+    assert.doesNotMatch(entregue, /Tempo estimado/);
+
+    const cancelado = await consultar('cancelado');
+    assert.match(cancelado, /❌ Cancelado/);
+    assert.match(cancelado, /Motivo: Cliente desistiu/);
+  } finally { globalThis.fetch = original; }
+});
+
+test('saudação só trata como "em andamento" o pedido que ainda não foi entregue, com o status atual do banco', async () => {
+  const original = globalThis.fetch;
+  const tel = '5512999993333';
+  let statusPedido = 'em_preparo';
+  const prompts = [];
+  globalThis.fetch = async (url, opcoes) => ({ ok: true, json: async () => {
+    if (String(url).includes('horarios-atendimento')) return agendaAberta;
+    if (String(url).endsWith('/pausa')) return { pausado: false, status: 'conversa_iniciada' };
+    if (String(url).includes('/bot/conversas/')) return { status: 'conversa_iniciada', historico: [{ role: 'user', content: 'oi' }], ultimo_pedido: { codigo_pedido: 'PED-1', status: statusPedido, created_at: new Date().toISOString(), nome: 'Ana' } };
+    if (String(url).includes('openrouter')) { prompts.push(JSON.stringify(JSON.parse(opcoes.body).messages[0])); return { choices: [{ message: { content: 'ok' } }] }; }
+    return {};
+  } });
+  try {
+    cerebro.limparMemoria(tel);
+    await cerebro.responderNaFila(tel, 'oi');
+    assert.match(prompts[0], /PED-1 \(Status atual: \\+"Em preparação/);
+    assert.match(prompts[0], /Nunca mostre ao cliente códigos internos/);
+    // A cozinha entregou pelo painel: mesmo com a conversa em cache, o bot vê o status novo.
+    statusPedido = 'entregue';
+    await cerebro.responderNaFila(tel, 'oi');
+    assert.match(prompts[1], /Nenhum pedido ativo recente/);
+  } finally { globalThis.fetch = original; }
+});
+
+test('antes do pagamento o cliente recebe o total calculado pelo sistema, mesmo se a IA não citar o valor', async () => {
+  const original = globalThis.fetch;
+  const tel = '5512999994444';
+  const respostasDoModelo = [];
+  const estadosEnviados = [];
+  let enviadoAoTotal = null;
+  const chamadaTotal = { tool_calls: [{ id: 't1', function: { name: 'calcular_total_pedido', arguments: JSON.stringify({ itens: [{ codigo: 13, quantidade: 2 }, { codigo: 20, quantidade: 1 }] }) } }] };
+  globalThis.fetch = async (url, opcoes) => ({ ok: true, status: 200, json: async () => {
+    if (String(url).includes('horarios-atendimento')) return agendaAberta;
+    if (String(url).endsWith('/pausa')) return { pausado: false, status: 'coletando_endereco' };
+    if (String(url).endsWith('/bot/pedidos/total')) {
+      enviadoAoTotal = JSON.parse(opcoes.body);
+      return { total: 80, itens: [{ nome: 'Frango', tamanho: 'Grande', quantidade: 2, preco_unitario: 30, subtotal: 60 }, { nome: 'Coca-Cola 2L', tamanho: 'Padrão', quantidade: 1, preco_unitario: 20, subtotal: 20 }] };
+    }
+    if (String(url).includes('/bot/conversas/')) return { status: 'coletando_endereco', rascunho: { pratos: ['2x Frango'] }, historico: [{ role: 'user', content: 'quero 2 frangos' }] };
+    if (String(url).includes('openrouter')) {
+      estadosEnviados.push(JSON.stringify(JSON.parse(opcoes.body).messages[0]));
+      return { choices: [{ message: respostasDoModelo.shift() }] };
+    }
+    return {};
+  } });
+  try {
+    // 1) A IA calcula e esquece de dizer o valor: o bot acrescenta o total.
+    cerebro.limparMemoria(tel);
+    respostasDoModelo.push(chamadaTotal, { content: 'Endereço anotado! Qual a forma de pagamento?' });
+    const semValor = await cerebro.responderNaFila(tel, 'Rua A, 10, Centro. Ana');
+    assert.deepEqual(enviadoAoTotal, { itens: [{ variacao_id: 13, quantidade: 2 }, { variacao_id: 20, quantidade: 1 }] });
+    assert.match(semValor, /Qual a forma de pagamento\?\n\n💰 \*Total do pedido:\* R\$ 80,00$/);
+    assert.equal(cerebro.memoria[tel].rascunho.total, 'R$ 80,00');
+
+    // 2) A IA já cita o valor: nada é repetido. O total segue no estado para as próximas mensagens.
+    respostasDoModelo.push(chamadaTotal, { content: 'Seu pedido deu *R$ 80,00*. Pix, cartão ou dinheiro?' });
+    const comValor = await cerebro.responderNaFila(tel, 'pode repetir o total?');
+    assert.equal(comValor, 'Seu pedido deu *R$ 80,00*. Pix, cartão ou dinheiro?');
+    assert.match(estadosEnviados[0], /TOTAL JÁ INFORMADO AO CLIENTE: ainda não calculado/);
+    assert.match(estadosEnviados.at(-1), /TOTAL JÁ INFORMADO AO CLIENTE: R\$ 80,00/);
+  } finally { globalThis.fetch = original; }
 });
 
 test('dados da empresa vêm da configuração e mantêm os textos atuais por padrão', async () => {

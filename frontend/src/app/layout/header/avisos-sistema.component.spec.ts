@@ -3,7 +3,9 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { AvisosSistemaComponent } from './avisos-sistema.component';
-import { API_BASE } from '../../core/services/session-state';
+import { signal } from '@angular/core';
+import { API_BASE, SessionState } from '../../core/services/session-state';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
 describe('Avisos do sistema', () => {
   beforeEach(() => {
@@ -98,6 +100,72 @@ describe('Avisos do sistema', () => {
       queryParams: { conversa: '5511977776666' },
     });
     expect(dialog.open).toBe(false);
+    fixture.destroy();
+    http.verify();
+  });
+
+  it('exclui uma mensagem do aviso, depois todas, e fecha a lista quando esvazia', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [AvisosSistemaComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: SessionState, useValue: { user: signal({ role: 'admin' }), csrf: signal('') } },
+        // Modal de decisão confirma na hora.
+        {
+          provide: ConfirmacaoService,
+          useValue: { pedir: (_: unknown, aoConfirmar: () => void) => aoConfirmar() },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AvisosSistemaComponent);
+    const http = TestBed.inject(HttpTestingController);
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    const dialog = el.querySelector('dialog') as HTMLDialogElement;
+    dialog.showModal = vi.fn(() => dialog.setAttribute('open', ''));
+    dialog.close = vi.fn(() => dialog.removeAttribute('open'));
+    const AVISO = {
+      codigo: 'clientes_sem_resposta',
+      mensagem: '1 cliente(s) sem resposta.',
+      detalhes: true,
+    };
+    const msg = (id: number) => ({
+      id,
+      direcao: 'entrada',
+      telefone: '5511976181946',
+      texto: 'Oi',
+      status: 'ignorada',
+      erro: null,
+      created_at: '2026-10-05T20:04:36Z',
+    });
+    http.expectOne(`${API_BASE}/sistema/saude`).flush({ problemas: [AVISO] });
+    fixture.detectChanges();
+    (el.querySelector('.ver') as HTMLButtonElement).click();
+    http
+      .expectOne(`${API_BASE}/sistema/saude/clientes_sem_resposta`)
+      .flush([msg(3), msg(2), msg(1)]);
+    fixture.detectChanges();
+    expect(dialog.querySelectorAll('.excluir').length).toBe(3);
+
+    (dialog.querySelector('.excluir') as HTMLButtonElement).click();
+    http
+      .expectOne({ method: 'DELETE', url: `${API_BASE}/sistema/saude/clientes_sem_resposta/3` })
+      .flush({ dispensadas: 1 });
+    http.expectOne(`${API_BASE}/sistema/saude`).flush({ problemas: [AVISO] });
+    fixture.detectChanges();
+    expect(dialog.querySelectorAll('.mensagens li').length).toBe(2);
+    expect(dialog.open).toBe(true);
+
+    (dialog.querySelector('.todas') as HTMLButtonElement).click();
+    http
+      .expectOne({ method: 'DELETE', url: `${API_BASE}/sistema/saude/clientes_sem_resposta` })
+      .flush({ dispensadas: 2 });
+    http.expectOne(`${API_BASE}/sistema/saude`).flush({ problemas: [] });
+    fixture.detectChanges();
+    expect(dialog.open).toBe(false);
+    expect(el.querySelector('[role="alert"]')).toBeNull();
     fixture.destroy();
     http.verify();
   });

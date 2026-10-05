@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\MensagemWhatsapp;
+use App\Models\Perfil;
 use App\Models\StatusConversa;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
@@ -91,6 +93,33 @@ class SaudeSistemaTest extends TestCase
         $id = StatusConversa::create(['telefone' => '5512999990002', 'status_atual' => 'transbordo_humano'])->id;
         $this->deleteJson("/api/status-conversa/{$id}")->assertOk();
         $this->assertNotContains('envios_falharam', $this->codigos());
+    }
+
+    public function test_dispensar_tira_uma_mensagem_ou_todas_do_aviso(): void
+    {
+        $this->botNoAr();
+        $entrada = fn (string $id, string $tel) => MensagemWhatsapp::create(['direcao' => 'entrada', 'telefone' => $tel, 'wa_message_id' => $id, 'texto' => 'Oi', 'status' => 'ignorada']);
+        $a = $entrada('w1', '5512999990001');
+        $entrada('w2', '5512999990001');
+        $entrada('w3', '5512999990002');
+        $falha = $this->saida(['status' => 'falhou', 'telefone' => '5512999990009']);
+
+        $this->deleteJson("/api/sistema/saude/clientes_sem_resposta/{$a->id}")->assertOk()->assertJsonPath('dispensadas', 1);
+        $this->assertSame('processada', $a->fresh()->status);
+        $this->getJson('/api/sistema/saude/clientes_sem_resposta')->assertJsonCount(2);
+        $this->deleteJson("/api/sistema/saude/clientes_sem_resposta/{$a->id}")->assertNotFound();
+
+        $this->deleteJson('/api/sistema/saude/clientes_sem_resposta')->assertOk()->assertJsonPath('dispensadas', 2);
+        $this->assertNotContains('clientes_sem_resposta', $this->codigos());
+
+        // Envio que falhou: descartado, não some do histórico e não volta para a fila.
+        $this->deleteJson('/api/sistema/saude/envios_falharam')->assertOk()->assertJsonPath('dispensadas', 1);
+        $this->assertSame('descartada', $falha->fresh()->status);
+        $this->assertSame([], $this->codigos());
+
+        $this->deleteJson('/api/sistema/saude/bot_fora_do_ar')->assertNotFound();
+        $this->actingAs(User::factory()->create(['role' => 'operador', 'active' => true, 'perfil_id' => Perfil::create(['nome' => 'Cozinha', 'permissoes' => ['pedidos' => ['ver']]])->id]));
+        $this->deleteJson('/api/sistema/saude/clientes_sem_resposta')->assertForbidden();
     }
 
     public function test_verificacao_agendada_envia_email_uma_vez_por_conjunto_de_problemas(): void
