@@ -81,7 +81,7 @@ describe('Tela de login BotClient', () => {
     await preencher(fixture, '  Admin@Example.com ', 'Senha123!');
     await enviar(fixture);
     expect(login).toHaveBeenCalledWith('admin@example.com', 'Senha123!');
-    expect(navegar).toHaveBeenCalledWith('/dashboard');
+    expect(navegar).toHaveBeenCalledWith('/');
     expect(fixture.componentInstance.senha).toBe('');
   });
 

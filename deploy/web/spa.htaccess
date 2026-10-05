@@ -1,0 +1,31 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Sempre HTTPS (login usa cookie de sessão seguro).
+    RewriteCond %{HTTPS} !on
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteCond %{HTTP:X-CSRF-TOKEN} .
+    RewriteRule .* - [E=HTTP_X_CSRF_TOKEN:%{HTTP:X-CSRF-TOKEN}]
+    RewriteRule (^|/)\. - [F]
+    # /api e /up: Laravel. /webhook é encaminhado ao bot pelo servidor web (contexto proxy do vhost).
+    RewriteRule ^api(?:/|$) index.php [END]
+    RewriteRule ^up$ index.php [END]
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [END]
+    RewriteRule ^ index.html [END]
+</IfModule>
+# Content-Security-Policy do painel: tudo do próprio site; fontes do Google Fonts (styles.css).
+# preparar-empresa.sh copia esta linha para o vhost do OpenLiteSpeed, que não aceita Header no .htaccess.
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+</IfModule>
+<FilesMatch "\.(?:php|phtml|phar)$">
+    Require all denied
+</FilesMatch>
+<Files "index.php">
+    Require all granted
+</Files>

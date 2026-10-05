@@ -73,7 +73,7 @@ export class LoginComponent implements OnInit {
         this.senha = '';
         gravarEmailLembrado(this.lembrarEmail() ? email : null);
         this.carregando.set(false);
-        void this.router.navigateByUrl('/dashboard');
+        void this.router.navigateByUrl('/');
       },
       error: (e: { status?: number }) => {
         this.carregando.set(false);

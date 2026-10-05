@@ -1,6 +1,7 @@
 import { AuthService } from '../../core/services/auth.service';
 import { Component, Input, Output, EventEmitter, inject, signal, OnDestroy } from '@angular/core';
 import { TransbordosModalComponent } from './transbordos-modal.component';
+import { AvisosSistemaComponent } from './avisos-sistema.component';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../core/services/api.service';
@@ -8,7 +9,7 @@ import { ApiService } from '../../core/services/api.service';
 @Component({
   selector: 'app-header',
   standalone: true,
-  imports: [CommonModule, TransbordosModalComponent],
+  imports: [CommonModule, TransbordosModalComponent, AvisosSistemaComponent],
   templateUrl: './header.component.html',
   styleUrl: './header.component.css',
 })
@@ -22,7 +23,8 @@ export class HeaderComponent implements OnDestroy {
   private relogio = setInterval(() => this.agora.set(new Date()), 60000);
 
   constructor() {
-    this.transbordo.iniciar();
+    // Fila de atendimento humano (sino e contador do menu): só para quem vê Atendimentos.
+    if (this.auth.pode('atendimentos', 'ver')) this.transbordo.iniciar();
     this.api.getHorariosAtendimento().subscribe({ error: () => {} });
   }
 

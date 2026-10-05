@@ -19,6 +19,15 @@
     />
   </div>
 
+  @if (erroLista()) {
+    <div class="lista-erro" role="alert">
+      <span>{{ erroLista() }}</span>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="carregarClientes()">
+        Tentar novamente
+      </button>
+    </div>
+  }
+
   <!-- Tabela de Clientes -->
   <div class="table-container glass-card">
     <table class="data-table">
@@ -49,7 +58,7 @@
             </td>
             <td>
               <span class="addr-badge">
-                <app-icon nome="local" /> {{ c.enderecos?.[0]?.bairro || 'Martim de Sá' }}
+                <app-icon nome="local" /> {{ c.enderecos?.[0]?.bairro || '—' }}
               </span>
             </td>
             <td>
@@ -71,6 +80,18 @@
               >
                 <app-icon nome="atendimentos" /> Abrir Conversa
               </a>
+              @if (podeExcluir()) {
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm apagar-dados"
+                  [disabled]="apagando() === c.id"
+                  [attr.aria-label]="'Apagar dados de ' + c.nome"
+                  title="LGPD: apagar nome, telefone, endereços e conversas deste cliente"
+                  (click)="apagarDados(c)"
+                >
+                  <app-icon nome="excluir" /> Apagar dados
+                </button>
+              }
             </td>
           </tr>
         } @empty {
@@ -81,4 +102,13 @@
       </tbody>
     </table>
   </div>
+  <app-paginacao
+    [pagina]="pagina()"
+    [ultima]="ultimaPagina()"
+    [total]="totalClientes()"
+    (mudar)="irParaPagina($event)"
+  />
+  @if (mensagem()) {
+    <p class="mensagem-lgpd" role="status">{{ mensagem() }}</p>
+  }
 </div>

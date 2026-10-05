@@ -1,0 +1,101 @@
+.empresa-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 860px;
+}
+.eyebrow {
+  color: var(--primary-text);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+.duas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 11px 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 400;
+  resize: vertical;
+}
+.tempos {
+  margin: 8px 0 0;
+  min-width: 0;
+  padding: 14px 20px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+.tempos legend {
+  margin-left: -8px;
+  padding: 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.tempos p {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.tempos .duas {
+  align-items: start;
+  gap: 16px 24px;
+}
+.tempos input {
+  max-width: 140px;
+}
+.tempos small {
+  line-height: 1.4;
+}
+.campo-erro {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--danger);
+}
+.erros {
+  margin: 0 0 0 18px;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+.sucesso {
+  color: var(--success);
+  font-size: 0.85rem;
+}
+.acoes {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 600px) {
+  .duas {
+    grid-template-columns: 1fr;
+  }
+  form {
+    padding: 16px;
+  }
+}
+
+.ajuda {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

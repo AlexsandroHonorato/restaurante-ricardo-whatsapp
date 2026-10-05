@@ -14,6 +14,7 @@ class Pedido extends Model
     protected $fillable = [
         'motivo_cancelamento',
         'codigo_pedido',
+        'chave_idempotencia',
         'cliente_id',
         'endereco_id',
         'status',
@@ -31,6 +32,7 @@ class Pedido extends Model
         'saiu_entrega_em',
         'entregue_em',
         'cancelado_em',
+        'comanda_impressa_em',
     ];
 
     protected $casts = [
@@ -45,6 +47,7 @@ class Pedido extends Model
         'saiu_entrega_em' => 'datetime',
         'entregue_em' => 'datetime',
         'cancelado_em' => 'datetime',
+        'comanda_impressa_em' => 'datetime',
     ];
 
     public function cliente()

@@ -1,0 +1,168 @@
+<section class="perfis-page">
+  <header class="topo">
+    <div>
+      <span class="eyebrow">CONFIGURAÇÕES</span>
+      <h1 class="page-title">Perfis de usuário</h1>
+      <p class="page-subtitle">
+        Defina o que cada perfil vê e faz no painel. O perfil de cada pessoa é escolhido em
+        “Usuários do sistema”.
+      </p>
+    </div>
+    <button type="button" class="btn btn-primary novo" (click)="novo()">
+      <app-icon nome="adicionar" /> Novo perfil
+    </button>
+  </header>
+
+  @if (erro()) {
+    <p class="aviso erro" role="alert">{{ erro() }}</p>
+  }
+  @if (sucesso()) {
+    <p class="aviso sucesso" role="status">{{ sucesso() }}</p>
+  }
+
+  @if (editando() !== null) {
+    <form class="glass-card formulario" (ngSubmit)="salvar()">
+      <h2>{{ editando() ? 'Editar perfil' : 'Novo perfil' }}</h2>
+      <label for="perfil-nome"
+        >Nome do perfil
+        <input
+          id="perfil-nome"
+          name="nome"
+          [(ngModel)]="nome"
+          required
+          minlength="2"
+          maxlength="60"
+          placeholder="Ex.: Cozinha, Gerente, Atendente"
+        />
+      </label>
+
+      <div class="grade-rolagem">
+        <table class="grade">
+          <caption>
+            Permissões por tela
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Tela</th>
+              @for (acao of acoes; track acao.id) {
+                <th scope="col">{{ acao.nome }}</th>
+              }
+              <th scope="col">Tudo</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (tela of telas(); track tela.id) {
+              <tr [class.ativa]="marcada(tela.id, 'ver')">
+                <th scope="row">
+                  {{ tela.nome }}
+                  @if (dicas[tela.id]) {
+                    <small>{{ dicas[tela.id] }}</small>
+                  }
+                </th>
+                @for (acao of acoes; track acao.id) {
+                  <td>
+                    @if (existe(tela.id, acao.id)) {
+                      <input
+                        type="checkbox"
+                        [checked]="marcada(tela.id, acao.id)"
+                        (change)="alternar(tela.id, acao.id)"
+                        [attr.aria-label]="acao.nome + ' ' + tela.nome"
+                      />
+                    } @else {
+                      <span class="nao-existe" aria-hidden="true">—</span>
+                    }
+                  </td>
+                }
+                <td>
+                  <input
+                    type="checkbox"
+                    [checked]="telaInteira(tela.id)"
+                    (change)="alternarTela(tela.id)"
+                    [attr.aria-label]="'Tudo em ' + tela.nome"
+                  />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="ajuda">
+        Marcar Criar, Editar ou Excluir libera também Ver. “—” indica ação que não existe na tela. A
+        tela de Perfis é sempre exclusiva do Administrador.
+      </p>
+      @if (!temTela()) {
+        <p class="aviso erro" role="alert">Marque ao menos uma tela para o perfil.</p>
+      }
+
+      <div class="acoes-formulario">
+        <button type="button" class="btn btn-secondary" (click)="fechar()">Cancelar</button>
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="salvando() || nome.trim().length < 2 || !temTela()"
+          [attr.aria-busy]="salvando()"
+        >
+          <app-icon nome="confirmar" />
+          {{ salvando() ? 'Salvando…' : editando() ? 'Salvar alterações' : 'Criar perfil' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (carregando() && !perfis().length) {
+    <p role="status">Carregando perfis…</p>
+  } @else {
+    <ul class="lista" aria-label="Perfis">
+      <li class="glass-card perfil fixo">
+        <div class="perfil-info">
+          <strong>Administrador <span class="selo">fixo</span></strong>
+          <span>Acesso total a todas as telas e ações. Não pode ser editado nem excluído.</span>
+        </div>
+      </li>
+      @for (perfil of perfis(); track perfil.id) {
+        <li class="glass-card perfil" [class.selecionado]="editando() === perfil.id">
+          <div class="perfil-info">
+            <strong>
+              {{ perfil.nome }}
+              @if (perfil.padrao) {
+                <span class="selo">padrão</span>
+              }
+            </strong>
+            <span>{{ resumo(perfil) }}</span>
+            <small
+              >{{ perfil.usuarios_count }}
+              {{ perfil.usuarios_count === 1 ? 'usuário' : 'usuários' }}</small
+            >
+          </div>
+          <div class="perfil-acoes">
+            <button
+              type="button"
+              class="action-btn"
+              title="Editar"
+              [attr.aria-label]="'Editar ' + perfil.nome"
+              (click)="editar(perfil)"
+            >
+              <app-icon nome="editar" />
+            </button>
+            <button
+              type="button"
+              class="action-btn delete"
+              [title]="
+                perfil.padrao
+                  ? 'O perfil padrão não pode ser excluído'
+                  : perfil.usuarios_count
+                    ? 'Há usuários com este perfil'
+                    : 'Excluir'
+              "
+              [attr.aria-label]="'Excluir ' + perfil.nome"
+              [disabled]="perfil.padrao || perfil.usuarios_count > 0"
+              (click)="excluir(perfil)"
+            >
+              <app-icon nome="excluir" />
+            </button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</section>

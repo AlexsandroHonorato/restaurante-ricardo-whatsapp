@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cliente;
+use App\Support\DadosPessoais;
 use Illuminate\Http\Request;
 
 class ClienteController extends Controller
@@ -29,5 +30,13 @@ class ClienteController extends Controller
         $cliente = Cliente::with(['enderecos', 'pedidos.itens', 'atendimentos'])->findOrFail($id);
 
         return response()->json($cliente);
+    }
+
+    /** LGPD: exclusão a pedido do titular (admin). Pedidos continuam no faturamento, sem identificar a pessoa. */
+    public function anonimizar(int $id)
+    {
+        DadosPessoais::anonimizar(Cliente::findOrFail($id));
+
+        return response()->json(['message' => 'Dados pessoais do cliente removidos.']);
     }
 }

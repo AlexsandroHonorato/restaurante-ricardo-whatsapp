@@ -31,11 +31,15 @@ describe('ApiService', () => {
 
   it('does not replace operational orders with an empty success on failure', () => {
     let emitted = false;
-    api.getPedidos().subscribe(() => (emitted = true));
+    let falhou = false;
+    api.getPedidos('em_preparo', 'Ana', 2).subscribe({
+      next: () => (emitted = true),
+      error: () => (falhou = true),
+    });
     http
-      .expectOne('http://localhost:8080/api/pedidos')
+      .expectOne('http://localhost:8080/api/pedidos?page=2&status=em_preparo&busca=Ana')
       .flush({}, { status: 500, statusText: 'Error' });
     expect(emitted).toBe(false);
-    expect(api.erro()).toBeTruthy();
+    expect(falhou).toBe(true);
   });
 });

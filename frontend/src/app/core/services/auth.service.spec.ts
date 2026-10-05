@@ -44,6 +44,29 @@ describe('Login seguro', () => {
     http.expectOne(API_BASE + '/auth/me').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(auth.user()).toBeNull();
   });
+  it('depois do login as guardas de rota não consultam a API de novo', () => {
+    auth.login('admin@example.com', 'Senha123!').subscribe();
+    http.expectOne(API_BASE + '/auth/csrf').flush({ csrf: 't' });
+    http.expectOne(API_BASE + '/auth/login').flush({ csrf: 't2', user: { id: 1, role: 'admin' } });
+    const usuarios: unknown[] = [];
+    for (let i = 0; i < 4; i++) auth.check().subscribe((u) => usuarios.push(u));
+    http.expectNone(API_BASE + '/auth/csrf');
+    http.expectNone(API_BASE + '/auth/me');
+    expect(usuarios).toHaveLength(4);
+  });
+  it('na primeira abertura, consultas simultâneas da sessão viram uma só', () => {
+    const usuarios: unknown[] = [];
+    auth.check().subscribe((u) => usuarios.push(u));
+    auth.check().subscribe((u) => usuarios.push(u));
+    http.expectOne(API_BASE + '/auth/csrf').flush({ csrf: 'token' });
+    http.expectOne(API_BASE + '/auth/me').flush({ user: { id: 1, role: 'admin' } });
+    expect(usuarios).toEqual([
+      { id: 1, role: 'admin' },
+      { id: 1, role: 'admin' },
+    ]);
+    auth.check().subscribe();
+    http.expectNone(API_BASE + '/auth/me');
+  });
   it('avalia os cinco critérios da senha', () => {
     expect(criteriosSenha('abc')).toEqual([false, false, true, false, false]);
     expect(criteriosSenha('Senha123!').every(Boolean)).toBe(true);

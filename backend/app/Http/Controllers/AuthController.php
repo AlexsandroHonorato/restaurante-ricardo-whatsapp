@@ -36,12 +36,12 @@ class AuthController extends Controller
         Auth::login($usuario);
         $request->session()->regenerate();
 
-        return response()->json(['user' => $usuario, 'csrf' => csrf_token()])->header('Cache-Control', 'no-store');
+        return response()->json(['user' => $usuario->paraSessao(), 'csrf' => csrf_token()])->header('Cache-Control', 'no-store');
     }
 
     public function me(Request $request)
     {
-        return response()->json(['user' => $request->user()])->header('Cache-Control', 'no-store');
+        return response()->json(['user' => $request->user()->paraSessao()])->header('Cache-Control', 'no-store');
     }
 
     public function logout(Request $request)
