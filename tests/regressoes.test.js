@@ -462,6 +462,18 @@ test('assinatura HMAC exige segredo válido e rejeita alterações no corpo', as
   assert.equal(assinaturaValida(bruto, undefined, 'segredo-teste'), false);
 });
 
+test('mensagem enviada há mais de 10 minutos (reentrega tardia da Meta) é reconhecida como antiga', async () => {
+  const { mensagemAntiga } = await import('../lib/webhook.js');
+  const agora = Date.parse('2026-10-05T12:00:00Z');
+  const ha = minutos => ({ timestamp: String(agora / 1000 - minutos * 60) });
+  assert.equal(mensagemAntiga(ha(0), agora), false);
+  assert.equal(mensagemAntiga(ha(9), agora), false);
+  assert.equal(mensagemAntiga(ha(11), agora), true);
+  assert.equal(mensagemAntiga(ha(55), agora), true);
+  assert.equal(mensagemAntiga({}, agora), false);
+  assert.equal(mensagemAntiga({ timestamp: 'x' }, agora), false);
+});
+
 test('rota de notificação exige token configurado, mesmo para chamadas locais', async () => {
   const { notificacaoAutorizada } = await import('../lib/webhook.js');
   assert.equal(notificacaoAutorizada(undefined, undefined), false);

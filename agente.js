@@ -1,7 +1,7 @@
 // agente.js: passo 2 e passo 8. O servidor que a Meta chama (webhook) e que responde pelo WhatsApp.
 // Rode com:  npm start   (lê o .env pelo --env-file do Node 20.6+)
 import { createServer } from 'node:http';
-import { assinaturaValida, notificacaoAutorizada } from './lib/webhook.js';
+import { assinaturaValida, mensagemAntiga, notificacaoAutorizada } from './lib/webhook.js';
 import { EMPRESA } from './lib/empresa.js';
 import { criarFilaPorChave } from './lib/fila.js';
 import { criarMensageiro } from './lib/mensageiro.js';
@@ -136,7 +136,14 @@ createServer((req, res) => {
         return;
       }
       res.writeHead(200).end();
+      const antigas = new Set(mensagens.filter(m => mensagemAntiga(m)).map(m => m.id));
       for (const entrada of novas) {
+        // Reentrega tardia da Meta: fica no histórico da conversa, mas o bot não responde nem muda a etapa.
+        if (antigas.has(entrada.wa_message_id)) {
+          console.warn(JSON.stringify({ evento: 'mensagem_antiga_ignorada', mensagem: entrada.id, telefone: entrada.telefone }));
+          apiBot.atualizar(entrada.id, { status: 'processada' }).catch(erro => console.error(JSON.stringify({ evento: 'mensagem_antiga_nao_marcada', mensagem: entrada.id, erro: erro.message })));
+          continue;
+        }
         mensageiro.registrar(entrada.telefone, entrada.wa_message_id);
         console.log(`📩 [WhatsApp] Mensagem recebida de ${entrada.telefone}: "${entrada.texto ?? entrada.tipo}"`);
         tratar(entrada);

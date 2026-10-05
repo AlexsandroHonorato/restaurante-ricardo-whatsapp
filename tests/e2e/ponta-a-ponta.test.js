@@ -170,6 +170,20 @@ test('mensagem no WhatsApp vira pedido com preço do servidor e o despacho pelo 
   assert.equal(textos().filter(t => /PED-/.test(t)).length, 1);
   assert.equal(pedidosAoModelo.length, 1);
 
+  // Meta entrega com 1 hora de atraso uma mensagem antiga: fica gravada, mas o bot não responde.
+  const antigo = JSON.stringify({ entry: [{ changes: [{ value: { messages: [{
+    id: 'wamid.entrada.antiga', from: TELEFONE, type: 'text', timestamp: String(Math.floor(Date.now() / 1000) - 3600), text: { body: '3' },
+  }] } }] }] });
+  const enviadasAntes = enviadasMeta.length;
+  assert.equal((await http(`http://127.0.0.1:${portaBot}/webhook`, {
+    method: 'POST', body: antigo,
+    headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': 'sha256=' + createHmac('sha256', SEGREDO_META).update(antigo).digest('hex') },
+  })).status, 200);
+  await esperar(async () => bot.saida.includes('mensagem_antiga_ignorada'), 'mensagem antiga ignorada');
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  assert.equal(enviadasMeta.length, enviadasAntes, 'nada enviado ao WhatsApp por mensagem antiga');
+  assert.equal(pedidosAoModelo.length, 1);
+
   // ------------------------------------------------ cozinha: agente de impressão pega o pedido e manda para a térmica
   const recebidoImpressora = [];
   const impressora = net.createServer(s => s.on('data', d => recebidoImpressora.push(d)));
