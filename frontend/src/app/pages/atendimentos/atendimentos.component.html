@@ -1,4 +1,8 @@
-<div class="atendimentos-page">
+<div
+  class="atendimentos-page"
+  [class.sem-editar]="!podeEditar()"
+  [class.sem-excluir]="!podeExcluir()"
+>
   <div class="page-header">
     <div>
       <h1 class="page-title">Monitor de Atendimentos & Status da IA</h1>

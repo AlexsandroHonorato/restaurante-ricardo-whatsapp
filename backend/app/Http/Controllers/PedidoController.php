@@ -8,6 +8,7 @@ use App\Models\StatusPedido;
 use App\PedidoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +25,19 @@ class PedidoController extends Controller
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+
+        // Período personalizado: dias inteiros no fuso do restaurante (início 00:00, fim até 23:59 do último dia).
+        $datas = $request->validate([
+            'data_inicio' => 'nullable|required_with:data_fim|date_format:Y-m-d',
+            'data_fim' => 'nullable|required_with:data_inicio|date_format:Y-m-d|after_or_equal:data_inicio',
+        ]);
+        if (! empty($datas['data_inicio']) && ! empty($datas['data_fim'])) {
+            if (Carbon::parse($datas['data_inicio'])->diffInDays(Carbon::parse($datas['data_fim'])) + 1 > 365) {
+                throw ValidationException::withMessages(['data_fim' => 'Selecione um intervalo de até 365 dias.']);
+            }
+            $query->where('created_at', '>=', Carbon::parse($datas['data_inicio'], 'America/Sao_Paulo')->startOfDay()->utc())
+                ->where('created_at', '<', Carbon::parse($datas['data_fim'], 'America/Sao_Paulo')->startOfDay()->addDay()->utc());
         }
 
         if ($request->boolean('sem_comanda')) {
@@ -66,6 +80,27 @@ class PedidoController extends Controller
         $marcados = Pedido::whereKey($id)->whereNull('comanda_impressa_em')->update(['comanda_impressa_em' => now()]);
 
         return response()->json(['primeira' => $marcados === 1]);
+    }
+
+    /**
+     * Exclui o pedido definitivamente (itens e histórico saem junto; o atendimento fica sem o vínculo).
+     * O pedido deixa de contar no faturamento e nos totais do cliente. Fica registrado no log quem excluiu.
+     */
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        DB::transaction(function () use ($request, $id) {
+            $pedido = Pedido::with('cliente')->lockForUpdate()->findOrFail($id);
+            if ($cliente = $pedido->cliente) {
+                $cliente->update([
+                    'total_pedidos' => max(0, $cliente->total_pedidos - 1),
+                    'total_gasto' => max(0, (float) $cliente->total_gasto - (float) $pedido->valor_total),
+                ]);
+            }
+            $pedido->delete();
+            Log::info('Pedido excluído', ['codigo' => $pedido->codigo_pedido, 'valor_total' => $pedido->valor_total, 'status' => $pedido->status, 'por' => $request->user()->email]);
+        });
+
+        return response()->json(['ok' => true]);
     }
 
     /**

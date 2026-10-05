@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, finalize, map, of, shareReplay, switchMap, tap } from 'rxjs';
 import { API_BASE, SessionState, SystemUser } from './session-state';
+import { Acao, pode } from '../permissoes';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -10,6 +11,10 @@ export class AuthService {
   state = inject(SessionState);
   private transbordo = inject(TransbordoService);
   user = this.state.user;
+  /** Permissão do usuário logado: `auth.pode('cardapio', 'editar')`. A API confere de novo em cada ação. */
+  pode(tela: string, acao: Acao): boolean {
+    return pode(this.user(), tela, acao);
+  }
   private csrf() {
     return this.http
       .get<{ csrf: string }>(API_BASE + '/auth/csrf')

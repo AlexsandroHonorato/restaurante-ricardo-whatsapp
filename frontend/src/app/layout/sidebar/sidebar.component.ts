@@ -1,11 +1,12 @@
 import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { BrandSymbolComponent } from '../../shared/brand/brand-symbol.component';
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { TransbordoService } from '../../core/services/transbordo.service';
+import { pode } from '../../core/permissoes';
 
 @Component({
   selector: 'app-sidebar',
@@ -20,4 +21,11 @@ export class SidebarComponent {
   auth = inject(AuthService);
   // Contador de Atendimentos = clientes aguardando atendimento humano agora (o mesmo do sino do cabeçalho).
   transbordo = inject(TransbordoService);
+  /** Grupo Configurações aparece se o perfil vê alguma tela dele (Perfis é só do Administrador). */
+  temConfiguracoes = computed(() => {
+    const user = this.auth.user();
+    return ['dashboard', 'cardapio', 'empresa', 'horarios', 'usuarios'].some((tela) =>
+      pode(user, tela, 'ver'),
+    );
+  });
 }

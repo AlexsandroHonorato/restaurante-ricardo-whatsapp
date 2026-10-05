@@ -293,6 +293,17 @@ CREATE TABLE `pedidos` (
   CONSTRAINT `pedidos_endereco_id_foreign` FOREIGN KEY (`endereco_id`) REFERENCES `enderecos` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `perfis` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `nome` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `permissoes` json NOT NULL,
+  `padrao` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `perfis_nome_unique` (`nome`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `personal_access_tokens` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `tokenable_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -398,7 +409,10 @@ CREATE TABLE `users` (
   `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'operador',
   `active` tinyint(1) NOT NULL DEFAULT '1',
+  `perfil_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `users_email_unique` (`email`)
+  UNIQUE KEY `users_email_unique` (`email`),
+  KEY `users_perfil_id_foreign` (`perfil_id`),
+  CONSTRAINT `users_perfil_id_foreign` FOREIGN KEY (`perfil_id`) REFERENCES `perfis` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

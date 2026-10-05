@@ -158,7 +158,8 @@
         <button
           class="btn btn-primary"
           type="submit"
-          [disabled]="salvando() || !form.nome.trim() || f.invalid"
+          [disabled]="salvando() || !form.nome.trim() || f.invalid || !podeEditar()"
+          [title]="podeEditar() ? '' : 'Seu perfil só pode ver estes dados'"
           [attr.aria-busy]="salvando()"
         >
           {{ salvando() ? 'Salvando…' : 'Salvar dados' }}

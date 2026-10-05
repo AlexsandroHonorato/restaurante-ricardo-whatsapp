@@ -22,7 +22,7 @@ export class ClientesComponent implements OnInit {
   private confirmacao = inject(ConfirmacaoService);
   clientes = signal<Cliente[]>([]);
   termoBusca: string = '';
-  ehAdmin = computed(() => this.auth.user()?.role === 'admin');
+  podeExcluir = computed(() => this.auth.pode('clientes', 'excluir'));
   apagando = signal<number | null>(null);
   mensagem = signal('');
 

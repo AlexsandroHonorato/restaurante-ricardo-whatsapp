@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { API_BASE, SessionState, SystemUser } from '../../core/services/session-state';
@@ -10,6 +10,7 @@ import {
 } from '../../shared/ui/mascara-telefone.directive';
 import { EquipeListaComponent } from './equipe-lista.component';
 import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
+import { pode } from '../../core/permissoes';
 @Component({
   selector: 'app-usuarios',
   standalone: true,
@@ -18,7 +19,7 @@ import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
     <h1 class="page-title">Usuários do sistema</h1>
     <p class="page-subtitle">Gerencie quem tem acesso ao restaurante.</p>
     <div class="users-layout">
-      <section class="glass-card user-form">
+      <section class="glass-card user-form" [hidden]="!(editando() ? podeEditar() : podeCriar())">
         <h2>
           <app-icon [nome]="editando() ? 'editar' : 'adicionar'" />
           {{ editando() ? 'Editar usuário' : 'Cadastrar usuário' }}
@@ -62,9 +63,18 @@ import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
               }
             </label>
             <label
-              >Perfil<select name="role" [(ngModel)]="dados.role" [disabled]="ehEu(editando())">
-                <option value="operador">Operador</option>
-                <option value="admin">Administrador</option>
+              >Perfil<select
+                name="perfil"
+                [(ngModel)]="dados.perfil"
+                [disabled]="ehEu(editando())"
+                required
+              >
+                @for (p of perfis(); track p.id) {
+                  <option [value]="p.id">{{ p.nome }}</option>
+                }
+                @if (souAdmin()) {
+                  <option value="admin">Administrador (acesso total)</option>
+                }
               </select></label
             >
             <label
@@ -155,6 +165,9 @@ import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
           [meuId]="sessao.user()?.id"
           [editandoId]="editando()?.id"
           [excluindoId]="excluindo()"
+          [souAdmin]="souAdmin()"
+          [podeEditar]="podeEditar()"
+          [podeExcluir]="podeExcluir()"
           (editar)="editar($event, form)"
           (excluir)="excluir($event, form)"
           (mais)="mais()"
@@ -180,6 +193,13 @@ export class UsuariosComponent implements OnInit {
   erroLista = signal('');
   sucesso = signal('');
   private pagina = 1;
+  /** Perfis para o campo "Perfil"; o Administrador é fixo e só outro administrador pode concedê-lo. */
+  perfis = signal<{ id: number; nome: string; padrao: boolean }[]>([]);
+  souAdmin = computed(() => this.sessao.user()?.role === 'admin');
+  podeCriar = computed(() => pode(this.sessao.user(), 'usuarios', 'criar'));
+  podeEditar = computed(() => pode(this.sessao.user(), 'usuarios', 'editar'));
+  podeExcluir = computed(() => pode(this.sessao.user(), 'usuarios', 'excluir'));
+  private perfilPadrao = computed(() => String(this.perfis().find((p) => p.padrao)?.id ?? ''));
   dados = this.novo();
   criterios = [
     'Mínimo de 8 caracteres',
@@ -193,7 +213,8 @@ export class UsuariosComponent implements OnInit {
       name: '',
       email: '',
       phone: '',
-      role: 'operador' as SystemUser['role'],
+      // 'admin' ou o id do perfil.
+      perfil: this.perfilPadrao(),
       active: true,
       password: '',
       password_confirmation: '',
@@ -214,6 +235,15 @@ export class UsuariosComponent implements OnInit {
   }
   ngOnInit() {
     this.listar();
+    this.http
+      .get<{ perfis: { id: number; nome: string; padrao: boolean }[] }>(API_BASE + '/perfis')
+      .subscribe({
+        next: (r) => {
+          this.perfis.set(r.perfis);
+          if (!this.dados.perfil) this.dados.perfil = this.perfilPadrao();
+        },
+        error: () => this.erro.set('Não foi possível carregar os perfis.'),
+      });
   }
   listar() {
     this.carregando.set(true);
@@ -250,7 +280,7 @@ export class UsuariosComponent implements OnInit {
       name: user.name,
       email: user.email,
       phone: mascararTelefone(user.phone),
-      role: user.role,
+      perfil: user.role === 'admin' ? 'admin' : String(user.perfil_id ?? this.perfilPadrao()),
       active: user.active,
       password: '',
       password_confirmation: '',
@@ -325,10 +355,13 @@ export class UsuariosComponent implements OnInit {
     this.erro.set('');
     this.sucesso.set('');
     const editando = this.editando();
+    const { perfil, ...campos } = this.dados;
     const corpo = {
-      ...this.dados,
+      ...campos,
       email: this.dados.email.trim().toLowerCase(),
       phone: this.dados.phone || null,
+      role: perfil === 'admin' ? 'admin' : 'operador',
+      perfil_id: perfil === 'admin' ? null : Number(perfil) || null,
     };
     const requisicao = editando
       ? this.http.put(API_BASE + '/usuarios/' + editando.id, corpo)

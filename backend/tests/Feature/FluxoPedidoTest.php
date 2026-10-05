@@ -9,6 +9,7 @@ use App\Models\Pedido;
 use App\Models\Produto;
 use App\Models\ProdutoVariacao;
 use App\Models\StatusConversa;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
@@ -134,6 +135,55 @@ class FluxoPedidoTest extends TestCase
             'produto_id' => $this->frango->produto_id, 'variacao_id' => $this->frango->id,
         ]);
         $this->assertDatabaseHas('pedido_itens', ['nome_snapshot' => 'Coca-Cola 2L', 'subtotal' => 20]);
+    }
+
+    public function test_excluir_pedido_remove_itens_e_historico_ajusta_cliente_e_exige_permissao(): void
+    {
+        $this->postJson('/api/pedidos', $this->dados())->assertCreated();
+        $pedido = Pedido::firstOrFail();
+        $this->patchJson("/api/pedidos/{$pedido->id}/status", ['status' => 'em_preparo'])->assertOk();
+        $this->assertSame(1, $pedido->cliente->fresh()->total_pedidos);
+
+        // Perfil padrão (Operador) vê e altera pedidos, mas não exclui.
+        $admin = auth()->user();
+        $this->actingAs(User::factory()->create(['role' => 'operador', 'active' => true]));
+        $this->deleteJson("/api/pedidos/{$pedido->id}")->assertForbidden();
+        $this->assertDatabaseCount('pedidos', 1);
+
+        $this->actingAs($admin);
+        $this->deleteJson("/api/pedidos/{$pedido->id}")->assertOk();
+        $this->assertDatabaseCount('pedidos', 0);
+        $this->assertDatabaseCount('pedido_itens', 0);
+        $this->assertDatabaseCount('historico_status_pedidos', 0);
+        $cliente = $pedido->cliente->fresh();
+        $this->assertSame(0, $cliente->total_pedidos);
+        $this->assertSame('0.00', $cliente->total_gasto);
+        // O atendimento continua no histórico, sem o vínculo.
+        $this->assertDatabaseHas('atendimentos', ['cliente_id' => $cliente->id, 'pedido_id' => null]);
+        $this->deleteJson("/api/pedidos/{$pedido->id}")->assertNotFound();
+    }
+
+    public function test_lista_de_pedidos_filtra_por_periodo_no_fuso_do_restaurante(): void
+    {
+        $this->postJson('/api/pedidos', $this->dados())->assertCreated();
+        $this->postJson('/api/pedidos', [...$this->dados(), 'codigo_pedido' => 'PED-NOITE'])->assertCreated();
+        $this->postJson('/api/pedidos', [...$this->dados(), 'codigo_pedido' => 'PED-ANTIGO'])->assertCreated();
+        // 01/10 às 23:30 em São Paulo já é 02/10 em UTC: precisa cair no dia 01.
+        Pedido::where('codigo_pedido', 'PED-TESTE')->update(['created_at' => '2026-10-01 15:00:00']);
+        Pedido::where('codigo_pedido', 'PED-NOITE')->update(['created_at' => '2026-10-02 02:30:00']);
+        Pedido::where('codigo_pedido', 'PED-ANTIGO')->update(['created_at' => '2026-09-20 15:00:00']);
+
+        $codigos = fn (string $consulta) => array_column($this->getJson('/api/pedidos?'.$consulta)->assertOk()->json('data'), 'codigo_pedido');
+        $this->assertEqualsCanonicalizing(['PED-TESTE', 'PED-NOITE'], $codigos('data_inicio=2026-10-01&data_fim=2026-10-01'));
+        $this->assertSame([], $codigos('data_inicio=2026-10-02&data_fim=2026-10-05'));
+        $this->assertSame(['PED-ANTIGO'], $codigos('data_inicio=2026-09-01&data_fim=2026-09-30'));
+        $this->assertCount(3, $codigos(''));
+        // Período combina com os outros filtros.
+        $this->assertSame(['PED-NOITE'], $codigos('data_inicio=2026-10-01&data_fim=2026-10-01&busca=NOITE'));
+
+        $this->getJson('/api/pedidos?data_inicio=2026-10-05&data_fim=2026-10-01')->assertUnprocessable();
+        $this->getJson('/api/pedidos?data_inicio=2026-10-05')->assertUnprocessable();
+        $this->getJson('/api/pedidos?data_inicio=2025-01-01&data_fim=2026-10-01')->assertUnprocessable();
     }
 
     public function test_reenvio_do_pedido_nao_duplica_itens_cliente_ou_atendimento(): void

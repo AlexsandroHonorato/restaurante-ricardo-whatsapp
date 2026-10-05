@@ -23,7 +23,8 @@ export class HeaderComponent implements OnDestroy {
   private relogio = setInterval(() => this.agora.set(new Date()), 60000);
 
   constructor() {
-    this.transbordo.iniciar();
+    // Fila de atendimento humano (sino e contador do menu): só para quem vê Atendimentos.
+    if (this.auth.pode('atendimentos', 'ver')) this.transbordo.iniciar();
     this.api.getHorariosAtendimento().subscribe({ error: () => {} });
   }
 

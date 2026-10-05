@@ -1,8 +1,9 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { finalize } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { HorarioAtendimento } from '../../core/models/dashboard.model';
 import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
@@ -22,6 +23,8 @@ interface DiaEditavel extends HorarioAtendimento {
 export class ConfiguracoesComponent implements OnInit {
   private api = inject(ApiService);
   private confirmacao = inject(ConfirmacaoService);
+  private auth = inject(AuthService);
+  podeEditar = computed(() => this.auth.pode('horarios', 'editar'));
   private originais = new Map<number, string>();
   dias = signal<DiaEditavel[]>([]);
   carregando = signal(false);

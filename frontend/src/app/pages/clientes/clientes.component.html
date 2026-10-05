@@ -80,7 +80,7 @@
               >
                 <app-icon nome="atendimentos" /> Abrir Conversa
               </a>
-              @if (ehAdmin()) {
+              @if (podeExcluir()) {
                 <button
                   type="button"
                   class="btn btn-secondary btn-sm apagar-dados"

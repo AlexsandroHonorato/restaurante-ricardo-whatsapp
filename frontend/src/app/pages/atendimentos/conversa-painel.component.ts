@@ -4,6 +4,7 @@ import {
   ElementRef,
   OnInit,
   afterRenderEffect,
+  computed,
   inject,
   input,
   signal,
@@ -13,6 +14,7 @@ import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { API_BASE } from '../../core/services/session-state';
+import { AuthService } from '../../core/services/auth.service';
 
 interface MensagemConversa {
   id: number;
@@ -35,6 +37,9 @@ interface MensagemConversa {
 })
 export class ConversaPainelComponent implements OnInit {
   private http = inject(HttpClient);
+  /** Perfil sem "editar" em Atendimentos lê a conversa, mas não responde nem pausa o bot. */
+  private auth = inject(AuthService);
+  podeEditar = computed(() => this.auth.pode('atendimentos', 'editar'));
   telefone = input.required<string>();
   mensagens = signal<MensagemConversa[]>([]);
   pausadoAte = signal<string | null>(null);

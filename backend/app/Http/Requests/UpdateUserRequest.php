@@ -16,7 +16,7 @@ class UpdateUserRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->user()?->active && $this->user()?->role === 'admin';
+        return (bool) $this->user()?->active && $this->user()->pode('usuarios', 'editar');
     }
 
     public function rules(): array
@@ -26,6 +26,7 @@ class UpdateUserRequest extends FormRequest
             'email' => ['required', 'email:rfc', 'max:254', Rule::unique('users')->ignore((int) $this->route('id'))],
             'phone' => ['nullable', 'regex:/^[+0-9 ()-]{10,20}$/'],
             'role' => ['required', Rule::in(['admin', 'operador'])],
+            'perfil_id' => ['nullable', 'integer', Rule::exists('perfis', 'id')],
             'active' => ['required', 'boolean'],
             'password' => $this->filled('password') ? PasswordPolicy::rules() : ['nullable'],
         ];

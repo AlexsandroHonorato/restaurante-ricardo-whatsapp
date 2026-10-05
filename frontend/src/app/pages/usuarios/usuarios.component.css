@@ -8,6 +8,13 @@
 .user-list {
   padding: 24px;
 }
+/* Perfil sem permissão de cadastrar: só a lista, em largura total. */
+.user-form[hidden] {
+  display: none;
+}
+.user-form[hidden] + .user-list {
+  grid-column: 1 / -1;
+}
 h2 {
   display: flex;
   gap: 8px;

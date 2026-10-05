@@ -6,6 +6,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { vi } from 'vitest';
 import { CardapioComponent } from './cardapio.component';
 import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
+import { SessionState } from '../../core/services/session-state';
+import { signal } from '@angular/core';
 
 registerLocaleData(localePt, 'pt-BR');
 
@@ -39,6 +41,8 @@ function montar(cardapio: object | 'erro' = CARDAPIO) {
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      // Administrador: todas as ações do cardápio liberadas.
+      { provide: SessionState, useValue: { user: signal({ role: 'admin' }), csrf: signal('') } },
       // Modal de decisão confirma na hora.
       {
         provide: ConfirmacaoService,

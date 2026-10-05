@@ -10,9 +10,12 @@
 
   <!-- Navigation -->
   <nav class="nav-list">
-    <div class="nav-section-title">PRINCIPAL</div>
+    @if (auth.pode('pedidos', 'ver') || auth.pode('atendimentos', 'ver')) {
+      <div class="nav-section-title">PRINCIPAL</div>
+    }
 
     <a
+      [hidden]="!auth.pode('pedidos', 'ver')"
       routerLink="/pedidos"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -26,6 +29,7 @@
     </a>
 
     <a
+      [hidden]="!auth.pode('atendimentos', 'ver')"
       routerLink="/atendimentos"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -42,9 +46,12 @@
       }
     </a>
 
-    <div class="nav-section-title">CADASTROS</div>
+    @if (auth.pode('clientes', 'ver')) {
+      <div class="nav-section-title">CADASTROS</div>
+    }
 
     <a
+      [hidden]="!auth.pode('clientes', 'ver')"
       routerLink="/clientes"
       routerLinkActive="active"
       ariaCurrentWhenActive="page"
@@ -54,7 +61,7 @@
       <span class="nav-label">Clientes & LTV</span>
     </a>
 
-    @if (auth.user()?.role === 'admin') {
+    @if (temConfiguracoes()) {
       <div class="nav-section-title">ADMINISTRAÇÃO</div>
       <div class="config-menu">
         <button
@@ -69,6 +76,7 @@
         </button>
         <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
           <a
+            [hidden]="!auth.pode('dashboard', 'ver')"
             routerLink="/configuracoes/dashboard"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
@@ -76,6 +84,7 @@
             >Dashboard Geral</a
           >
           <a
+            [hidden]="!auth.pode('cardapio', 'ver')"
             routerLink="/configuracoes/cardapio"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
@@ -83,6 +92,7 @@
             >Cardápio & Preços</a
           >
           <a
+            [hidden]="!auth.pode('empresa', 'ver')"
             routerLink="/configuracoes/empresa"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
@@ -90,6 +100,7 @@
             >Dados da empresa</a
           >
           <a
+            [hidden]="!auth.pode('horarios', 'ver')"
             routerLink="/configuracoes/horarios"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
@@ -97,12 +108,22 @@
             >Horário de atendimento</a
           >
           <a
+            [hidden]="!auth.pode('usuarios', 'ver')"
             routerLink="/configuracoes/usuarios"
             routerLinkActive="active"
             ariaCurrentWhenActive="page"
             class="nav-item"
             >Usuários do sistema</a
           >
+          @if (auth.user()?.role === 'admin') {
+            <a
+              routerLink="/configuracoes/perfis"
+              routerLinkActive="active"
+              ariaCurrentWhenActive="page"
+              class="nav-item"
+              >Perfis de usuário</a
+            >
+          }
         </div>
       </div>
     }

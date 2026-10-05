@@ -37,8 +37,9 @@ const normalizar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g,
         (change)="perfil.set($any($event.target).value)"
       >
         <option value="">Todos os perfis</option>
-        <option value="admin">Administradores</option>
-        <option value="operador">Operadores</option>
+        @for (nome of perfisNaLista(); track nome) {
+          <option [value]="nome">{{ nome }}</option>
+        }
       </select>
       <select
         aria-label="Filtrar por status"
@@ -79,9 +80,7 @@ const normalizar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g,
               }
             </span>
             <span class="selos">
-              <span class="selo" [class.admin]="user.role === 'admin'">{{
-                user.role === 'admin' ? 'Administrador' : 'Operador'
-              }}</span>
+              <span class="selo" [class.admin]="user.role === 'admin'">{{ nomePerfil(user) }}</span>
               <span class="selo" [class.ativo]="user.active" [class.desligado]="!user.active">{{
                 user.active ? 'Ativo' : 'Inativo'
               }}</span>
@@ -91,25 +90,36 @@ const normalizar = (texto: string) => texto.normalize('NFD').replace(/[̀-ͯ]/g,
             </span>
           </div>
           <div class="acoes">
-            <button
-              type="button"
-              class="action-btn"
-              [attr.aria-label]="'Editar ' + user.name"
-              title="Editar"
-              (click)="editar.emit(user)"
-            >
-              <app-icon nome="editar" />
-            </button>
-            <button
-              type="button"
-              class="action-btn delete"
-              [attr.aria-label]="'Excluir ' + user.name"
-              [title]="user.id === meuId() ? 'Você não pode excluir a própria conta' : 'Excluir'"
-              [disabled]="user.id === meuId() || excluindoId() === user.id"
-              (click)="excluir.emit(user)"
-            >
-              <app-icon nome="excluir" />
-            </button>
+            @if (podeEditar()) {
+              <button
+                type="button"
+                class="action-btn"
+                [attr.aria-label]="'Editar ' + user.name"
+                [title]="protegido(user) ? 'Só um administrador altera esta conta' : 'Editar'"
+                [disabled]="protegido(user)"
+                (click)="editar.emit(user)"
+              >
+                <app-icon nome="editar" />
+              </button>
+            }
+            @if (podeExcluir()) {
+              <button
+                type="button"
+                class="action-btn delete"
+                [attr.aria-label]="'Excluir ' + user.name"
+                [title]="
+                  user.id === meuId()
+                    ? 'Você não pode excluir a própria conta'
+                    : protegido(user)
+                      ? 'Só um administrador exclui esta conta'
+                      : 'Excluir'
+                "
+                [disabled]="user.id === meuId() || protegido(user) || excluindoId() === user.id"
+                (click)="excluir.emit(user)"
+              >
+                <app-icon nome="excluir" />
+              </button>
+            }
           </div>
         </li>
       }
@@ -143,13 +153,17 @@ export class EquipeListaComponent {
   meuId = input<number | undefined>();
   editandoId = input<number | undefined>();
   excluindoId = input<number | null>(null);
+  /** Permissões de quem está vendo a lista. Conta de administrador só é alterada por outro administrador. */
+  souAdmin = input(true);
+  podeEditar = input(true);
+  podeExcluir = input(true);
   editar = output<SystemUser>();
   excluir = output<SystemUser>();
   mais = output<void>();
   recarregar = output<void>();
 
   busca = signal('');
-  perfil = signal<'' | SystemUser['role']>('');
+  perfil = signal('');
   status = signal<'' | 'ativo' | 'inativo'>('');
 
   admins = computed(() => this.usuarios().filter((u) => u.role === 'admin').length);
@@ -160,13 +174,27 @@ export class EquipeListaComponent {
     const digitos = busca.replace(/\D/g, '');
     return this.usuarios().filter(
       (u) =>
-        (!this.perfil() || u.role === this.perfil()) &&
+        (!this.perfil() || this.nomePerfil(u) === this.perfil()) &&
         (!this.status() || u.active === (this.status() === 'ativo')) &&
         (!busca ||
           normalizar(`${u.name} ${u.email}`).includes(busca) ||
           (!!digitos && (u.phone ?? '').replace(/\D/g, '').includes(digitos))),
     );
   });
+
+  perfisNaLista = computed(() =>
+    [...new Set(this.usuarios().map((u) => this.nomePerfil(u)))].sort((a, b) =>
+      a.localeCompare(b, 'pt-BR'),
+    ),
+  );
+
+  nomePerfil(user: SystemUser) {
+    return user.role === 'admin' ? 'Administrador' : (user.perfil?.nome ?? 'Operador');
+  }
+
+  protegido(user: SystemUser) {
+    return user.role === 'admin' && !this.souAdmin();
+  }
 
   iniciais(nome: string) {
     const partes = nome.trim().split(/\s+/);

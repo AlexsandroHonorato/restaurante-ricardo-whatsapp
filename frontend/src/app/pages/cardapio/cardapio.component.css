@@ -644,3 +644,9 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Botões fora da permissão do perfil. */
+.sem-editar .action-icon-btn.edit,
+.sem-excluir .action-icon-btn.delete {
+  display: none;
+}

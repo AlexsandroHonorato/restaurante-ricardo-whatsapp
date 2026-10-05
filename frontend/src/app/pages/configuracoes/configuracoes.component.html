@@ -80,7 +80,7 @@
               class="btn"
               [class.btn-primary]="alterado(dia)"
               [class.btn-secondary]="!alterado(dia)"
-              [disabled]="dia.salvando || !alterado(dia) || !!validacao(dia)"
+              [disabled]="dia.salvando || !alterado(dia) || !!validacao(dia) || !podeEditar()"
               [attr.aria-label]="'Salvar horário de ' + dia.nome_dia"
             >
               {{ dia.salvando ? 'Salvando...' : 'Salvar' }}

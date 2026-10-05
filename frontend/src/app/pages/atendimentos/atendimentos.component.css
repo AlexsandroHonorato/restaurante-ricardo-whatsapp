@@ -691,3 +691,10 @@
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/* Botões fora da permissão do perfil. */
+.sem-editar .handoff-actions button,
+.sem-editar .dispensar,
+.sem-excluir .excluir-conversa {
+  display: none;
+}

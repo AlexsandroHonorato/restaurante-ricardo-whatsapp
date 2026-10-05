@@ -22,19 +22,26 @@ const ANA: SystemUser = {
   phone: '5512997500045',
   role: 'operador',
   active: true,
+  perfil_id: 5,
+  perfil: { id: 5, nome: 'Cozinha' },
 };
 
 // Modal de decisão: nos testes confirma na hora e guarda o que foi perguntado.
 const pedir = vi.fn((_pedido: PedidoConfirmacao, aoConfirmar: () => void) => aoConfirmar());
 
-async function montar() {
+const PERFIS = [
+  { id: 1, nome: 'Operador', padrao: true },
+  { id: 5, nome: 'Cozinha', padrao: false },
+];
+
+async function montar(eu: SystemUser = EU) {
   pedir.mockClear();
   TestBed.configureTestingModule({
     imports: [UsuariosComponent],
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
-      { provide: SessionState, useValue: { user: signal(EU), csrf: signal('') } },
+      { provide: SessionState, useValue: { user: signal(eu), csrf: signal('') } },
       { provide: ConfirmacaoService, useValue: { pedir } },
     ],
   });
@@ -42,6 +49,7 @@ async function montar() {
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   http.expectOne(`${API_BASE}/usuarios?page=1`).flush({ data: { data: [EU, ANA], total: 2 } });
+  http.expectOne(`${API_BASE}/perfis`).flush({ perfis: PERFIS });
   fixture.detectChanges();
   await fixture.whenStable();
   return { fixture, http, el: fixture.nativeElement as HTMLElement };
@@ -85,7 +93,15 @@ describe('Usuários do sistema', () => {
     (el.querySelector('form button[type="submit"]') as HTMLButtonElement).click();
     expect(pedir.mock.calls[0][0].titulo).toBe('Salvar alterações?');
     const req = http.expectOne({ method: 'PUT', url: `${API_BASE}/usuarios/2` });
-    expect(req.request.body).toMatchObject({ name: 'Ana Souza', password: '', role: 'operador' });
+    // O campo Perfil vira role + perfil_id; "Cozinha" continua sendo o perfil dela.
+    expect(el.textContent).toContain('Cozinha');
+    expect(req.request.body).toMatchObject({
+      name: 'Ana Souza',
+      password: '',
+      role: 'operador',
+      perfil_id: 5,
+    });
+    expect(req.request.body.perfil).toBeUndefined();
     req.flush({ user: { ...ANA, name: 'Ana Souza' } });
     http.expectOne(`${API_BASE}/usuarios?page=1`).flush({ data: { data: [EU], total: 1 } });
     fixture.detectChanges();
@@ -100,7 +116,7 @@ describe('Usuários do sistema', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(campo(el, 'role').disabled).toBe(true);
+    expect(campo(el, 'perfil').disabled).toBe(true);
     expect(campo(el, 'active').disabled).toBe(true);
 
     botao(el, 'Excluir Ana Lima').click();
@@ -112,5 +128,23 @@ describe('Usuários do sistema', () => {
     expect(el.textContent).toContain('Usuário Ana Lima excluído.');
     expect(el.textContent).not.toContain('ana@x.com');
     http.verify();
+  });
+
+  it('perfil que só vê e edita: sem cadastro, sem excluir, sem tocar em administrador', async () => {
+    const gerente: SystemUser = {
+      ...ANA,
+      id: 3,
+      name: 'Gerente',
+      permissoes: { usuarios: ['ver', 'editar'] },
+    };
+    const { el } = await montar(gerente);
+    // Sem "criar": formulário de cadastro escondido. Sem "excluir": nenhum botão de excluir.
+    expect((el.querySelector('.user-form') as HTMLElement).hidden).toBe(true);
+    expect(botao(el, 'Excluir Ana Lima')).toBeNull();
+    // Conta de administrador só é alterada por outro administrador.
+    expect(botao(el, 'Editar Admin').disabled).toBe(true);
+    expect(botao(el, 'Editar Ana Lima').disabled).toBe(false);
+    // Quem não é administrador não pode conceder o perfil Administrador.
+    expect(el.querySelector('select[name="perfil"] option[value="admin"]')).toBeNull();
   });
 });

@@ -10,6 +10,7 @@ import { CommonModule } from '@angular/common';
 import { finalize } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 import { MascaraMoedaDirective } from '../../shared/ui/mascara-moeda.directive';
 import {
@@ -45,6 +46,11 @@ function indiceHoje(): number {
 export class CardapioComponent implements OnInit {
   api = inject(ApiService);
   private confirmacao = inject(ConfirmacaoService);
+  private auth = inject(AuthService);
+  podeCriar = computed(() => this.auth.pode('cardapio', 'criar'));
+  /** Editar inclui pausar/ativar o prato e mudar os dias. */
+  podeEditar = computed(() => this.auth.pode('cardapio', 'editar'));
+  podeExcluir = computed(() => this.auth.pode('cardapio', 'excluir'));
   diasSemana = DIAS_CARDAPIO;
   formDias = lerDiasCardapio('todos');
   nomeDias = nomeDiasCardapio;

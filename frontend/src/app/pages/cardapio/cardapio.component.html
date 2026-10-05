@@ -1,4 +1,4 @@
-<div class="cardapio-page">
+<div class="cardapio-page" [class.sem-editar]="!podeEditar()" [class.sem-excluir]="!podeExcluir()">
   <!-- Toast de Notificação -->
   @if (toastMensagem()) {
     <div class="toast-notification glass-card animate-fade-in">
@@ -20,9 +20,11 @@
     </div>
 
     <div class="header-actions">
-      <button class="btn btn-primary" (click)="abrirModalNovo()">
-        <app-icon nome="adicionar" /> Novo Prato / Item
-      </button>
+      @if (podeCriar()) {
+        <button class="btn btn-primary" (click)="abrirModalNovo()">
+          <app-icon nome="adicionar" /> Novo Prato / Item
+        </button>
+      }
       <button
         class="refresh-btn glass-card"
         (click)="carregarCardapio()"
@@ -161,7 +163,7 @@
                     [attr.aria-pressed]="lerDias(prod.dias_disponiveis).includes(dia.valor)"
                     [attr.aria-label]="prod.nome + ' — ' + dia.nome"
                     [title]="dia.nome + (diaFechado(i) ? ' (fechado)' : '')"
-                    [disabled]="ocupados().has(prod.id)"
+                    [disabled]="ocupados().has(prod.id) || !podeEditar()"
                     (click)="alternarDiaProduto(prod, dia.valor)"
                   >
                     {{ dia.nome.slice(0, 3) }}
@@ -187,7 +189,7 @@
                   class="btn btn-sm toggle-btn"
                   [class.btn-success]="prod.ativo"
                   [class.btn-secondary]="!prod.ativo"
-                  [disabled]="ocupados().has(prod.id)"
+                  [disabled]="ocupados().has(prod.id) || !podeEditar()"
                   (click)="toggleProduto(prod)"
                   title="Alternar disponibilidade no robô"
                 >

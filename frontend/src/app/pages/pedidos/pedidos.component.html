@@ -1,4 +1,4 @@
-<div class="pedidos-page">
+<div class="pedidos-page" [class.so-leitura]="!podeEditar()">
   <dialog
     #cancelamentoDialog
     class="cancelamento-dialog"
@@ -165,6 +165,49 @@
     </button>
   </div>
 
+  <!-- Período personalizado (mesmo campo da tela Operação do restaurante) -->
+  <div class="filtro-datas">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Período personalizado</mat-label>
+      <mat-date-range-input [formGroup]="datas" [rangePicker]="calendario">
+        <input
+          matStartDate
+          formControlName="inicio"
+          placeholder="Data inicial"
+          aria-label="Data inicial"
+        />
+        <input matEndDate formControlName="fim" placeholder="Data final" aria-label="Data final" />
+      </mat-date-range-input>
+      <mat-datepicker-toggle matIconSuffix [for]="calendario"></mat-datepicker-toggle>
+      <mat-date-range-picker
+        #calendario
+        panelClass="calendario-restaurante"
+      ></mat-date-range-picker>
+    </mat-form-field>
+    <button
+      class="btn btn-primary aplicar-datas"
+      type="button"
+      [disabled]="datas.invalid || !datas.value.inicio || !datas.value.fim"
+      (click)="aplicarDatas()"
+    >
+      Aplicar datas
+    </button>
+    @if (periodo() || datas.value.inicio || datas.value.fim) {
+      <button class="btn btn-secondary limpar-datas" type="button" (click)="limparDatas()">
+        Limpar período
+      </button>
+    }
+    @if (erroDatas()) {
+      <span role="alert" class="erro-datas">{{ erroDatas() }}</span>
+    }
+    @if (datas.invalid && datas.touched) {
+      <span role="alert" class="erro-datas"
+        >Informe datas válidas em DD/MM/AAAA, com o fim igual ou posterior ao início.</span
+      >
+    }
+    <span class="periodo-descricao">{{ rotuloPeriodo() }}</span>
+  </div>
+
   @if (erroLista()) {
     <div class="lista-erro" role="alert">
       <span>{{ erroLista() }}</span>
@@ -196,7 +239,19 @@
           [class.highlight]="pedido.status === 'em_preparo'"
           [class.in-delivery]="pedido.status === 'saiu_para_entrega'"
         >
-          <div class="order-card-header">
+          @if (podeExcluir()) {
+            <button
+              type="button"
+              class="excluir-pedido"
+              [disabled]="excluindoIds().has(pedido.id)"
+              (click)="excluirPedido(pedido)"
+              title="Excluir pedido"
+              [attr.aria-label]="'Excluir pedido ' + pedido.codigo_pedido"
+            >
+              <app-icon nome="excluir" />
+            </button>
+          }
+          <div class="order-card-header" [class.com-excluir]="podeExcluir()">
             <div class="order-id-group">
               <span class="order-code">{{ pedido.codigo_pedido }}</span>
               <span class="order-time">{{ pedido.created_at | date: 'HH:mm • dd/MM' }}</span>

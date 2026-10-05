@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { API_BASE } from '../../core/services/session-state';
+import { AuthService } from '../../core/services/auth.service';
 import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 import {
   MascaraTelefoneDirective,
@@ -31,6 +32,8 @@ interface FichaEmpresa {
 export class EmpresaComponent {
   private http = inject(HttpClient);
   private confirmacao = inject(ConfirmacaoService);
+  private auth = inject(AuthService);
+  podeEditar = computed(() => this.auth.pode('empresa', 'editar'));
   form: FichaEmpresa = {
     nome: '',
     tipo_negocio: 'restaurante',

@@ -88,3 +88,9 @@ time,
   font: inherit;
   resize: vertical;
 }
+
+/* Perfil só com "ver" em Atendimentos: lê a conversa, sem responder nem pausar o bot. */
+.so-leitura .resposta,
+.so-leitura .pausa {
+  display: none;
+}

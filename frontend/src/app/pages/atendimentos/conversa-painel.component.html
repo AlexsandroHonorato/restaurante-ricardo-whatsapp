@@ -1,4 +1,4 @@
-<div class="conversa">
+<div class="conversa" [class.so-leitura]="!podeEditar()">
   <div class="estado" [class.pausado]="pausadoAte()">
     <span>
       @if (pausadoAte()) {

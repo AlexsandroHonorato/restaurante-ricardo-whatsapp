@@ -80,6 +80,47 @@ describe('Lista de pedidos', () => {
     expect(c.pagina()).toBe(2);
   });
 
+  it('período personalizado: aplica as datas, volta à página 1 e "Limpar período" traz tudo de novo', () => {
+    const getPedidos = vi.fn((_s?: string, _b?: string, n = 1) => of(pagina(n, 3)));
+    const { f, c, el } = montar(getPedidos);
+    f.detectChanges();
+    expect(el.querySelector('.periodo-descricao')?.textContent).toContain('Todos os períodos');
+    expect(el.querySelector('.limpar-datas')).toBeNull();
+    c.irParaPagina(2);
+
+    c.datas.setValue({ inicio: new Date(2026, 9, 1), fim: new Date(2026, 9, 5) });
+    f.detectChanges();
+    (el.querySelector('.aplicar-datas') as HTMLButtonElement).click();
+    f.detectChanges();
+    expect(getPedidos).toHaveBeenLastCalledWith('', '', 1, {
+      inicio: '2026-10-01',
+      fim: '2026-10-05',
+    });
+    expect(el.querySelector('.periodo-descricao')?.textContent).toContain(
+      '01/10/2026 a 05/10/2026',
+    );
+    // O período continua valendo ao filtrar por status.
+    c.filtrarStatus('entregue');
+    expect(getPedidos).toHaveBeenLastCalledWith('entregue', '', 1, {
+      inicio: '2026-10-01',
+      fim: '2026-10-05',
+    });
+
+    f.detectChanges();
+    (el.querySelector('.limpar-datas') as HTMLButtonElement).click();
+    f.detectChanges();
+    expect(getPedidos).toHaveBeenLastCalledWith('entregue', '', 1);
+    expect(c.periodo()).toBeNull();
+
+    // Mais de 365 dias: avisa e não consulta.
+    const chamadas = getPedidos.mock.calls.length;
+    c.datas.setValue({ inicio: new Date(2025, 0, 1), fim: new Date(2026, 9, 5) });
+    c.aplicarDatas();
+    f.detectChanges();
+    expect(el.textContent).toContain('Selecione um intervalo de 1 a 365 dias.');
+    expect(getPedidos).toHaveBeenCalledTimes(chamadas);
+  });
+
   it('alterar status: trava clique duplo e mostra o motivo da recusa', () => {
     const resposta = new Subject<unknown>();
     const atualizar = vi.fn(() => resposta);

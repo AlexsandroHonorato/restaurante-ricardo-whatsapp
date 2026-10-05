@@ -3,6 +3,7 @@ import {
   ElementRef,
   ViewChild,
   DestroyRef,
+  computed,
   inject,
   signal,
   HostListener,
@@ -12,6 +13,7 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../shared/ui/icon.component';
 import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 
@@ -27,6 +29,9 @@ export class TransbordosModalComponent {
   transbordo = inject(TransbordoService);
   private api = inject(ApiService);
   private confirmacao = inject(ConfirmacaoService);
+  private auth = inject(AuthService);
+  podeEditar = computed(() => this.auth.pode('atendimentos', 'editar'));
+  podeExcluir = computed(() => this.auth.pode('atendimentos', 'excluir'));
   private destroyRef = inject(DestroyRef);
   enviando = signal(new Set<number>());
   erros = signal<Record<number, string>>({});

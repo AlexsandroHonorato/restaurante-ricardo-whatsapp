@@ -200,3 +200,9 @@ a:focus-visible {
     width: 100%;
   }
 }
+
+/* Botões fora da permissão do perfil. */
+.excluir-alerta[hidden],
+.pending-item .btn[hidden] {
+  display: none;
+}

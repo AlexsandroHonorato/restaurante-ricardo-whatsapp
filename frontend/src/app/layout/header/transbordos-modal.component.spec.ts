@@ -40,7 +40,17 @@ describe('Modal de transbordos', () => {
     const dialog = f.nativeElement.querySelector('dialog') as HTMLDialogElement;
     dialog.showModal = vi.fn(() => dialog.setAttribute('open', ''));
     dialog.close = vi.fn(() => dialog.removeAttribute('open'));
-    return { fila, f, c: f.componentInstance, dialog, enviar, resposta, assumir, ocultar, reexibir };
+    return {
+      fila,
+      f,
+      c: f.componentInstance,
+      dialog,
+      enviar,
+      resposta,
+      assumir,
+      ocultar,
+      reexibir,
+    };
   }
   it('abre dialog, fecha sem alterar fila e informa ausência de pendências', () => {
     const { fila, f, c, dialog, assumir } = preparar();

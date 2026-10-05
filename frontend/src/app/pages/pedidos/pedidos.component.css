@@ -277,7 +277,39 @@
   gap: 20px;
 }
 
+/* Ícone de excluir no canto superior direito do card. */
+.excluir-pedido {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+.excluir-pedido:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--danger-glow);
+}
+.excluir-pedido:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.excluir-pedido:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
+}
+.order-card-header.com-excluir {
+  padding-right: 22px;
+}
 .order-card {
+  position: relative;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -598,4 +630,32 @@
 .impressao-auto[aria-pressed='true'] {
   color: var(--success);
   background: var(--success-glow);
+}
+
+/* Perfil só com "ver" em Pedidos: sem botões de ação. */
+.so-leitura .order-actions button,
+.so-leitura .action-cell button,
+.so-leitura .impressao-auto {
+  display: none;
+}
+
+/* Período personalizado, como no Dashboard. */
+.filtro-datas {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.filtro-datas mat-form-field {
+  width: 310px;
+  max-width: 100%;
+}
+.erro-datas {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+.periodo-descricao {
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }

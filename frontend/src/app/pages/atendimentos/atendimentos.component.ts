@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angula
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService, ClienteSemResposta } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { Atendimento } from '../../core/models/dashboard.model';
@@ -18,6 +19,10 @@ import { ConversaPainelComponent } from './conversa-painel.component';
 export class AtendimentosComponent implements OnInit {
   api = inject(ApiService);
   private destroyRef = inject(DestroyRef);
+  private auth = inject(AuthService);
+  /** Editar: responder, saudar, pausar o bot e dispensar avisos. Excluir: alertas e conversas. */
+  podeEditar = computed(() => this.auth.pode('atendimentos', 'editar'));
+  podeExcluir = computed(() => this.auth.pode('atendimentos', 'excluir'));
   private rota = inject(ActivatedRoute);
   private router = inject(Router);
   atendimentos = signal<Atendimento[]>([]);
