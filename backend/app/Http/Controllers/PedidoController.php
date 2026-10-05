@@ -214,6 +214,18 @@ class PedidoController extends Controller
         ], $pedido->wasRecentlyCreated ? 201 : 200);
     }
 
+    /** Para o bot: total do pedido em montagem (preços do banco), informado ao cliente antes do pagamento. */
+    public function totalParaBot(Request $request): JsonResponse
+    {
+        $dados = $request->validate([
+            'itens' => 'required|array|min:1|max:100',
+            'itens.*.variacao_id' => 'required|integer|min:1',
+            'itens.*.quantidade' => 'required|integer|min:1|max:100',
+        ]);
+
+        return response()->json(app(PedidoService::class)->orcar($dados['itens']));
+    }
+
     public function consultaBot(Request $request): JsonResponse
     {
         $dados = $request->validate([

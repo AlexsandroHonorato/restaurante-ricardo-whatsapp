@@ -1,4 +1,14 @@
-import { Component, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { AuthService } from '../../core/services/auth.service';
+import { ConfirmacaoService } from '../../shared/ui/confirmacao.service';
 import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -67,6 +77,14 @@ interface MensagemAviso {
       } @else if (erro()) {
         <p class="estado" role="alert">{{ erro() }}</p>
       } @else {
+        @if (podeDispensar() && mensagens().length > 1) {
+          <div class="barra">
+            <span>{{ mensagens().length }} mensagens</span>
+            <button type="button" class="btn btn-secondary btn-sm todas" (click)="excluirTodas()">
+              <app-icon nome="excluir" /> Excluir todas
+            </button>
+          </div>
+        }
         <ul class="mensagens">
           @for (m of mensagens(); track m.id) {
             <li>
@@ -80,9 +98,23 @@ interface MensagemAviso {
                   <small>Motivo: {{ m.erro }}</small>
                 }
               </div>
-              <button type="button" class="btn btn-primary btn-sm" (click)="conversa(m.telefone)">
-                <app-icon nome="atendimentos" /> Abrir conversa
-              </button>
+              <div class="acoes-linha">
+                <button type="button" class="btn btn-primary btn-sm" (click)="conversa(m.telefone)">
+                  <app-icon nome="atendimentos" /> Abrir conversa
+                </button>
+                @if (podeDispensar()) {
+                  <button
+                    type="button"
+                    class="excluir"
+                    [disabled]="excluindo().has(m.id)"
+                    (click)="excluir(m)"
+                    title="Excluir do aviso"
+                    [attr.aria-label]="'Excluir do aviso a mensagem de ' + m.telefone"
+                  >
+                    <app-icon nome="excluir" />
+                  </button>
+                }
+              </div>
             </li>
           } @empty {
             <li class="estado">Nenhuma mensagem neste aviso agora.</li>
@@ -183,6 +215,41 @@ interface MensagemAviso {
       padding: 12px 0;
       border-bottom: 1px solid var(--border-color);
     }
+    .barra {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 20px 0;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .acoes-linha {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .excluir {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .excluir:hover:not(:disabled) {
+      color: var(--danger);
+      border-color: var(--danger);
+      background: var(--danger-glow);
+    }
+    .excluir:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
     .mensagens li:last-child {
       border-bottom: 0;
     }
@@ -221,6 +288,8 @@ interface MensagemAviso {
 export class AvisosSistemaComponent {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private auth = inject(AuthService);
+  private confirmacao = inject(ConfirmacaoService);
   private dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   problemas = signal<Problema[]>([]);
   aberto = signal<Problema | null>(null);
@@ -263,6 +332,57 @@ export class AvisosSistemaComponent {
 
   fechar() {
     this.dialog().nativeElement.close();
+  }
+
+  /** Dispensar mensagens de um aviso conta como "editar" em Atendimentos (a API confere). */
+  podeDispensar = computed(() => this.auth.pode('atendimentos', 'editar'));
+  excluindo = signal(new Set<number>());
+
+  /** Tira a mensagem do aviso: a equipe viu e decidiu não agir. A mensagem continua no histórico da conversa. */
+  excluir(m: MensagemAviso) {
+    const aviso = this.aberto();
+    if (!aviso || this.excluindo().has(m.id)) return;
+    this.confirmacao.pedir(
+      {
+        titulo: 'Excluir do aviso?',
+        mensagem: `A mensagem de ${m.telefone} sai deste aviso para toda a equipe. Ela continua no histórico da conversa.`,
+        confirmar: 'Excluir',
+        perigo: true,
+      },
+      () => this.dispensar(aviso, [m.id], `${API_BASE}/sistema/saude/${aviso.codigo}/${m.id}`),
+    );
+  }
+
+  excluirTodas() {
+    const aviso = this.aberto();
+    const ids = this.mensagens().map((m) => m.id);
+    if (!aviso || !ids.length) return;
+    this.confirmacao.pedir(
+      {
+        titulo: 'Excluir todas do aviso?',
+        mensagem: `As ${ids.length} mensagens saem deste aviso para toda a equipe. Elas continuam no histórico das conversas.`,
+        confirmar: 'Excluir todas',
+        perigo: true,
+      },
+      () => this.dispensar(aviso, ids, `${API_BASE}/sistema/saude/${aviso.codigo}`),
+    );
+  }
+
+  private dispensar(aviso: Problema, ids: number[], url: string) {
+    this.excluindo.update((atuais) => new Set([...atuais, ...ids]));
+    this.erro.set('');
+    this.http.delete(url).subscribe({
+      next: () => {
+        this.mensagens.update((lista) => lista.filter((m) => !ids.includes(m.id)));
+        this.excluindo.update((atuais) => new Set([...atuais].filter((id) => !ids.includes(id))));
+        this.consultar();
+        if (!this.mensagens().length) this.fechar();
+      },
+      error: () => {
+        this.excluindo.update((atuais) => new Set([...atuais].filter((id) => !ids.includes(id))));
+        this.erro.set('Não foi possível excluir do aviso. Tente novamente.');
+      },
+    });
   }
 
   conversa(telefone: string) {

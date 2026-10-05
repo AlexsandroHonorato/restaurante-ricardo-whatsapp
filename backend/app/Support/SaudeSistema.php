@@ -75,6 +75,26 @@ class SaudeSistema
      *
      * @return Collection<int, MensagemWhatsapp>|null
      */
+    /**
+     * A equipe viu e decidiu não agir: tira do aviso uma mensagem (ou todas, sem $id). Mensagem de cliente volta
+     * a ser histórico comum; envio que falhou ou está na fila é descartado e não será reenviado.
+     * Devolve quantas saíram; null quando o aviso não é sobre mensagens.
+     */
+    public static function dispensar(string $codigo, ?int $id = null): ?int
+    {
+        $consulta = self::mensagens($codigo);
+        if (! $consulta) {
+            return null;
+        }
+        // Busca os ids antes: o MySQL não atualiza a tabela usada na subconsulta do próprio filtro.
+        $ids = $consulta->when($id, fn (Builder $q) => $q->whereKey($id))->pluck('id');
+        $saida = in_array($codigo, ['envios_falharam', 'fila_atrasada'], true);
+
+        return MensagemWhatsapp::whereKey($ids)->update($saida
+            ? ['status' => 'descartada', 'proxima_tentativa_em' => null]
+            : ['status' => 'processada']);
+    }
+
     public static function detalhes(string $codigo): ?Collection
     {
         return self::mensagens($codigo)?->orderByDesc('id')->limit(50)->get(['id', 'direcao', 'telefone', 'texto', 'status', 'erro', 'created_at']);

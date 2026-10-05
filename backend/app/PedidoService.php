@@ -88,6 +88,25 @@ class PedidoService
         });
     }
 
+    /**
+     * Total do pedido antes de fechar, para o bot informar ao cliente na hora de escolher o pagamento.
+     * Mesmas regras do fechamento: preço do cardápio no banco, item ativo e servido hoje. Não grava nada.
+     *
+     * @return array{itens: list<array{nome: string, tamanho: string, quantidade: int, preco_unitario: float, subtotal: float}>, total: float}
+     */
+    public function orcar(array $itens): array
+    {
+        $resolvidos = $this->resolverItens($itens);
+
+        return [
+            'itens' => array_map(fn (array $item) => [
+                'nome' => $item['nome_snapshot'], 'tamanho' => $item['tamanho_snapshot'], 'quantidade' => $item['quantidade'],
+                'preco_unitario' => $item['preco_unitario'], 'subtotal' => $item['subtotal'],
+            ], $resolvidos),
+            'total' => array_sum(array_column($resolvidos, 'subtotal_centavos')) / 100,
+        ];
+    }
+
     /** PED-AAMMDD-NNN (data de São Paulo), sorteado e conferido no banco dentro da transação. */
     private function novoCodigo(): string
     {
