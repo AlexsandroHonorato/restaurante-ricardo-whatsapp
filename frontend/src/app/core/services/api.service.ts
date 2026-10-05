@@ -17,6 +17,14 @@ import {
   HorariosAtendimentoResponse,
 } from '../models/dashboard.model';
 
+/** Resposta paginada do Laravel (paginate). */
+export interface Paginado<T> {
+  data: T[];
+  current_page: number;
+  last_page: number;
+  total: number;
+}
+
 export interface PeriodoDashboard {
   inicio: string;
   fim: string;
@@ -131,32 +139,26 @@ export class ApiService {
     return this.http.get<{ data: Pedido[] }>(`${this.baseUrl}/pedidos?per_page=5`);
   }
 
-  getPedidos(status?: string, busca?: string): Observable<{ data: Pedido[] }> {
-    let params: string[] = [];
+  /** Falhas chegam à tela, que mostra o erro na própria lista sem apagar o que já estava carregado. */
+  getPedidos(status?: string, busca?: string, pagina = 1): Observable<Paginado<Pedido>> {
+    let params: string[] = [`page=${pagina}`];
     if (status) params.push(`status=${status}`);
     if (busca) params.push(`busca=${encodeURIComponent(busca)}`);
-    const qs = params.length ? `?${params.join('&')}` : '';
-
-    return this.http.get<{ data: Pedido[] }>(`${this.baseUrl}/pedidos${qs}`).pipe(
-      catchError(() => {
-        this.registrarFalha();
-        return EMPTY;
-      }),
-    );
+    return this.http.get<Paginado<Pedido>>(`${this.baseUrl}/pedidos?${params.join('&')}`);
   }
 
   updatePedidoStatus(id: number, status: string, motivo_cancelamento?: string): Observable<any> {
     return this.http.patch(`${this.baseUrl}/pedidos/${id}/status`, { status, motivo_cancelamento });
   }
 
-  getClientes(busca?: string): Observable<{ data: Cliente[] }> {
-    const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
-    return this.http.get<{ data: Cliente[] }>(`${this.baseUrl}/clientes${qs}`).pipe(
-      catchError(() => {
-        this.registrarFalha();
-        return EMPTY;
-      }),
-    );
+  /** LGPD: apaga os dados pessoais do cliente (somente administrador). */
+  anonimizarCliente(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.baseUrl}/clientes/${id}`);
+  }
+
+  getClientes(busca?: string, pagina = 1): Observable<Paginado<Cliente>> {
+    const qs = busca ? `&busca=${encodeURIComponent(busca)}` : '';
+    return this.http.get<Paginado<Cliente>>(`${this.baseUrl}/clientes?page=${pagina}${qs}`);
   }
 
   getCardapioConfiguracao(): Observable<CategoriaCardapio[]> {

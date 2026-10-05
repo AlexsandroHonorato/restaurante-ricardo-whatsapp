@@ -2,14 +2,19 @@
 
 use App\Http\Controllers\AtendimentoController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BotMensagemController;
 use App\Http\Controllers\CardapioController;
 use App\Http\Controllers\ClienteController;
+use App\Http\Controllers\ConversaController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HorarioAtendimentoController;
 use App\Http\Controllers\PedidoController;
+use App\Http\Controllers\SaudeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\ActiveUser;
+use App\Http\Middleware\AdminOnly;
 use App\Http\Middleware\BotAccess;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +26,13 @@ Route::middleware(BotAccess::class)->group(function () {
     Route::get('/cardapio/texto', [CardapioController::class, 'getTextoCardapio']);
     Route::post('/status-conversa/sync', [AtendimentoController::class, 'syncStatus']);
     Route::get('/bot/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
+    Route::post('/bot/mensagens/entrada', [BotMensagemController::class, 'registrarEntrada']);
+    Route::post('/bot/mensagens/saida', [BotMensagemController::class, 'criarSaida']);
+    Route::get('/bot/mensagens/pendentes', [BotMensagemController::class, 'pendentes']);
+    Route::patch('/bot/mensagens/{id}', [BotMensagemController::class, 'atualizar'])->whereNumber('id');
+    Route::get('/bot/conversas/{telefone}', [BotMensagemController::class, 'conversa']);
+    Route::get('/bot/empresa', [EmpresaController::class, 'paraBot']);
+    Route::get('/bot/conversas/{telefone}/pausa', [ConversaController::class, 'pausaParaBot']);
 });
 Route::middleware('web')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth');
@@ -32,6 +44,12 @@ Route::middleware('web')->group(function () {
         Route::get('/usuarios', [UserController::class, 'index']);
         Route::post('/usuarios', [UserController::class, 'store'])->middleware('throttle:30,1');
         Route::get('/horarios-atendimento', [HorarioAtendimentoController::class, 'index']);
+        Route::get('/sistema/saude', SaudeController::class);
+        Route::get('/empresa', [EmpresaController::class, 'show']);
+        Route::get('/conversas/{telefone}/mensagens', [ConversaController::class, 'mensagens']);
+        Route::post('/conversas/{telefone}/mensagens', [ConversaController::class, 'enviar'])->middleware('throttle:60,1');
+        Route::post('/conversas/{telefone}/pausa', [ConversaController::class, 'alterarPausa']);
+        Route::put('/empresa', [EmpresaController::class, 'update'])->middleware(AdminOnly::class);
         // Rotas do Dashboard
         Route::prefix('dashboard')->group(function () {
             Route::get('/analises', [DashboardController::class, 'getAnalises']);
@@ -49,6 +67,7 @@ Route::middleware('web')->group(function () {
 
             Route::get('/{id}', [PedidoController::class, 'show']);
             Route::patch('/{id}/status', [PedidoController::class, 'updateStatus']);
+            Route::post('/{id}/comanda', [PedidoController::class, 'registrarComanda'])->whereNumber('id');
         });
         Route::get('/status-pedidos', [PedidoController::class, 'getStatusCatalog']);
 
@@ -56,6 +75,7 @@ Route::middleware('web')->group(function () {
         Route::prefix('clientes')->group(function () {
             Route::get('/', [ClienteController::class, 'index']);
             Route::get('/{id}', [ClienteController::class, 'show']);
+            Route::delete('/{id}', [ClienteController::class, 'anonimizar'])->whereNumber('id')->middleware(AdminOnly::class);
         });
 
         // Rotas do Cardápio (CRUD Completo & Listagem Ativa para o Robô)
@@ -63,10 +83,10 @@ Route::middleware('web')->group(function () {
             Route::get('/', [CardapioController::class, 'index']);
             Route::get('/categorias', [CardapioController::class, 'getCategorias']);
 
-            Route::post('/produtos', [CardapioController::class, 'store']);
+            Route::post('/produtos', [CardapioController::class, 'store'])->middleware(AdminOnly::class);
             Route::get('/produtos/{id}', [CardapioController::class, 'show']);
-            Route::put('/produtos/{id}', [CardapioController::class, 'update']);
-            Route::delete('/produtos/{id}', [CardapioController::class, 'destroy']);
+            Route::put('/produtos/{id}', [CardapioController::class, 'update'])->middleware(AdminOnly::class);
+            Route::delete('/produtos/{id}', [CardapioController::class, 'destroy'])->middleware(AdminOnly::class);
             Route::patch('/produtos/{id}/toggle', [CardapioController::class, 'toggleProdutoStatus']);
         });
 
@@ -81,7 +101,7 @@ Route::middleware('web')->group(function () {
 
         });
 
-        Route::put('/horarios-atendimento/{dia}', [HorarioAtendimentoController::class, 'update'])->where('dia', '[1-7]');
+        Route::put('/horarios-atendimento/{dia}', [HorarioAtendimentoController::class, 'update'])->where('dia', '[1-7]')->middleware(AdminOnly::class);
 
     });
 });

@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { vi } from 'vitest';
 import { AtendimentosComponent } from './atendimentos.component';
 import { ApiService } from '../../core/services/api.service';
@@ -59,5 +61,36 @@ describe('Solicitação de atendimento humano', () => {
     const chamadas = consultar.mock.calls.length;
     await vi.advanceTimersByTimeAsync(10000);
     expect(consultar).toHaveBeenCalledTimes(chamadas);
+  });
+
+  it('abre a conversa no painel pelo card e fecha pelo botão', () => {
+    vi.useFakeTimers();
+    TestBed.configureTestingModule({
+      imports: [AtendimentosComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: ApiService,
+          useValue: {
+            getStatusConversas: () =>
+              of([{ id: 1, telefone: '5511999999999', status_atual: 'conversa_iniciada' }]),
+            getAtendimentos: () => of({ data: [] }),
+          },
+        },
+      ],
+    });
+    const fixture = TestBed.createComponent(AtendimentosComponent);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('.chat-footer button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const modal = el.querySelector('[role="dialog"]');
+    expect(modal?.textContent).toContain('Conversa com 5511999999999');
+    expect(modal?.querySelector('app-conversa-painel')).not.toBeNull();
+    (el.querySelector('[aria-label="Fechar conversa"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
+    fixture.destroy();
   });
 });

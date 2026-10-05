@@ -1,298 +1,402 @@
--- =============================================================================
--- BANCO DE DADOS: agente-watsapp (MySQL 8.0+)
--- Arquitetura relacional completa e otimizada para Dashboard e Operação
--- =============================================================================
+-- Estrutura do banco gerada das migrations Laravel por `php artisan botclient:exportar-schema`.
+-- NÃO edite à mão nem aplique em produção: o banco é criado com `php artisan migrate`.
 
-CREATE DATABASE IF NOT EXISTS `agente-watsapp`
-  DEFAULT CHARACTER SET utf8mb4
-  DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE `agente-watsapp`;
-
--- Desabilita checagem de chave estrangeira temporariamente para recriação limpa se necessário
-SET FOREIGN_KEY_CHECKS = 0;
-
--- -----------------------------------------------------------------------------
--- 1. TABELA: clientes
--- Armazena o perfil do cliente no WhatsApp e métricas de fidelidade (LTV)
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `clientes`;
-CREATE TABLE `clientes` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `telefone` VARCHAR(30) NOT NULL COMMENT 'Número no padrão WhatsApp (ex: 5512997500045)',
-  `nome` VARCHAR(150) NULL,
-  `primeiro_contato_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `ultimo_contato_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `total_pedidos` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Total histórico de pedidos concluídos',
-  `total_gasto` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'LTV (Lifetime Value) acumulado',
-  `ativo` TINYINT(1) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_clientes_telefone` (`telefone`),
-  INDEX `idx_clientes_nome` (`nome`),
-  INDEX `idx_clientes_total_pedidos` (`total_pedidos`),
-  INDEX `idx_clientes_total_gasto` (`total_gasto`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 2. TABELA: enderecos
--- Armazena histórico de endereços de entrega (Heatmap por bairro para o Dashboard)
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `enderecos`;
-CREATE TABLE `enderecos` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `cliente_id` BIGINT UNSIGNED NOT NULL,
-  `logradouro` VARCHAR(255) NOT NULL COMMENT 'Rua / Avenida / Travessa',
-  `numero` VARCHAR(30) NOT NULL,
-  `bairro` VARCHAR(100) NOT NULL COMMENT 'Utilizado para métricas de entrega por região',
-  `complemento` VARCHAR(100) NULL,
-  `ponto_referencia` VARCHAR(255) NULL,
-  `cep` VARCHAR(20) NULL,
-  `cidade` VARCHAR(100) NOT NULL DEFAULT 'Caraguatatuba',
-  `estado` VARCHAR(2) NOT NULL DEFAULT 'SP',
-  `padrao` TINYINT(1) NOT NULL DEFAULT 1,
-  `criado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `atualizado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  INDEX `idx_enderecos_cliente` (`cliente_id`),
-  INDEX `idx_enderecos_bairro` (`bairro`),
-  CONSTRAINT `fk_enderecos_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 3. TABELA: categorias
--- Categorias do cardápio (Pratos Diários, Pratos do Dia, Porções, Bebidas, etc.)
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `categorias`;
-CREATE TABLE `categorias` (
-  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `nome` VARCHAR(100) NOT NULL,
-  `slug` VARCHAR(100) NOT NULL,
-  `descricao` VARCHAR(255) NULL,
-  `ordem_exibicao` INT NOT NULL DEFAULT 0,
-  `ativo` TINYINT(1) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_categorias_slug` (`slug`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 4. TABELA: produtos
--- Catálogo mestre unificado de pratos, porções, adicionais e bebidas
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `produtos`;
-CREATE TABLE `produtos` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `categoria_id` INT UNSIGNED NOT NULL,
-  `tipo` ENUM('prato_executivo', 'prato_do_dia', 'porcao', 'adicional', 'bebida', 'cerveja') NOT NULL,
-  `nome` VARCHAR(150) NOT NULL,
-  `descricao` TEXT NULL,
-  `dias_disponiveis` VARCHAR(100) NOT NULL DEFAULT 'todos' COMMENT 'ex: todos | quarta,sabado | seg,ter,qui,sex',
-  `ativo` TINYINT(1) NOT NULL DEFAULT 1,
-  `criado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  INDEX `idx_produtos_categoria` (`categoria_id`),
-  INDEX `idx_produtos_tipo` (`tipo`),
-  INDEX `idx_produtos_ativo` (`ativo`),
-  CONSTRAINT `fk_produtos_categoria` FOREIGN KEY (`categoria_id`) REFERENCES `categorias` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 5. TABELA: produto_variacoes
--- Variações de tamanho e preço para cada produto (Infantil, Médio, Grande, 2L, Lata)
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `produto_variacoes`;
-CREATE TABLE `produto_variacoes` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `produto_id` BIGINT UNSIGNED NOT NULL,
-  `tamanho` VARCHAR(50) NOT NULL COMMENT 'ex: Infantil, Médio, Grande, Pequena, Lata, 2 Litros, Unidade',
-  `preco` DECIMAL(10,2) NOT NULL,
-  `codigo_sku` VARCHAR(50) NULL,
-  `ativo` TINYINT(1) NOT NULL DEFAULT 1,
-  PRIMARY KEY (`id`),
-  INDEX `idx_variacoes_produto` (`produto_id`),
-  CONSTRAINT `fk_variacoes_produto` FOREIGN KEY (`produto_id`) REFERENCES `produtos` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 5.1 TABELA: status_pedidos
--- Catálogo oficial de status operacionais dos pedidos com metadados e cores
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `status_pedidos`;
-CREATE TABLE `status_pedidos` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `codigo` VARCHAR(50) NOT NULL,
-  `nome` VARCHAR(100) NOT NULL,
-  `descricao` TEXT NULL,
-  `cor_badge` VARCHAR(20) NOT NULL DEFAULT '#6B7280',
-  `icone` VARCHAR(50) NULL,
-  `ordem` INT UNSIGNED NOT NULL DEFAULT 0,
-  `ativo` TINYINT(1) NOT NULL DEFAULT 1,
-  `created_at` TIMESTAMP NULL,
-  `updated_at` TIMESTAMP NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_status_pedidos_codigo` (`codigo`),
-  INDEX `idx_status_pedidos_ativo` (`ativo`),
-  INDEX `idx_status_pedidos_ordem` (`ordem`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 6. TABELA: pedidos
--- Registro central de pedidos delivery (Faturamento, Status, Prazos e Pagamento)
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `pedidos`;
-CREATE TABLE `pedidos` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `codigo_pedido` VARCHAR(30) NOT NULL COMMENT 'Código amigável gerado (ex: PED-021430-A1B)',
-  `cliente_id` BIGINT UNSIGNED NOT NULL,
-  `endereco_id` BIGINT UNSIGNED NULL,
-  `status` ENUM('pendente', 'confirmado', 'em_preparo', 'saiu_para_entrega', 'entregue', 'cancelado') NOT NULL DEFAULT 'pendente',
-  `forma_pagamento` ENUM('dinheiro', 'pix', 'cartao_credito', 'cartao_debito', 'outro') NOT NULL,
-  `valor_subtotal` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  `taxa_entrega` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  `valor_desconto` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  `valor_total` DECIMAL(10,2) NOT NULL,
-  `troco_para` DECIMAL(10,2) NULL COMMENT 'Valor informado pelo cliente para troco em dinheiro',
-  `valor_troco` DECIMAL(10,2) NULL COMMENT 'Troco calculado a ser devolvido',
-  `tempo_estimado_min` INT NOT NULL DEFAULT 50 COMMENT 'Tempo estimado informado (ex: 40-60 min)',
-  `observacoes` TEXT NULL,
-  `origem` VARCHAR(50) NOT NULL DEFAULT 'whatsapp_ia',
-  `criado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `preparado_em` DATETIME NULL,
-  `saiu_entrega_em` DATETIME NULL,
-  `entregue_em` DATETIME NULL,
-  `cancelado_em` DATETIME NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_pedidos_codigo` (`codigo_pedido`),
-  INDEX `idx_pedidos_cliente` (`cliente_id`),
-  INDEX `idx_pedidos_endereco` (`endereco_id`),
-  INDEX `idx_pedidos_status` (`status`),
-  INDEX `idx_pedidos_forma_pagamento` (`forma_pagamento`),
-  INDEX `idx_pedidos_criado_em` (`criado_em`),
-  CONSTRAINT `fk_pedidos_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
-  CONSTRAINT `fk_pedidos_endereco` FOREIGN KEY (`endereco_id`) REFERENCES `enderecos` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 7. TABELA: pedido_itens
--- Itens contratados em cada pedido (Snapshot histórico de nome e preço)
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `pedido_itens`;
-CREATE TABLE `pedido_itens` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `pedido_id` BIGINT UNSIGNED NOT NULL,
-  `produto_id` BIGINT UNSIGNED NULL COMMENT 'Pode ser nulo caso o produto do catálogo seja deletado futuramente',
-  `variacao_id` BIGINT UNSIGNED NULL,
-  `nome_snapshot` VARCHAR(150) NOT NULL COMMENT 'Nome no momento da venda',
-  `tamanho_snapshot` VARCHAR(50) NOT NULL COMMENT 'Tamanho no momento da venda',
-  `quantidade` INT UNSIGNED NOT NULL DEFAULT 1,
-  `preco_unitario` DECIMAL(10,2) NOT NULL,
-  `subtotal` DECIMAL(10,2) NOT NULL,
-  `observacao` VARCHAR(255) NULL COMMENT 'ex: Sem cebola, bife bem passado',
-  PRIMARY KEY (`id`),
-  INDEX `idx_pedido_itens_pedido` (`pedido_id`),
-  INDEX `idx_pedido_itens_produto` (`produto_id`),
-  CONSTRAINT `fk_pedido_itens_pedido` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_pedido_itens_produto` FOREIGN KEY (`produto_id`) REFERENCES `produtos` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_pedido_itens_variacao` FOREIGN KEY (`variacao_id`) REFERENCES `produto_variacoes` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 8. TABELA: pedido_item_adicionais
--- Adicionais / complementos associados a um prato específico
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `pedido_item_adicionais`;
-CREATE TABLE `pedido_item_adicionais` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `pedido_item_id` BIGINT UNSIGNED NOT NULL,
-  `produto_id` BIGINT UNSIGNED NULL,
-  `nome_snapshot` VARCHAR(150) NOT NULL COMMENT 'ex: Ovo Frito, Farofa, Mix de Legumes',
-  `quantidade` INT UNSIGNED NOT NULL DEFAULT 1,
-  `preco_unitario` DECIMAL(10,2) NOT NULL,
-  `subtotal` DECIMAL(10,2) NOT NULL,
-  PRIMARY KEY (`id`),
-  INDEX `idx_adicionais_item` (`pedido_item_id`),
-  CONSTRAINT `fk_adicionais_item` FOREIGN KEY (`pedido_item_id`) REFERENCES `pedido_itens` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_adicionais_produto` FOREIGN KEY (`produto_id`) REFERENCES `produtos` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- -----------------------------------------------------------------------------
--- 9. TABELA: atendimentos (Métricas de IA e Conversão no WhatsApp)
--- Essencial para o Dashboard: TMA, Taxa de Conversão da IA e Taxa de Transbordo
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `atendimentos`;
 CREATE TABLE `atendimentos` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `cliente_id` BIGINT UNSIGNED NOT NULL,
-  `pedido_id` BIGINT UNSIGNED NULL COMMENT 'Preenchido caso o atendimento resulte em pedido',
-  `inicio_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `fim_em` DATETIME NULL,
-  `duracao_segundos` INT UNSIGNED NULL,
-  `status` ENUM('em_andamento', 'finalizado_com_pedido', 'finalizado_sem_pedido', 'transbordo_humano', 'abandonado') NOT NULL DEFAULT 'em_andamento',
-  `total_mensagens_cliente` INT UNSIGNED NOT NULL DEFAULT 0,
-  `total_mensagens_bot` INT UNSIGNED NOT NULL DEFAULT 0,
-  `transbordo_humano` TINYINT(1) NOT NULL DEFAULT 0,
-  `motivo_transbordo` VARCHAR(255) NULL COMMENT 'ex: atraso_pedido, duvida_fora_cardapio, solicitacao_cliente',
-  `tokens_estimados` INT UNSIGNED NOT NULL DEFAULT 0,
-  `canal` VARCHAR(50) NOT NULL DEFAULT 'whatsapp',
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `cliente_id` bigint unsigned NOT NULL,
+  `pedido_id` bigint unsigned DEFAULT NULL,
+  `inicio_em` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `fim_em` timestamp NULL DEFAULT NULL,
+  `duracao_segundos` int unsigned DEFAULT NULL,
+  `status` enum('em_andamento','finalizado_com_pedido','finalizado_sem_pedido','transbordo_humano','abandonado') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'em_andamento',
+  `total_mensagens_cliente` int unsigned NOT NULL DEFAULT '0',
+  `total_mensagens_bot` int unsigned NOT NULL DEFAULT '0',
+  `transbordo_humano` tinyint(1) NOT NULL DEFAULT '0',
+  `motivo_transbordo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tokens_estimados` int unsigned NOT NULL DEFAULT '0',
+  `canal` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'whatsapp',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `etapa_abandono` varchar(80) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
-  INDEX `idx_atendimentos_cliente` (`cliente_id`),
-  INDEX `idx_atendimentos_pedido` (`pedido_id`),
-  INDEX `idx_atendimentos_status` (`status`),
-  INDEX `idx_atendimentos_inicio` (`inicio_em`),
-  INDEX `idx_atendimentos_transbordo` (`transbordo_humano`),
-  CONSTRAINT `fk_atendimentos_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`),
-  CONSTRAINT `fk_atendimentos_pedido` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE SET NULL
+  KEY `atendimentos_cliente_id_foreign` (`cliente_id`),
+  KEY `atendimentos_pedido_id_foreign` (`pedido_id`),
+  KEY `atendimentos_inicio_em_index` (`inicio_em`),
+  KEY `atendimentos_status_index` (`status`),
+  KEY `atendimentos_transbordo_humano_index` (`transbordo_humano`),
+  CONSTRAINT `atendimentos_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `atendimentos_pedido_id_foreign` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- -----------------------------------------------------------------------------
--- 10. TABELA: historico_status_pedidos (Auditoria & Lead Time da Cozinha/Entrega)
--- Permite ao Dashboard calcular Tempo de Preparo, Tempo de Entrega e Gargalos
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `historico_status_pedidos`;
+CREATE TABLE `cache` (
+  `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `value` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expiration` bigint NOT NULL,
+  PRIMARY KEY (`key`),
+  KEY `cache_expiration_index` (`expiration`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `cache_locks` (
+  `key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `owner` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expiration` bigint NOT NULL,
+  PRIMARY KEY (`key`),
+  KEY `cache_locks_expiration_index` (`expiration`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `categorias` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `nome` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `slug` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descricao` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ordem_exibicao` int NOT NULL DEFAULT '0',
+  `ativo` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `categorias_slug_unique` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `clientes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `telefone` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nome` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `primeiro_contato_em` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `ultimo_contato_em` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `total_pedidos` int unsigned NOT NULL DEFAULT '0',
+  `total_gasto` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `ativo` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `clientes_telefone_unique` (`telefone`),
+  KEY `clientes_nome_index` (`nome`),
+  KEY `clientes_total_pedidos_index` (`total_pedidos`),
+  KEY `clientes_total_gasto_index` (`total_gasto`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `empresa` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `nome` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tipo_negocio` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'restaurante',
+  `telefone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `telefone_2` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `endereco` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `quem_somos` text COLLATE utf8mb4_unicode_ci,
+  `formas_pagamento` text COLLATE utf8mb4_unicode_ci,
+  `politicas` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `enderecos` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `cliente_id` bigint unsigned NOT NULL,
+  `logradouro` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `numero` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `bairro` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `complemento` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ponto_referencia` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cep` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cidade` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Caraguatatuba',
+  `estado` varchar(2) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'SP',
+  `padrao` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `enderecos_cliente_id_foreign` (`cliente_id`),
+  KEY `enderecos_bairro_index` (`bairro`),
+  CONSTRAINT `enderecos_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `failed_jobs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `uuid` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `connection` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `queue` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payload` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `exception` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `failed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `failed_jobs_uuid_unique` (`uuid`),
+  KEY `failed_jobs_connection_queue_failed_at_index` (`connection`,`queue`,`failed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `historico_status_pedidos` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `pedido_id` BIGINT UNSIGNED NOT NULL,
-  `status_anterior` VARCHAR(50) NULL,
-  `status_novo` VARCHAR(50) NOT NULL,
-  `alterado_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `alterado_por` VARCHAR(100) NOT NULL DEFAULT 'ia_bot' COMMENT 'ex: ia_bot, cozinha_painel, motoboy_app, admin',
-  `observacao` VARCHAR(255) NULL,
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `pedido_id` bigint unsigned NOT NULL,
+  `status_anterior` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status_novo` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `alterado_em` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `alterado_por` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ia_bot',
+  `observacao` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  INDEX `idx_historico_pedido` (`pedido_id`),
-  INDEX `idx_historico_alterado_em` (`alterado_em`),
-  CONSTRAINT `fk_historico_pedido` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE
+  KEY `historico_status_pedidos_pedido_id_foreign` (`pedido_id`),
+  KEY `historico_status_pedidos_alterado_em_index` (`alterado_em`),
+  CONSTRAINT `historico_status_pedidos_pedido_id_foreign` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- -----------------------------------------------------------------------------
--- 11. TABELA: status_conversas (Estado Ativo da Conversa & Rascunho)
--- Armazena o estágio do atendimento no WhatsApp, rascunho de itens e expiração de 30min
--- -----------------------------------------------------------------------------
-DROP TABLE IF EXISTS `status_conversas`;
+CREATE TABLE `horarios_atendimento` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `dia_semana` tinyint unsigned NOT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT '0',
+  `hora_inicio` time DEFAULT NULL,
+  `hora_fim` time DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `horarios_atendimento_dia_semana_unique` (`dia_semana`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `job_batches` (
+  `id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `total_jobs` int NOT NULL,
+  `pending_jobs` int NOT NULL,
+  `failed_jobs` int NOT NULL,
+  `failed_job_ids` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `options` mediumtext COLLATE utf8mb4_unicode_ci,
+  `cancelled_at` int DEFAULT NULL,
+  `created_at` int NOT NULL,
+  `finished_at` int DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `jobs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `queue` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payload` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `attempts` smallint unsigned NOT NULL,
+  `reserved_at` int unsigned DEFAULT NULL,
+  `available_at` int unsigned NOT NULL,
+  `created_at` int unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `jobs_queue_index` (`queue`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `mensagens_whatsapp` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `direcao` varchar(8) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `telefone` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `wa_message_id` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `chave` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tipo` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'text',
+  `texto` text COLLATE utf8mb4_unicode_ci,
+  `status` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tentativas` smallint unsigned NOT NULL DEFAULT '0',
+  `proxima_tentativa_em` timestamp NULL DEFAULT NULL,
+  `erro` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `meta_message_id` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `processada_em` timestamp NULL DEFAULT NULL,
+  `enviada_em` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `enviada_por` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `mensagens_whatsapp_wa_message_id_unique` (`wa_message_id`),
+  UNIQUE KEY `mensagens_whatsapp_chave_unique` (`chave`),
+  KEY `mensagens_whatsapp_telefone_id_index` (`telefone`,`id`),
+  KEY `mensagens_whatsapp_direcao_status_proxima_tentativa_em_index` (`direcao`,`status`,`proxima_tentativa_em`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `migrations` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `migration` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `batch` int NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `password_reset_tokens` (
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `pedido_item_adicionais` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `pedido_item_id` bigint unsigned NOT NULL,
+  `produto_id` bigint unsigned DEFAULT NULL,
+  `nome_snapshot` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantidade` int unsigned NOT NULL DEFAULT '1',
+  `preco_unitario` decimal(10,2) NOT NULL,
+  `subtotal` decimal(10,2) NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `pedido_item_adicionais_pedido_item_id_foreign` (`pedido_item_id`),
+  KEY `pedido_item_adicionais_produto_id_foreign` (`produto_id`),
+  CONSTRAINT `pedido_item_adicionais_pedido_item_id_foreign` FOREIGN KEY (`pedido_item_id`) REFERENCES `pedido_itens` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pedido_item_adicionais_produto_id_foreign` FOREIGN KEY (`produto_id`) REFERENCES `produtos` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `pedido_itens` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `pedido_id` bigint unsigned NOT NULL,
+  `produto_id` bigint unsigned DEFAULT NULL,
+  `variacao_id` bigint unsigned DEFAULT NULL,
+  `nome_snapshot` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tamanho_snapshot` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantidade` int unsigned NOT NULL DEFAULT '1',
+  `preco_unitario` decimal(10,2) NOT NULL,
+  `subtotal` decimal(10,2) NOT NULL,
+  `observacao` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `pedido_itens_pedido_id_foreign` (`pedido_id`),
+  KEY `pedido_itens_produto_id_foreign` (`produto_id`),
+  KEY `pedido_itens_variacao_id_foreign` (`variacao_id`),
+  CONSTRAINT `pedido_itens_pedido_id_foreign` FOREIGN KEY (`pedido_id`) REFERENCES `pedidos` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `pedido_itens_produto_id_foreign` FOREIGN KEY (`produto_id`) REFERENCES `produtos` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `pedido_itens_variacao_id_foreign` FOREIGN KEY (`variacao_id`) REFERENCES `produto_variacoes` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `pedidos` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `codigo_pedido` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `chave_idempotencia` varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cliente_id` bigint unsigned NOT NULL,
+  `endereco_id` bigint unsigned DEFAULT NULL,
+  `status` enum('pendente','confirmado','em_preparo','saiu_para_entrega','entregue','cancelado') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pendente',
+  `forma_pagamento` enum('dinheiro','pix','cartao_credito','cartao_debito','outro') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `valor_subtotal` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `taxa_entrega` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `valor_desconto` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `valor_total` decimal(10,2) NOT NULL,
+  `troco_para` decimal(10,2) DEFAULT NULL,
+  `valor_troco` decimal(10,2) DEFAULT NULL,
+  `tempo_estimado_min` int NOT NULL DEFAULT '50',
+  `observacoes` text COLLATE utf8mb4_unicode_ci,
+  `origem` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'whatsapp_ia',
+  `preparado_em` timestamp NULL DEFAULT NULL,
+  `saiu_entrega_em` timestamp NULL DEFAULT NULL,
+  `entregue_em` timestamp NULL DEFAULT NULL,
+  `cancelado_em` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `motivo_cancelamento` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `comanda_impressa_em` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `pedidos_codigo_pedido_unique` (`codigo_pedido`),
+  UNIQUE KEY `pedidos_chave_idempotencia_unique` (`chave_idempotencia`),
+  KEY `pedidos_cliente_id_foreign` (`cliente_id`),
+  KEY `pedidos_endereco_id_foreign` (`endereco_id`),
+  KEY `pedidos_status_index` (`status`),
+  KEY `pedidos_forma_pagamento_index` (`forma_pagamento`),
+  CONSTRAINT `pedidos_cliente_id_foreign` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `pedidos_endereco_id_foreign` FOREIGN KEY (`endereco_id`) REFERENCES `enderecos` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `personal_access_tokens` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tokenable_type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tokenable_id` bigint unsigned NOT NULL,
+  `name` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `abilities` text COLLATE utf8mb4_unicode_ci,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `personal_access_tokens_token_unique` (`token`),
+  KEY `personal_access_tokens_tokenable_type_tokenable_id_index` (`tokenable_type`,`tokenable_id`),
+  KEY `personal_access_tokens_expires_at_index` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `produto_variacoes` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `produto_id` bigint unsigned NOT NULL,
+  `tamanho` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `preco` decimal(10,2) NOT NULL,
+  `codigo_sku` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ativo` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `produto_variacoes_produto_id_foreign` (`produto_id`),
+  CONSTRAINT `produto_variacoes_produto_id_foreign` FOREIGN KEY (`produto_id`) REFERENCES `produtos` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `produtos` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `categoria_id` bigint unsigned NOT NULL,
+  `tipo` enum('prato_executivo','prato_do_dia','porcao','adicional','bebida','cerveja') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nome` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descricao` text COLLATE utf8mb4_unicode_ci,
+  `dias_disponiveis` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'todos',
+  `ativo` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `produtos_categoria_id_foreign` (`categoria_id`),
+  KEY `produtos_tipo_index` (`tipo`),
+  KEY `produtos_ativo_index` (`ativo`),
+  CONSTRAINT `produtos_categoria_id_foreign` FOREIGN KEY (`categoria_id`) REFERENCES `categorias` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `sessions` (
+  `id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint unsigned DEFAULT NULL,
+  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` text COLLATE utf8mb4_unicode_ci,
+  `payload` longtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_activity` int NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `sessions_user_id_index` (`user_id`),
+  KEY `sessions_last_activity_index` (`last_activity`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `status_conversas` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `telefone` VARCHAR(30) NOT NULL,
-  `status_atual` VARCHAR(50) NOT NULL DEFAULT 'conversa_iniciada',
-  `status_anterior` VARCHAR(50) NULL,
-  `rascunho` JSON NULL,
-  `ultimo_contato_em` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `expira_em` DATETIME NULL,
-  `created_at` TIMESTAMP NULL,
-  `updated_at` TIMESTAMP NULL,
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `telefone` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status_atual` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'conversa_iniciada',
+  `status_anterior` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rascunho` json DEFAULT NULL,
+  `ultimo_contato_em` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `expira_em` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `contato_iniciado_em` timestamp NULL DEFAULT NULL,
+  `bot_pausado_ate` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_status_telefone` (`telefone`),
-  INDEX `idx_status_conversas_status` (`status_atual`)
+  UNIQUE KEY `status_conversas_telefone_unique` (`telefone`),
+  KEY `status_conversas_status_atual_index` (`status_atual`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-SET FOREIGN_KEY_CHECKS = 1;
-
--- Configuração semanal: 1 = segunda-feira, 7 = domingo (America/Sao_Paulo).
-CREATE TABLE IF NOT EXISTS `horarios_atendimento` (
-  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `dia_semana` TINYINT UNSIGNED NOT NULL,
-  `ativo` TINYINT(1) NOT NULL DEFAULT 0,
-  `hora_inicio` TIME NULL,
-  `hora_fim` TIME NULL,
-  `created_at` TIMESTAMP NULL,
-  `updated_at` TIMESTAMP NULL,
+CREATE TABLE `status_pedidos` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `codigo` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nome` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descricao` text COLLATE utf8mb4_unicode_ci,
+  `cor_badge` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '#6B7280',
+  `icone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ordem` int unsigned NOT NULL DEFAULT '0',
+  `ativo` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_horarios_dia_semana` (`dia_semana`)
+  UNIQUE KEY `status_pedidos_codigo_unique` (`codigo`),
+  KEY `status_pedidos_ativo_index` (`ativo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `users` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email_verified_at` timestamp NULL DEFAULT NULL,
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `remember_token` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'operador',
+  `active` tinyint(1) NOT NULL DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `users_email_unique` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\SaudeSistema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -21,12 +22,16 @@ class HealthController extends Controller
         }
 
         $manifesto = json_decode((string) @file_get_contents(base_path('version.json')), true);
+        // Monitores externos (UptimeRobot) também detectam o bot fora do ar por aqui.
+        $bot = SaudeSistema::botNoAr() ? 'ok' : 'error';
+        $saudavel = $banco === 'ok' && $bot === 'ok';
 
         return response()->json([
             'application' => 'BotClient',
-            'status' => $banco === 'ok' ? 'healthy' : 'unhealthy',
+            'status' => $saudavel ? 'healthy' : 'unhealthy',
             'database' => $banco,
+            'bot' => $bot,
             'version' => is_array($manifesto) && is_string($manifesto['commit'] ?? null) ? $manifesto['commit'] : 'dev',
-        ], $banco === 'ok' ? 200 : 503)->header('Cache-Control', 'no-store, private');
+        ], $saudavel ? 200 : 503)->header('Cache-Control', 'no-store, private');
     }
 }

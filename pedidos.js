@@ -1,48 +1,6 @@
 import { cabecalhosApiBot } from './lib/api-bot.js';
-// pedidos.js: Gerenciamento, persistência, consulta na tabela de pedidos e formatação de comandas
-import { converterValor, validarItensTotal } from './lib/pedido.js';
-export { converterValor } from './lib/pedido.js';
-import { fileURLToPath } from 'node:url';
-import { randomInt } from 'node:crypto';
+// pedidos.js: registro e consulta de pedidos pela API (MySQL é a única tabela de pedidos) e formatação de comandas.
 import { EMPRESA } from './lib/empresa.js';
-import { lerJson, gravarJson } from './lib/persistencia.js';
-
-const ARQ_PEDIDOS = process.env.ARQ_PEDIDOS || fileURLToPath(new URL('./pedidos.json', import.meta.url));
-
-export const carregarPedidos = () => lerJson(ARQ_PEDIDOS);
-export const salvarPedidos = (dados) => gravarJson(ARQ_PEDIDOS, dados);
-
-// A data completa evita reaproveitar o código de outro mês (a API trata código repetido como o mesmo pedido).
-export function gerarIdPedido(agora = new Date(), usados = new Set(Object.keys(carregarPedidos()))) {
-  const data = new Intl.DateTimeFormat('en-CA', { timeZone: process.env.FUSO || 'America/Sao_Paulo', year: '2-digit', month: '2-digit', day: '2-digit' })
-    .format(agora).replaceAll('-', '');
-  const inicio = randomInt(900);
-  for (let passo = 0; passo < 900; passo++) {
-    const id = `PED-${data}-${100 + (inicio + passo) % 900}`; // ex: PED-261004-742
-    if (!usados.has(id)) return id;
-  }
-  throw new Error('Números de pedido do dia esgotados');
-}
-
-/**
- * Consulta um pedido específico diretamente na tabela de pedidos por ID
- */
-export function obterPedidoPorId(id) {
-  const pedidos = carregarPedidos();
-  if (!id) return null;
-  return pedidos[String(id).trim()] || null;
-}
-
-/**
- * Consulta o último pedido registrado para um determinado telefone
- */
-export function obterUltimoPedidoPorTelefone(telefone) {
-  const pedidos = carregarPedidos();
-  if (!telefone) return null;
-  const telLimpo = String(telefone).replace(/\D/g, '');
-  const encontrados = Object.values(pedidos).filter((p) => p.telefone && String(p.telefone).replace(/\D/g, '').replace(/^00/, '') === telLimpo);
-  return encontrados.sort((a, b) => new Date(b.dataHora) - new Date(a.dataHora))[0] || null;
-}
 
 /**
  * Formata a mensagem oficial de confirmação do pedido consultado na tabela para envio direto ao cliente
@@ -89,61 +47,74 @@ export function formatarMensagemStatusCliente(pedido) {
     `Qualquer dúvida estamos à disposição! 😊`;
 }
 
-/**
- * Registra o pedido na tabela, consulta o registro oficial, gera a comanda para a cozinha
- * e gera a mensagem oficial para o cliente.
- */
-export async function registrarPedido({ id, telefone, nome, itens, endereco, formaPagamento, trocoPara, total, observacoes }) {
-  if (typeof telefone !== 'string' || !/^\d{10,15}$/.test(telefone) || !nome?.trim() || !endereco?.trim() || !formaPagamento?.trim() || !Array.isArray(itens) || !itens.length || itens.some(i => typeof i !== 'string' || !i.trim())) throw new Error('Pedido incompleto ou inválido');
-  if (nome.length > 150 || endereco.length > 255 || itens.length > 100) throw new Error('Pedido excede os limites permitidos');
-  validarItensTotal(itens, total);
-  const valor = converterValor(total);
-  if (valor < 25 && !/retirada|balc[aã]o/i.test(endereco)) throw new Error('Pedido mínimo para entrega: R$ 25,00');
-  if (valor <= 0) throw new Error('Total do pedido inválido');
-  if (trocoPara && converterValor(trocoPara) < valor) throw new Error('O valor para troco não cobre o pedido');
-  const pedidos = carregarPedidos();
-  const novoId = id || gerarIdPedido(new Date(), new Set(Object.keys(pedidos)));
+const reais = valor => Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  if (pedidos[novoId]) throw new Error('Número do pedido já registrado');
+/** Grava na API, que busca preço/disponibilidade pelo código e calcula total, troco e mínimo de entrega. */
+async function gravarNaApi(corpo) {
+  let resposta;
+  try {
+    resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos`, {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { ...cabecalhosApiBot(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    });
+  } catch (erro) {
+    console.error('API de pedidos inacessível:', erro.message);
+    resposta = null;
+  }
+  const dados = resposta ? await resposta.json().catch(() => ({})) : {};
+  if (resposta?.status === 422) {
+    // Motivo legível (item pausado, fora do dia, mínimo, troco) para a IA explicar ao cliente.
+    throw new Error(Object.values(dados.errors || {}).flat()[0] || dados.message || 'Pedido recusado pelo sistema.');
+  }
+  if (!resposta?.ok || !dados.pedido) {
+    throw new Error('Sistema de pedidos indisponível no momento; o pedido NÃO foi registrado. Oriente o cliente a ligar para a loja.');
+  }
+  return dados.pedido;
+}
+
+/**
+ * Registra o pedido pela API (fonte de verdade de preços), guarda cópia local para consultas,
+ * gera a comanda para a cozinha e a mensagem oficial para o cliente.
+ * Cada item é { codigo, quantidade }: o código "[cod N]" de um tamanho no cardápio.
+ */
+export async function registrarPedido({ telefone, nome, itens, endereco, formaPagamento, trocoPara, observacoes, chave }) {
+  const itemValido = i => i && Number.isInteger(i.codigo) && i.codigo > 0 && Number.isInteger(i.quantidade) && i.quantidade >= 1 && i.quantidade <= 100;
+  if (typeof telefone !== 'string' || !/^\d{10,15}$/.test(telefone) || !nome?.trim() || !endereco?.trim() || !formaPagamento?.trim() || !Array.isArray(itens) || !itens.length || !itens.every(itemValido)) {
+    throw new Error('Pedido incompleto: informe nome, endereço, pagamento e cada item com o código [cod N] do cardápio e a quantidade.');
+  }
+  if (nome.length > 150 || endereco.length > 255 || itens.length > 100) throw new Error('Pedido excede os limites permitidos');
+  // O servidor gera o código do pedido; a chave (id da mensagem) impede pedido em dobro se ela for reprocessada.
+  const remoto = await gravarNaApi({
+    telefone, nome: nome.trim(), endereco: endereco.trim(), formaPagamento,
+    trocoPara: trocoPara || null, observacoes: observacoes || null, chave_idempotencia: chave || null,
+    itens: itens.map(i => ({ variacao_id: i.codigo, quantidade: i.quantidade })),
+  });
   const pedido = {
-    id: novoId,
-    dataHora: new Date().toISOString(),
+    id: remoto.codigo_pedido,
+    dataHora: remoto.created_at,
     status: 'Em preparo',
-    sincronizado: false,
     telefone,
-    nome: nome || 'Cliente',
-    itens: itens || [],
-    endereco: endereco || 'Retirada no balcão',
-    formaPagamento: formaPagamento || 'A combinar',
-    trocoPara: trocoPara || null,
-    total: total || 'A calcular',
+    nome: remoto.cliente?.nome || nome,
+    itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, tamanho: i.tamanho_snapshot, qtd: i.quantidade, preco: reais(i.preco_unitario) })),
+    endereco: remoto.endereco?.logradouro || endereco,
+    formaPagamento,
+    trocoPara: remoto.troco_para ? reais(remoto.troco_para) : null,
+    total: `R$ ${reais(remoto.valor_total)}`,
     observacoes: observacoes || '',
   };
 
-  // Salva no banco de pedidos
-  pedidos[novoId] = pedido;
-  salvarPedidos(pedidos);
-
-  await sincronizarPedido(pedido);
-
-  // Consulta o pedido diretamente da tabela para garantir consistência
-  const pedidoConsultado = obterPedidoPorId(novoId) || pedido;
-
-  // Imprime a comanda térmica para a cozinha
-  const comanda = formatarComanda(pedidoConsultado);
-  imprimirComanda(comanda);
-
-  // Gera a mensagem direta para a tela do cliente a partir da tabela
-  const mensagemCliente = formatarMensagemConfirmacaoCliente(pedidoConsultado);
+  // A impressão física sai pelo painel da cozinha (Pedidos → Comanda / impressão automática).
+  const comanda = formatarComanda(pedido);
 
   return {
     ok: true,
-    id: novoId,
-    status: pedidoConsultado.status,
+    id: pedido.id,
+    status: pedido.status,
     tempoEstimado: '40 a 60 minutos',
     comanda,
-    mensagemCliente,
-    pedido: pedidoConsultado,
+    mensagemCliente: formatarMensagemConfirmacaoCliente(pedido),
+    pedido,
   };
 }
 
@@ -154,24 +125,23 @@ export async function consultarStatusPedido(idOuTelefone, telefoneCliente) {
   if (!idOuTelefone) return { erro: 'Informe o número do pedido ou seu telefone.' };
 
   const idLimpo = String(idOuTelefone).trim();
-  let pedido = obterPedidoPorId(idLimpo);
-
-  if (!pedido) {
-    pedido = obterUltimoPedidoPorTelefone(idLimpo);
+  let pedido = null;
+  try {
+    // Sempre filtrado pelo telefone de quem pergunta: ninguém consulta pedido de outra pessoa.
+    const parametros = new URLSearchParams({ telefone: telefoneCliente });
+    if (/^PED-/i.test(idLimpo)) parametros.set('codigo_pedido', idLimpo);
+    const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos/consulta/bot?${parametros}`, { headers: cabecalhosApiBot(), signal: AbortSignal.timeout(5000) });
+    if (!resposta.ok && resposta.status !== 404) throw new Error(`API retornou ${resposta.status}`);
+    const remoto = resposta.ok ? (await resposta.json()).pedido : null;
+    if (remoto) pedido = { id: remoto.codigo_pedido, telefone: remoto.cliente.telefone, nome: remoto.cliente.nome, status: remoto.status, dataHora: remoto.created_at, endereco: remoto.endereco?.logradouro || 'Retirada no balcão', total: `R$ ${reais(remoto.valor_total)}`, itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, qtd: i.quantidade, tamanho: i.tamanho_snapshot, preco: reais(i.preco_unitario) })) };
+  } catch (erro) {
+    console.warn('Consulta de pedido indisponível:', erro.message);
+    return {
+      aviso: 'Não foi possível consultar a tabela de pedidos agora.',
+      mensagemStatus: `Desculpe, não consegui consultar seu pedido agora. 🙏\nTente de novo em alguns minutos ou ligue para ${EMPRESA.telefone}.`,
+    };
   }
-
-  if (telefoneCliente) {
-    try {
-      const parametros = new URLSearchParams({ telefone: telefoneCliente });
-      if (/^PED-/i.test(idLimpo)) parametros.set('codigo_pedido', idLimpo);
-      const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos/consulta/bot?${parametros}`, { headers: cabecalhosApiBot(), signal: AbortSignal.timeout(5000) });
-      if (resposta.ok) {
-        const { pedido: remoto } = await resposta.json();
-        if (remoto) pedido = { id: remoto.codigo_pedido, telefone: remoto.cliente.telefone, nome: remoto.cliente.nome, status: remoto.status, dataHora: remoto.created_at, endereco: remoto.endereco?.logradouro || 'Retirada no balcão', total: `R$ ${remoto.valor_total}`, itens: remoto.itens.map(i => ({ nome: i.nome_snapshot, qtd: i.quantidade, tamanho: i.tamanho_snapshot, preco: i.preco_unitario })) };
-      } else if (resposta.status === 404) { pedido = null; }
-    } catch (erro) { console.warn('Consulta usando registro local:', erro.message); }
-  }
-  if (pedido && telefoneCliente && String(pedido.telefone).replace(/\D/g, '') !== String(telefoneCliente).replace(/\D/g, '')) pedido = null;
+  if (pedido && String(pedido.telefone).replace(/\D/g, '') !== String(telefoneCliente).replace(/\D/g, '')) pedido = null;
 
   if (pedido) {
     const mensagemStatus = formatarMensagemStatusCliente(pedido);
@@ -219,46 +189,4 @@ PAGAMENTO: ${pedido.formaPagamento}${pedido.trocoPara ? ` (Troco para R$ ${pedid
 TOTAL:     ${pedido.total}
 ${pedido.observacoes ? `OBS:       ${pedido.observacoes}\n` : ''}${linha}
 `;
-}
-
-export function imprimirComanda(textoComanda) {
-  console.log(`\n🖨️ [IMPRESSORA DE PEDIDOS / COZINHA]\n${textoComanda}\n`);
-}
-
-
-async function sincronizarPedido(pedido) {
-  try {
-    const resposta = await fetch(`${process.env.API_BASE_URL || 'http://127.0.0.1:8080/api'}/pedidos`, {
-      method: 'POST', signal: AbortSignal.timeout(5000),
-      headers: { ...cabecalhosApiBot(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...pedido, codigo_pedido: pedido.id }),
-    });
-    if (!resposta.ok) throw new Error(`API de pedidos retornou ${resposta.status}`);
-    const atuais = carregarPedidos();
-    if (atuais[pedido.id]) {
-      atuais[pedido.id].sincronizado = true;
-      delete atuais[pedido.id].erroSincronizacao;
-      salvarPedidos(atuais);
-    }
-    return true;
-  } catch (erro) {
-    const atuais = carregarPedidos();
-    if (atuais[pedido.id]) {
-      atuais[pedido.id].erroSincronizacao = erro.message;
-      salvarPedidos(atuais);
-    }
-    console.error('Pedido salvo localmente; sincronização pendente:', pedido.id, erro.message);
-    return false;
-  }
-}
-
-let sincronizacaoEmCurso = null;
-export function sincronizarPedidosPendentes() {
-  if (sincronizacaoEmCurso) return sincronizacaoEmCurso;
-  sincronizacaoEmCurso = (async () => {
-    for (const pedido of Object.values(carregarPedidos())) {
-      if (pedido.sincronizado === false) await sincronizarPedido(pedido);
-    }
-  })().finally(() => { sincronizacaoEmCurso = null; });
-  return sincronizacaoEmCurso;
 }

@@ -25,6 +25,7 @@ ask port 'Porta do SSH' '22022'
 ask domain 'Endereço do painel desta empresa' "$slug.botclient.propoclient.com.br"
 [[ "$domain" =~ ^[a-z0-9]([a-z0-9-]*\.)+[a-z]{2,}$ ]] || fail 'endereço inválido.'
 ask admin_email 'E-mail do responsável técnico (avisos do certificado)' 'administrador@propoclient.com.br'
+ask alerta_email 'E-mail que recebe alertas (bot fora do ar, token da Meta, mensagens sem envio)' "$admin_email"
 ask bot_port 'Porta interna do bot (uma diferente por empresa, 3100-9999)' '3101'
 ask empresa_nome 'Nome da empresa (aparece nas mensagens do WhatsApp)'
 ask empresa_tel 'Telefone principal de contato da empresa' ''
@@ -59,6 +60,7 @@ cat > "$temporary/empresa.env" <<EOF
 SLUG=$slug
 DOMAIN=$domain
 ADMIN_EMAIL=$admin_email
+ALERTA_EMAIL=$alerta_email
 BOT_PORT=$bot_port
 EMPRESA_NOME=$empresa_nome
 EMPRESA_TELEFONE=$empresa_tel

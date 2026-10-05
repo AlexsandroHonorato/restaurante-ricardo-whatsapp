@@ -17,7 +17,7 @@ https://<empresa>.botclient.propoclient.com.br
    current -> releases/<SHA>
    shared/.env            configuração da API (preservada entre versões)
    shared/storage/        uploads e logs do Laravel
-   shared/bot/            bot.env, negocio.md, memoria.json, pedidos.json, conversas.log
+   shared/bot/            bot.env, negocio.md, conversas.log (conversas, mensagens e pedidos ficam no MySQL)
    shared/backups/        banco + uploads + dados do bot antes de cada publicação (10 mais recentes)
 ```
 
@@ -125,7 +125,17 @@ Workflow: `.github/workflows/producao.yml`.
 4. Em **Settings → Secrets and variables → Actions → Variables** (do repositório): `EMPRESAS` = `["familiaricardo"]`. A partir daí cada merge em `main` publica.
 5. Recomendado: **Settings → Rules** protegendo `main` (exigir PR com aprovação).
 
-## 5. Publicar à mão, voltar versão, diagnosticar
+## 5. Monitoramento e alertas
+
+Três camadas, para nada cair sem alguém saber:
+
+1. **Monitor externo (configure uma vez, grátis):** em <https://uptimerobot.com> crie um monitor **Keyword** para `https://<empresa>.botclient.propoclient.com.br/api/health`, palavra-chave `healthy`, intervalo de 5 minutos, com alerta no app do celular/e-mail. Ele avisa se a VPS, a API, o banco **ou o bot** pararem (o health responde 503 e `"bot":"error"` quando o bot não responde).
+2. **E-mail automático:** a cada 5 minutos o servidor verifica bot fora do ar, token da Meta recusado (expirado), mensagens que não puderam ser enviadas, fila de reenvio atrasada e clientes sem resposta. Um conjunto novo de problemas gera **um** e-mail para `ALERTA_EMAIL` (perguntado no `nova-empresa.sh`; fica em `shared/.env`). Enviado pelo Postfix local da VPS, remetente `noreply@propoclient.com.br`.
+3. **Painel:** os mesmos problemas aparecem numa faixa vermelha no topo de todas as telas, atualizada a cada minuto.
+
+O WhatsApp não é usado para alertas porque o problema mais comum (token expirado) derruba justamente ele.
+
+## 6. Publicar à mão, voltar versão, diagnosticar
 
 ```bash
 # Publicar o commit atual numa empresa, sem o Actions
@@ -152,7 +162,7 @@ Saúde: `https://<empresa>.botclient.propoclient.com.br/api/health` deve mostrar
 
 **Nenhum script desfaz migrations nem restaura banco automaticamente.** Restaurar um backup é decisão manual (`shared/backups/<data>-<SHA>/database.sql.gz`, `uploads.tar.gz`, `bot.tar.gz`) e pode perder o que foi gravado depois dele.
 
-## 6. Arquivos
+## 7. Arquivos
 
 | Arquivo | Papel |
 |---|---|
@@ -168,7 +178,7 @@ Saúde: `https://<empresa>.botclient.propoclient.com.br/api/health` deve mostrar
 | `deploy/cyberpanel/publicar.sh` | publicação manual (seu computador) |
 | `deploy/tests/` | testes dos scripts (rodam no CI em Linux) |
 
-## 7. O que já foi verificado e o que falta
+## 8. O que já foi verificado e o que falta
 
 Verificado localmente (04/10/2026):
 

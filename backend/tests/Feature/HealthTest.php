@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class HealthTest extends TestCase
@@ -16,6 +17,12 @@ class HealthTest extends TestCase
         parent::tearDown();
     }
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::fake(['127.0.0.1:3000/*' => Http::response('agente no ar')]);
+    }
+
     public function test_health_publico_informa_versao_publicada_e_banco(): void
     {
         File::put(base_path('version.json'), json_encode(['application' => 'BotClient', 'commit' => str_repeat('a', 40)]));
@@ -26,6 +33,7 @@ class HealthTest extends TestCase
                 'application' => 'BotClient',
                 'status' => 'healthy',
                 'database' => 'ok',
+                'bot' => 'ok',
                 'version' => str_repeat('a', 40),
             ])
             ->assertHeader('Cache-Control', 'no-store, private');

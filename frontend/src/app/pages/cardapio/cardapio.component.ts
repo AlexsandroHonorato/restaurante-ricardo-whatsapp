@@ -5,11 +5,12 @@ import {
   gravarDiasCardapio,
   nomeDiasCardapio,
 } from '../../core/models/dias-cardapio';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { finalize } from 'rxjs';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { CategoriaCardapio, ProdutoCardapio } from '../../core/models/dashboard.model';
 
 interface VariacaoForm {
@@ -26,6 +27,9 @@ interface VariacaoForm {
 })
 export class CardapioComponent implements OnInit {
   api = inject(ApiService);
+  // Operador só pausa/ativa pratos; criar, editar preço e excluir são do administrador (API também bloqueia).
+  private auth = inject(AuthService);
+  ehAdmin = computed(() => this.auth.user()?.role === 'admin');
   diasSemana = DIAS_CARDAPIO;
   formDias = lerDiasCardapio('todos');
   nomeDias = nomeDiasCardapio;

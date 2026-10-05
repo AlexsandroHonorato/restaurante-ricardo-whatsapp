@@ -26,6 +26,10 @@ class PedidoController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->boolean('sem_comanda')) {
+            $query->whereNull('comanda_impressa_em')->whereIn('status', ['pendente', 'confirmado', 'em_preparo']);
+        }
+
         if ($request->filled('busca')) {
             $busca = $request->busca;
             $query->where(function ($q) use ($busca) {
@@ -50,6 +54,18 @@ class PedidoController extends Controller
         $pedido = Pedido::with(['cliente', 'endereco', 'itens.adicionais', 'historicoStatus', 'atendimento'])->findOrFail($id);
 
         return response()->json($pedido);
+    }
+
+    /**
+     * Registra a impressão da comanda. "primeira" só é true para quem marcou primeiro: a impressão
+     * automática imprime apenas nesse caso, então dois aparelhos na cozinha não imprimem em dobro.
+     */
+    public function registrarComanda($id): JsonResponse
+    {
+        Pedido::findOrFail($id);
+        $marcados = Pedido::whereKey($id)->whereNull('comanda_impressa_em')->update(['comanda_impressa_em' => now()]);
+
+        return response()->json(['primeira' => $marcados === 1]);
     }
 
     /**
@@ -115,7 +131,9 @@ class PedidoController extends Controller
                 if ($notificacaoEnviada) {
                     $mensagemNotificacao = $mensagem;
                 } else {
-                    $erroNotificacao = 'O serviço não confirmou o envio.';
+                    $erroNotificacao = $resposta->json('pendente') === true
+                        ? 'Notificação na fila: o WhatsApp não respondeu e ela será reenviada automaticamente.'
+                        : 'O serviço não confirmou o envio.';
                 }
             } catch (\Throwable $e) {
                 Log::warning('Falha na notificação de despacho', ['pedido_id' => $pedido->id, 'erro' => $e->getMessage()]);
@@ -139,16 +157,18 @@ class PedidoController extends Controller
     public function store(Request $request)
     {
         $dados = $request->validate([
-            'codigo_pedido' => 'required|string|max:30',
+            'codigo_pedido' => 'nullable|string|max:30',
+            'chave_idempotencia' => 'nullable|string|max:150',
             'telefone' => ['required', 'regex:/^\d{10,15}$/'],
             'nome' => 'required|string|max:150',
             'endereco' => 'required|string|max:255',
             'bairro' => 'nullable|string|max:100',
-            'formaPagamento' => 'required|string',
-            'total' => 'required',
+            'formaPagamento' => 'required|string|max:50',
             'trocoPara' => 'nullable',
             'taxa_entrega' => 'nullable',
             'itens' => 'required|array|min:1|max:100',
+            'itens.*.variacao_id' => 'required|integer|min:1',
+            'itens.*.quantidade' => 'required|integer|min:1|max:100',
             'observacoes' => 'nullable|string|max:2000',
         ]);
         $pedido = app(PedidoService::class)->registrar($dados);

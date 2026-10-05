@@ -586,3 +586,8 @@
   margin-bottom: 12px;
   display: block;
 }
+
+.impressao-auto[aria-pressed='true'] {
+  color: var(--success);
+  background: var(--success-glow);
+}

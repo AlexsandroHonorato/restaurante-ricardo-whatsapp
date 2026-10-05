@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Atendimento;
 use App\Models\Cliente;
+use App\Models\Empresa;
 use App\Models\StatusConversa;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -148,7 +149,7 @@ class AtendimentoController extends Controller
                         ->withToken(config('services.bot.token') ?? '')
                         ->post(config('services.bot.url').'/api/notificar', [
                             'para' => $conversa->telefone,
-                            'texto' => 'Olá! Sou da equipe do '.config('services.empresa.nome').'. Como posso ajudar você?',
+                            'texto' => 'Olá! Sou da equipe do '.Empresa::nomeExibicao().'. Como posso ajudar você?',
                             'idempotency_key' => $chave,
                         ])->throw();
                     if ($resposta->json('ok') !== true) {
@@ -170,7 +171,14 @@ class AtendimentoController extends Controller
 
     public function getStatusConversas()
     {
-        $status = StatusConversa::orderBy('ultimo_contato_em', 'DESC')->get();
+        // Monitor ao vivo (o painel consulta a cada 5 s): só as conversas das últimas 24 h e os transbordos
+        // ainda sem contato, estes primeiro para nunca ficarem de fora do limite.
+        $status = StatusConversa::where('ultimo_contato_em', '>=', now()->subDay())
+            ->orWhere(fn ($q) => $q->where('status_atual', 'transbordo_humano')->whereNull('contato_iniciado_em'))
+            ->orderByRaw("CASE WHEN status_atual = 'transbordo_humano' AND contato_iniciado_em IS NULL THEN 0 ELSE 1 END")
+            ->orderBy('ultimo_contato_em', 'DESC')
+            ->limit(200)
+            ->get();
 
         return response()->json($status);
     }

@@ -5,11 +5,12 @@ import { ApiService } from '../../core/services/api.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TransbordoService } from '../../core/services/transbordo.service';
 import { Atendimento } from '../../core/models/dashboard.model';
+import { ConversaPainelComponent } from './conversa-painel.component';
 
 @Component({
   selector: 'app-atendimentos',
   standalone: true,
-  imports: [IconComponent, CommonModule],
+  imports: [IconComponent, CommonModule, ConversaPainelComponent],
   templateUrl: './atendimentos.component.html',
   styleUrls: ['../../shared/ui/page-actions.css', './atendimentos.component.css'],
 })
@@ -21,6 +22,15 @@ export class AtendimentosComponent implements OnInit {
   statusConversas = this.transbordo.conversas;
   filtroTransbordo = signal<boolean | undefined>(undefined);
   modoVisao = signal<'cards' | 'lista'>('cards');
+  conversaAberta = signal<string | null>(null);
+
+  abrirConversa(telefone: string) {
+    this.conversaAberta.set(telefone);
+  }
+
+  fecharConversa() {
+    this.conversaAberta.set(null);
+  }
 
   enviandoContato = signal(new Set<number>());
   contatosEnviados = signal(new Set<number>());

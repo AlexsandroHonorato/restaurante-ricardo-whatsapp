@@ -1,0 +1,61 @@
+<div class="conversa">
+  <div class="estado" [class.pausado]="pausadoAte()">
+    <span>
+      @if (pausadoAte()) {
+        Bot pausado nesta conversa até {{ pausadoAte() | date: 'HH:mm' }} — a equipe está atendendo.
+      } @else {
+        Bot respondendo esta conversa.
+      }
+    </span>
+    <button
+      type="button"
+      class="btn btn-secondary btn-sm pausa"
+      [disabled]="alterandoPausa()"
+      (click)="alternarPausa()"
+    >
+      {{ pausadoAte() ? 'Devolver ao bot' : 'Pausar bot' }}
+    </button>
+  </div>
+
+  <ol class="historico" aria-label="Mensagens da conversa">
+    @for (m of mensagens(); track m.id) {
+      <li class="balao" [class.cliente]="m.direcao === 'entrada'" [class.equipe]="m.enviada_por">
+        <span class="autor">{{
+          m.direcao === 'entrada' ? 'Cliente' : m.enviada_por || 'Bot'
+        }}</span>
+        <p>{{ m.texto }}</p>
+        <time [attr.datetime]="m.created_at">{{ m.created_at | date: 'dd/MM HH:mm' }}</time>
+        @if (m.status === 'pendente' || m.status === 'falhou') {
+          <span class="falha">{{
+            m.status === 'falhou' ? 'não enviada' : 'na fila de envio'
+          }}</span>
+        }
+      </li>
+    } @empty {
+      <li class="vazio">Nenhuma mensagem registrada ainda.</li>
+    }
+  </ol>
+
+  @if (erro()) {
+    <p class="erro" role="alert">{{ erro() }}</p>
+  }
+  <form class="resposta" (ngSubmit)="enviar()">
+    <label class="ds-sr-only" for="resposta-equipe">Resposta da equipe</label>
+    <textarea
+      id="resposta-equipe"
+      name="texto"
+      rows="2"
+      maxlength="4096"
+      [(ngModel)]="texto"
+      placeholder="Escreva a resposta… (ao enviar, o bot pausa nesta conversa)"
+    ></textarea>
+    <button
+      class="btn btn-primary"
+      type="submit"
+      [disabled]="enviando() || !texto.trim()"
+      [attr.aria-busy]="enviando()"
+    >
+      {{ enviando() ? 'Enviando…' : 'Enviar' }}
+    </button>
+  </form>
+</div>

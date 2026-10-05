@@ -3,7 +3,8 @@
     <div>
       <h1 class="page-title">Monitor de Atendimentos & Status da IA</h1>
       <p class="page-subtitle">
-        Acompanhe as conversas em tempo real, estágios da máquina de estados e transbordo humano
+        Conversas das últimas 24 horas em tempo real, estágios da máquina de estados e transbordo
+        humano
       </p>
     </div>
 
@@ -168,12 +169,20 @@
 
           <!-- Botões de Ação -->
           <div class="chat-footer">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm full"
+              (click)="abrirConversa(s.telefone)"
+            >
+              <app-icon nome="atendimentos" /> Conversar pelo painel
+            </button>
             <a
               [href]="'https://wa.me/' + s.telefone"
               target="_blank"
-              class="btn btn-primary btn-sm full"
+              rel="noopener noreferrer"
+              class="btn btn-secondary btn-sm full"
             >
-              <app-icon nome="atendimentos" /> Abrir Conversa no WhatsApp
+              Abrir no WhatsApp
             </a>
           </div>
         </div>
@@ -257,12 +266,20 @@
                 <span class="expire-badge">{{ s.expira_em | date: 'HH:mm:ss' }}</span>
               </td>
               <td>
+                <button
+                  type="button"
+                  class="btn btn-primary btn-xs flex-btn"
+                  (click)="abrirConversa(s.telefone)"
+                >
+                  <app-icon nome="atendimentos" /> Conversar
+                </button>
                 <a
                   [href]="'https://wa.me/' + s.telefone"
                   target="_blank"
-                  class="btn btn-primary btn-xs flex-btn"
+                  rel="noopener noreferrer"
+                  class="btn btn-secondary btn-xs flex-btn"
                 >
-                  <app-icon nome="atendimentos" /> Abrir WhatsApp
+                  WhatsApp
                 </a>
               </td>
             </tr>
@@ -278,6 +295,32 @@
           }
         </tbody>
       </table>
+    </div>
+  }
+
+  @if (conversaAberta(); as telefone) {
+    <div class="conversa-overlay" (click)="fecharConversa()">
+      <section
+        class="conversa-modal glass-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="conversa-titulo"
+        (click)="$event.stopPropagation()"
+        (keydown.escape)="fecharConversa()"
+      >
+        <header class="conversa-topo">
+          <h2 id="conversa-titulo">Conversa com {{ telefone }}</h2>
+          <button
+            type="button"
+            class="handoff-close"
+            (click)="fecharConversa()"
+            aria-label="Fechar conversa"
+          >
+            <app-icon nome="fechar" />
+          </button>
+        </header>
+        <app-conversa-painel [telefone]="telefone" />
+      </section>
     </div>
   }
 </div>

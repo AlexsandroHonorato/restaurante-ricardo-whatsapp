@@ -47,6 +47,8 @@ jobs:
           cp .env.example .env
           php artisan key:generate --no-interaction
           php artisan test --compact
+      - name: Ponta a ponta (WhatsApp -> bot -> API -> painel)
+        run: npm run test:e2e
       - name: Scripts de deploy
         run: |
           for script in deploy/*.sh deploy/cyberpanel/*.sh; do bash -n "$script"; done

@@ -78,35 +78,44 @@
         ><app-icon nome="clientes" /><span class="nav-label">Usuários do sistema</span></a
       >
     }
-    <div class="nav-section-title">ADMINISTRAÇÃO</div>
-    <div class="config-menu">
-      <button
-        type="button"
-        class="nav-item config-toggle"
-        (click)="configuracoesAbertas = !configuracoesAbertas"
-        [attr.aria-expanded]="configuracoesAbertas"
-        aria-controls="submenu-configuracoes"
-      >
-        <app-icon nome="configuracoes" /><span class="nav-label">Configurações</span
-        ><span class="chevron" aria-hidden="true">{{ configuracoesAbertas ? '⌄' : '›' }}</span>
-      </button>
-      <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
-        <a
-          routerLink="/configuracoes/horarios"
-          routerLinkActive="active"
-          ariaCurrentWhenActive="page"
-          class="nav-item"
-          >Horário de atendimento</a
+    @if (auth.user()?.role === 'admin') {
+      <div class="nav-section-title">ADMINISTRAÇÃO</div>
+      <div class="config-menu">
+        <button
+          type="button"
+          class="nav-item config-toggle"
+          (click)="configuracoesAbertas = !configuracoesAbertas"
+          [attr.aria-expanded]="configuracoesAbertas"
+          aria-controls="submenu-configuracoes"
         >
-        <a
-          routerLink="/configuracoes/pratos-semana"
-          routerLinkActive="active"
-          ariaCurrentWhenActive="page"
-          class="nav-item"
-          >Pratos por dia da semana</a
-        >
+          <app-icon nome="configuracoes" /><span class="nav-label">Configurações</span
+          ><span class="chevron" aria-hidden="true">{{ configuracoesAbertas ? '⌄' : '›' }}</span>
+        </button>
+        <div id="submenu-configuracoes" class="submenu" [hidden]="!configuracoesAbertas">
+          <a
+            routerLink="/configuracoes/empresa"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Dados da empresa</a
+          >
+          <a
+            routerLink="/configuracoes/horarios"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Horário de atendimento</a
+          >
+          <a
+            routerLink="/configuracoes/pratos-semana"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            class="nav-item"
+            >Pratos por dia da semana</a
+          >
+        </div>
       </div>
-    </div>
+    }
   </nav>
 
   <!-- Bot Status Card -->

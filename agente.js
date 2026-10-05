@@ -4,15 +4,20 @@ import { createServer } from 'node:http';
 import { assinaturaValida, notificacaoAutorizada } from './lib/webhook.js';
 import { EMPRESA } from './lib/empresa.js';
 import { criarFilaPorChave } from './lib/fila.js';
-import { sincronizarPedidosPendentes } from './pedidos.js';
 import { criarMensageiro } from './lib/mensageiro.js';
 import { criarNotificador } from './lib/notificacoes.js';
+import { criarCaixaPostal } from './lib/caixa-postal.js';
+import { apiBot } from './lib/api-bot.js';
 import { responderNaFila } from './cerebro.js';
 
 
 const PORTA = Number(process.env.PORTA || 3000);
-const GRAPH = `https://graph.facebook.com/${process.env.GRAPH_VERSAO || 'v25.0'}`;
+// GRAPH_URL só é trocado no teste ponta a ponta (tests/e2e), que simula a Meta localmente.
+const GRAPH = process.env.GRAPH_URL || `https://graph.facebook.com/${process.env.GRAPH_VERSAO || 'v25.0'}`;
 const { WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET } = process.env;
+
+process.on('uncaughtException', (erro) => console.error('🚨 [ERRO NÃO TRATADO NO PROCESSO]:', erro));
+process.on('unhandledRejection', (motivo) => console.error('🚨 [PROMISE REJEITADA NÃO TRATADA]:', motivo));
 
 for (const k of ['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_VERIFY_TOKEN']) {
   if (!process.env[k]) console.warn(`⚠ falta ${k} no .env`);
@@ -42,70 +47,42 @@ async function graph(corpo) {
   return data;
 }
 const mensageiro = criarMensageiro(graph);
-const enviarTexto = mensageiro.enviar;
-// marca como lida na Meta Cloud API
 
-
-
-// ---------------------------------------------------------------- segurança: a URL é pública, então confira quem mandou
-// ---------------------------------------------------------------- mensagens: sem duplicar (idempotência rigorosa)
+// ---------------------------------------------------------------- mensagens duráveis (tabela mensagens_whatsapp)
+// Toda entrada é gravada antes de responder 200 à Meta e toda saída antes de enviar: reinício ou falha não perde nada.
+const caixa = criarCaixaPostal({ api: apiBot, responder: responderNaFila, enviarTexto: mensageiro.enviar });
 const enfileirarMensagem = criarFilaPorChave();
-const tratar = msg => enfileirarMensagem(msg?.from, () => processarMensagem(msg)).catch(erro => console.error('Falha no processamento:', erro.message));
+// Uma mensagem por vez por telefone, na ordem de chegada.
+const tratar = entrada => enfileirarMensagem(entrada.telefone, async () => {
+  await mensageiro.digitando(entrada.telefone);
+  await caixa.processar(entrada);
+}).catch(erro => console.error(JSON.stringify({ evento: 'processamento_falhou', mensagem: entrada.id, erro: erro.message })));
 
-// Cache de deduplicação com expiração automática
-const mensagensTratadas = new Map(); // id -> timestamp
-const ultimasMensagensTexto = new Map(); // `${tel}:${texto}` -> timestamp
-
-function jaProcessada(msg) {
-  if (!msg || typeof msg.id !== 'string' || typeof msg.from !== 'string') return true;
+// Retransmissão dupla da rede (mesmo texto do mesmo telefone em até 3s, com IDs diferentes) é descartada.
+const ultimasMensagensTexto = new Map();
+function repetidaPelaRede(msg) {
+  if (msg.type !== 'text' || typeof msg.text?.body !== 'string') return false;
   const agora = Date.now();
-
-  // Limpa entradas com mais de 10 minutos
-  if (mensagensTratadas.size > 2000) {
-    for (const [id, tempo] of mensagensTratadas.entries()) {
-      if (agora - tempo > 600000) mensagensTratadas.delete(id);
-    }
-  }
   if (ultimasMensagensTexto.size > 2000) {
-    for (const [chave, tempo] of ultimasMensagensTexto.entries()) {
-      if (agora - tempo > 10000) ultimasMensagensTexto.delete(chave);
-    }
+    for (const [chave, tempo] of ultimasMensagensTexto) if (agora - tempo > 10000) ultimasMensagensTexto.delete(chave);
   }
-
-  // 1. Deduplicação por ID oficial da Meta
-  if (mensagensTratadas.has(msg.id)) return true;
-  mensagensTratadas.set(msg.id, agora);
-
-  // 2. Deduplicação por texto recente do mesmo telefone (janela de 3 segundos para evitar retransmissões duplas da rede)
-  if (msg.type === 'text' && typeof msg.text?.body === 'string') {
-    const chaveTexto = `${msg.from}:${msg.text.body.trim().toLowerCase()}`;
-    const ultimoEnvio = ultimasMensagensTexto.get(chaveTexto);
-    if (ultimoEnvio && agora - ultimoEnvio < 3000) {
-      console.log(`🛡️ [DEDUPLICAÇÃO] Mensagem repetida ignorada de ${msg.from}: "${msg.text.body}"`);
-      return true;
-    }
-    ultimasMensagensTexto.set(chaveTexto, agora);
-  }
-
-  return false;
+  const chave = `${msg.from}:${msg.text.body.trim().toLowerCase()}`;
+  const anterior = ultimasMensagensTexto.get(chave);
+  ultimasMensagensTexto.set(chave, agora);
+  return anterior !== undefined && agora - anterior < 3000;
 }
 
-async function processarMensagem(msg) {
-  const tel = msg.from;
-  try {
-    mensageiro.registrar(tel, msg.id);
-    await mensageiro.digitando(tel);
-    if (msg.type !== 'text') return await enviarTexto(tel, 'Por enquanto eu só consigo ler mensagens de texto. Pode escrever pra mim? 🙂');
-    const resposta = await responderNaFila(tel, msg.text.body); // uma de cada vez por pessoa
-    await enviarTexto(tel, resposta);
-    console.log(`💬 ${tel}: ${msg.text.body}\n🤖 ${resposta}\n`);
-  } catch (e) {
-    console.error('erro ao responder', tel, e);
-  }
-}
+// Notificações do painel também passam pela saída durável (reenvio automático se falhar).
+const notificar = criarNotificador(async (para, texto, chave) => {
+  const { mensagem } = await apiBot.criarSaida({ telefone: para, texto, chave });
+  if (mensagem.status === 'enviada') return { repetido: true };
+  return { enviado: await caixa.enviar(mensagem) };
+});
 
-// ---------------------------------------------------------------- idempotência de notificações
-const notificar = criarNotificador(enviarTexto);
+// Retoma entradas paradas e reenvia saídas vencidas (bot reiniciado, IA, API ou Meta fora do ar).
+const retomar = () => caixa.retomar().catch(erro => console.error(JSON.stringify({ evento: 'retomada_indisponivel', erro: erro.message })));
+setTimeout(retomar, 5000).unref();
+setInterval(retomar, 15000).unref();
 
 function lerCorpo(req, res, tratarCorpo) {
   const partes = [];
@@ -136,7 +113,7 @@ createServer((req, res) => {
 
   // cada mensagem nova chega num POST
   if (req.method === 'POST' && url.pathname === '/webhook') {
-    lerCorpo(req, res, (bruto) => {
+    lerCorpo(req, res, async (bruto) => {
       if (!assinaturaValida(bruto, req.headers['x-hub-signature-256'], WHATSAPP_APP_SECRET)) {
         res.writeHead(401).end();
         return;
@@ -144,19 +121,26 @@ createServer((req, res) => {
       let corpo;
       try { corpo = JSON.parse(bruto); } catch { res.writeHead(400).end(); return; }
       if (!corpo || typeof corpo !== 'object' || (corpo.entry !== undefined && !Array.isArray(corpo.entry))) { res.writeHead(400).end(); return; }
-      res.writeHead(200).end();
-      for (const e of corpo.entry ?? []) {
-        for (const c of (Array.isArray(e?.changes) ? e.changes : [])) {
-          for (const m of (Array.isArray(c?.value?.messages) ? c.value.messages : [])) {
-            if (!m) continue;
-            // Deduplica IMEDIATAMENTE antes de enfileirar qualquer processamento
-            if (jaProcessada(m)) continue;
-            console.log(`📩 [WhatsApp] Mensagem recebida de ${m.from}: "${m.text?.body || m.type}"`);
-            tratar(m);
-          }
-        }
-      }
+      const mensagens = (corpo.entry ?? [])
+        .flatMap(e => (Array.isArray(e?.changes) ? e.changes : []))
+        .flatMap(c => (Array.isArray(c?.value?.messages) ? c.value.messages : []))
+        .filter(m => m && typeof m.id === 'string' && /^\d{10,15}$/.test(m.from ?? '') && !repetidaPelaRede(m));
       // c.value.statuses (enviada, entregue, lida) chega aqui também e é ignorado de propósito
+      let novas;
+      try {
+        novas = await caixa.receber(mensagens);
+      } catch (erro) {
+        // Sem gravar não confirmamos: a Meta reenvia o webhook mais tarde.
+        console.error(JSON.stringify({ evento: 'webhook_nao_gravado', erro: erro.message }));
+        res.writeHead(503).end();
+        return;
+      }
+      res.writeHead(200).end();
+      for (const entrada of novas) {
+        mensageiro.registrar(entrada.telefone, entrada.wa_message_id);
+        console.log(`📩 [WhatsApp] Mensagem recebida de ${entrada.telefone}: "${entrada.texto ?? entrada.tipo}"`);
+        tratar(entrada);
+      }
     });
     return;
   }
@@ -189,6 +173,3 @@ createServer((req, res) => {
 
 
 
-const reconciliarPedidos = () => sincronizarPedidosPendentes().catch(erro => console.error('Falha na reconciliação de pedidos:', erro.message));
-reconciliarPedidos();
-setInterval(reconciliarPedidos, 60000).unref();

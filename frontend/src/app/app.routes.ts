@@ -50,9 +50,14 @@ export const routes: Routes = [
   },
   {
     path: 'configuracoes',
-    canActivate: [authGuard],
+    canActivate: [authGuard, adminGuard],
     children: [
       { path: '', redirectTo: 'horarios', pathMatch: 'full' },
+      {
+        path: 'empresa',
+        loadComponent: () =>
+          import('./pages/configuracoes/empresa.component').then((m) => m.EmpresaComponent),
+      },
       {
         path: 'horarios',
         loadComponent: () =>

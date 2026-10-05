@@ -28,6 +28,7 @@ check() { [[ "$(cfg "$1")" =~ $2 ]] || fail "valor inválido em empresa.env: $1"
 check SLUG '^[a-z][a-z0-9-]{1,30}$'
 check DOMAIN '^[a-z0-9]([a-z0-9-]*\.)+[a-z]{2,}$'
 check ADMIN_EMAIL '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$'
+check ALERTA_EMAIL '^([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+)?$'
 check BOT_PORT '^(3[1-9][0-9]{2}|[4-9][0-9]{3})$'
 check EMPRESA_NOME '^[^"\\$`]{3,120}$'
 check EMPRESA_TELEFONE '^[0-9 ()+-]{0,25}$'
@@ -119,7 +120,7 @@ create_env() {
         log 'Arquivo .env da API (Laravel)'
         # shellcheck disable=SC1090
         ( set -a; source "$STATE"; set +a
-          DOMAIN="$DOMAIN" BOT_PORT="$BOT_PORT" EMPRESA_NOME="$(cfg EMPRESA_NOME)" TARGET="$BASE/shared/.env" \
+          DOMAIN="$DOMAIN" BOT_PORT="$BOT_PORT" EMPRESA_NOME="$(cfg EMPRESA_NOME)" ALERTA_EMAIL="$(cfg ALERTA_EMAIL)" TARGET="$BASE/shared/.env" \
           EXAMPLE="$HERE/env.example" python3 - <<'PY'
 import base64, os
 e = os.environ
@@ -133,6 +134,9 @@ values = {
     'CACHE_STORE': 'file', 'QUEUE_CONNECTION': 'sync',
     'BOT_URL': 'http://127.0.0.1:' + e['BOT_PORT'], 'NOTIFICACAO_TOKEN': e['NOTIFICACAO_TOKEN'],
     'CORS_ALLOWED_ORIGINS': 'https://' + e['DOMAIN'], 'EMPRESA_NOME': '"%s"' % e['EMPRESA_NOME'],
+    # Alertas por e-mail pelo Postfix local da VPS (o mesmo do PropoClient), remetente do domínio com SPF/DKIM.
+    'ALERTA_EMAIL': e['ALERTA_EMAIL'], 'MAIL_MAILER': 'smtp', 'MAIL_URL': '"smtp://127.0.0.1:25?auto_tls=false"',
+    'MAIL_HOST': '127.0.0.1', 'MAIL_PORT': '25', 'MAIL_FROM_ADDRESS': '"noreply@propoclient.com.br"', 'MAIL_FROM_NAME': '"BotClient"',
 }
 lines, seen = open(e['EXAMPLE'], encoding='utf-8').read().splitlines(), set()
 for i, line in enumerate(lines):
@@ -169,8 +173,6 @@ NOTIFICACAO_TOKEN=$NOTIFICACAO_TOKEN
 EMPRESA_NOME="$(cfg EMPRESA_NOME)"
 EMPRESA_TELEFONE="$(cfg EMPRESA_TELEFONE)"
 EMPRESA_TELEFONE_2="$(cfg EMPRESA_TELEFONE_2)"
-ARQ_MEMORIA=$BASE/shared/bot/memoria.json
-ARQ_PEDIDOS=$BASE/shared/bot/pedidos.json
 ARQ_LOG=$BASE/shared/bot/conversas.log
 ARQ_NEGOCIO=$BASE/shared/bot/negocio.md
 LOG_RETENCAO_DIAS=30
@@ -252,6 +254,13 @@ HOOK
     printf '%s ALL=(root) NOPASSWD: /usr/local/bin/botclient-reload\n' "$user" > "/etc/sudoers.d/botclient-$user"
     chmod 440 "/etc/sudoers.d/botclient-$user"
     visudo -cq -f "/etc/sudoers.d/botclient-$user"
+}
+
+configure_cron() {
+    log 'Agendador do Laravel (verificação de saúde e alertas a cada 5 minutos)'
+    # flock na mesma trava do deploy: não roda no meio de uma publicação.
+    printf '%s\n' "* * * * * flock -n $BASE/.release.lock sh -c 'cd $BASE/current && $PHP artisan schedule:run' >> $BASE/shared/storage/logs/scheduler.log 2>&1" \
+        | crontab -u "$(site_user)" -
 }
 
 issue_certificate() {
@@ -364,6 +373,7 @@ install_node
 create_layout
 create_env
 create_service_and_hooks
+configure_cron
 issue_certificate
 configure_web
 log "Base pronta. Usuário de publicação: $(site_user)"

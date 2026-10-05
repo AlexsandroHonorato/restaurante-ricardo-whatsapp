@@ -19,9 +19,11 @@
     </div>
 
     <div class="header-actions">
-      <button class="btn btn-primary" (click)="abrirModalNovo()">
-        <app-icon nome="adicionar" /> Novo Prato / Item
-      </button>
+      @if (ehAdmin()) {
+        <button class="btn btn-primary" (click)="abrirModalNovo()">
+          <app-icon nome="adicionar" /> Novo Prato / Item
+        </button>
+      }
       <button
         class="refresh-btn glass-card"
         (click)="carregarCardapio()"
@@ -92,23 +94,25 @@
                   }}</span>
                 </button>
 
-                <button
-                  class="action-icon-btn edit"
-                  (click)="abrirModalEditar(prod, cat.id)"
-                  [attr.aria-label]="'Editar ' + prod.nome"
-                  title="Editar Prato"
-                >
-                  <app-icon nome="editar" />
-                </button>
+                @if (ehAdmin()) {
+                  <button
+                    class="action-icon-btn edit"
+                    (click)="abrirModalEditar(prod, cat.id)"
+                    [attr.aria-label]="'Editar ' + prod.nome"
+                    title="Editar Prato"
+                  >
+                    <app-icon nome="editar" />
+                  </button>
 
-                <button
-                  class="action-icon-btn delete"
-                  (click)="confirmarExcluir(prod)"
-                  [attr.aria-label]="'Excluir ' + prod.nome"
-                  title="Excluir Prato"
-                >
-                  <app-icon nome="excluir" />
-                </button>
+                  <button
+                    class="action-icon-btn delete"
+                    (click)="confirmarExcluir(prod)"
+                    [attr.aria-label]="'Excluir ' + prod.nome"
+                    title="Excluir Prato"
+                  >
+                    <app-icon nome="excluir" />
+                  </button>
+                }
               </div>
             </div>
           } @empty {

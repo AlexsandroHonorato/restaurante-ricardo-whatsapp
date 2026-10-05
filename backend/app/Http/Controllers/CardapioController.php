@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Categoria;
 use App\Models\Produto;
 use App\Models\ProdutoVariacao;
+use App\Support\DiasCardapio;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -53,9 +54,16 @@ class CardapioController extends Controller
             ->orderBy('ordem_exibicao', 'ASC')
             ->get();
 
+        // Só o que pode ser pedido hoje vai com preço e código; o resto vira uma linha com os dias
+        // (menos tokens por mensagem na IA, e a API recusa esses itens hoje de qualquer forma).
         $linhas = [];
+        $outrosDias = [];
         foreach ($categorias as $cat) {
-            if ($cat->produtos->isEmpty()) {
+            $deHoje = $cat->produtos->filter(fn ($prod) => DiasCardapio::disponivelHoje($prod->dias_disponiveis));
+            foreach ($cat->produtos->diff($deHoje) as $prod) {
+                $outrosDias[] = "• {$prod->nome} — ".DiasCardapio::descrever($prod->dias_disponiveis);
+            }
+            if ($deHoje->isEmpty()) {
                 continue;
             }
 
@@ -64,17 +72,21 @@ class CardapioController extends Controller
                 $linhas[] = "_{$cat->descricao}_";
             }
 
-            foreach ($cat->produtos as $prod) {
+            foreach ($deHoje as $prod) {
                 $variacoesStr = [];
                 foreach ($prod->variacoes as $v) {
                     $precoFmt = 'R$ '.number_format((float) $v->preco, 2, ',', '.');
-                    $variacoesStr[] = "{$v->tamanho}: {$precoFmt}";
+                    // O código identifica o tamanho no pedido: a API busca preço e disponibilidade por ele.
+                    $variacoesStr[] = "{$v->tamanho}: {$precoFmt} [cod {$v->id}]";
                 }
                 $varTexto = ! empty($variacoesStr) ? implode(' | ', $variacoesStr) : 'Preço sob consulta';
-                $diasTexto = $prod->dias_disponiveis && $prod->dias_disponiveis !== 'todos' ? " [Disponível: {$prod->dias_disponiveis}]" : '';
                 $descTexto = $prod->descricao ? " ({$prod->descricao})" : '';
-                $linhas[] = "• **{$prod->nome}**{$descTexto}{$diasTexto} — {$varTexto}";
+                $linhas[] = "• **{$prod->nome}**{$descTexto} — {$varTexto}";
             }
+        }
+        if ($outrosDias) {
+            $linhas[] = "\n### SÓ EM OUTROS DIAS (não aceite pedido hoje; informe os dias se perguntarem)";
+            array_push($linhas, ...$outrosDias);
         }
 
         $textoCompleto = implode("\n", $linhas);
@@ -187,16 +199,20 @@ class CardapioController extends Controller
             ]));
 
             if ($request->has('variacoes')) {
-                // Substitui ou sincroniza variações
-                $produto->variacoes()->delete();
+                // Mantém o ID de cada tamanho que continua existindo: o bot usa esse ID como código do item.
+                $existentes = $produto->variacoes()->get()->keyBy(fn ($v) => mb_strtolower(trim($v->tamanho)));
+                $mantidos = [];
                 foreach ($request->variacoes as $v) {
-                    ProdutoVariacao::create([
-                        'produto_id' => $produto->id,
-                        'tamanho' => $v['tamanho'],
-                        'preco' => $v['preco'],
-                        'ativo' => isset($v['ativo']) ? (bool) $v['ativo'] : true,
-                    ]);
+                    $dados = ['tamanho' => trim($v['tamanho']), 'preco' => $v['preco'], 'ativo' => isset($v['ativo']) ? (bool) $v['ativo'] : true];
+                    $atual = $existentes->get(mb_strtolower(trim($v['tamanho'])));
+                    if ($atual) {
+                        $atual->update($dados);
+                        $mantidos[] = $atual->id;
+                    } else {
+                        $mantidos[] = $produto->variacoes()->create($dados)->id;
+                    }
                 }
+                $produto->variacoes()->whereNotIn('id', $mantidos)->delete();
             }
 
             return response()->json([
