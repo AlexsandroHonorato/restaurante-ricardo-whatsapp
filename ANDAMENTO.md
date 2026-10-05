@@ -674,3 +674,9 @@ Alterações desta etapa ainda sem novo commit.
 - Causa: cada guarda de rota chamava `AuthService.check()`, que sempre ia à API (`/auth/csrf` + `/auth/me`). O caminho `/` → página inicial → `/configuracoes` → `/configuracoes/dashboard` passa por 4 guardas = 8 chamadas em sequência logo depois do login (que já trouxe o usuário). O layout (menu/cabeçalho) aparece assim que o login responde e dispara as próprias consultas; no `php artisan serve` (uma requisição por vez no Windows) tudo enfileira. Medido: ~60 ms por chamada isolada.
 - Correção: `check()` responde na hora quando o usuário já é conhecido (login ou sessão já conferida); só a primeira abertura (F5) consulta a API, e consultas simultâneas compartilham a mesma ida (`shareReplay`). Sessão expirada continua sendo detectada pelo interceptor no primeiro 401/419. Rotas com `withPreloading(PreloadAllModules)`: telas baixadas em segundo plano. Depois do login: 2 chamadas (csrf + login) em vez de 10 antes do Dashboard.
 - Testes: Angular 82 (2 novos: sem chamadas extras após login; consultas simultâneas viram uma); build OK. Não medido no navegador. Sem commit.
+
+## 62. Skills do projeto (.skills) — 04/10/2026
+
+- Usuário adicionou `.skills/` (21 skills, 38 MB: design, marca, slides, UI, segurança/pentest com Strix e OWASP) e cópias das 9 skills de segurança em `.agents/rules/`; pediu para carregá-las e para ignorar `.skills` no git.
+- O Claude Code só carrega skills de projeto de `.claude/skills/`. Criado `.claude/skills` como junction (atalho de pasta do Windows) para `.skills` — sem duplicar arquivos. `.gitignore`: `.skills/` e `.claude/skills`. Nada da pasta tinha sido versionado.
+- As skills aparecem ao abrir uma nova sessão do Claude Code. Observações: `impeccable` e `impeccable-copilot` usam o mesmo `name: impeccable`; uma skill tem `name: Security Scan` (com espaço/maiúsculas, fora do padrão). As cópias em `.agents/rules/` não são carregadas (são skills, não subagentes).

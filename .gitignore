@@ -23,6 +23,9 @@ Thumbs.db
 # Editores e IDEs
 .vscode/
 .idea/
+.skills/
+# Atalho (junction) para .skills, por onde o Claude Code carrega as skills do projeto
+.claude/skills
 *.suo
 *.ntvs*
 *.njsproj
