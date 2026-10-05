@@ -503,7 +503,7 @@
 }
 
 .data-table th {
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-muted);
   font-weight: 600;
@@ -512,9 +512,14 @@
 }
 
 .data-table td {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
+}
+/* Selo de status e código não quebram linha dentro da célula. */
+.data-table app-pedido-status,
+.data-table .code-cell {
+  white-space: nowrap;
 }
 
 .data-table tr:hover {
@@ -592,8 +597,32 @@
   white-space: nowrap;
 }
 
+/* Ações em uma linha, centralizadas na altura e com o mesmo tamanho (antes cada botão tinha uma altura). */
 .action-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   white-space: nowrap;
+}
+.action-cell .btn {
+  height: 32px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.action-cell .btn:hover {
+  transform: none;
+}
+.action-cell .imprimir {
+  width: 32px;
+  padding: 0;
+}
+.action-cell app-icon {
+  transform: scale(0.8);
 }
 
 .btn-xs {
@@ -604,6 +633,9 @@
 }
 
 .delivered-mini {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
   color: #34d399;
   font-size: 0.75rem;
   font-weight: 600;
